@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "scene": "ending",
+  "camera": {
+    "fov": 35,
+    "position": [
+      0,
+      0,
+      9
+    ],
+    "lookAt": [
+      0,
+      0,
+      0
+    ]
+  },
+  "background": "#14110d",
+  "lights": {
+    "ambient": {
+      "color": "#fff1dc",
+      "intensity": 0.6
+    },
+    "directional": {
+      "color": "#ffe6c2",
+      "intensity": 1.4,
+      "position": [
+        3,
+        5,
+        6
+      ]
+    }
+  },
+  "frame": {
+    "mode": "3d",
+    "color": "#8a6a2f",
+    "backColor": "#2a2118",
+    "size": [
+      6,
+      4,
+      1
+    ],
+    "border": 0.3,
+    "planeDepth": -0.6,
+    "metalness": 0.6,
+    "roughness": 0.35,
+    "backRoughness": 0.9
+  },
+  "slots": {
+    "slotA": {
+      "position": [
+        -1.8,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "autoFit": true,
+      "fitSize": 1.2
+    },
+    "slotB": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "autoFit": true,
+      "fitSize": 1.2
+    },
+    "slotC": {
+      "position": [
+        1.8,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "autoFit": true,
+      "fitSize": 1.2
+    }
+  },
+  "reveal": {
+    "fadeDuration": 1.5,
+    "textDelay": 1
+  },
+  "specimen": {
+    "emissiveIntensity": 0.25,
+    "roughness": 0.45,
+    "metalness": 0.1
+  }
+}

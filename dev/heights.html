@@ -1,0 +1,27 @@
+<!doctype html><html><body><script type="module">
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+import { acceleratedRaycast, computeBoundsTree } from 'three-mesh-bvh'
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree
+THREE.Mesh.prototype.raycast = acceleratedRaycast
+// 采样碰撞体高度：在给定矩形区域内按网格采样，输出高度分布（选水面高度用）
+const q = new URLSearchParams(location.search)
+const cfg = await (await fetch(`/src/config/scenes/${q.get('s')}.json`)).json()
+const loader = new GLTFLoader(); const d = new DRACOLoader(); d.setDecoderPath('/draco/'); loader.setDRACOLoader(d)
+const g = new THREE.Group(); g.scale.setScalar(cfg.env.scale); g.position.fromArray(cfg.env.position)
+const src = q.get('model') === '1' ? cfg.env.model : cfg.env.collider
+g.add((await loader.loadAsync(src)).scene); g.updateMatrixWorld(true)
+g.traverse(m => m.isMesh && m.geometry.computeBoundsTree())
+const ray = new THREE.Raycaster(); ray.firstHitOnly = true
+const h = (x, z) => { ray.set(new THREE.Vector3(x, 1e3, z), new THREE.Vector3(0, -1, 0)); return ray.intersectObject(g, true)[0]?.point.y ?? null }
+const out = {}
+for (const [name, x0, z0, x1, z1] of JSON.parse(q.get('regions'))) {
+  const v = []
+  for (let x = x0; x <= x1; x += 0.5) for (let z = z0; z <= z1; z += 0.5) { const y = h(x, z); if (y !== null) v.push(y) }
+  v.sort((a, b) => a - b)
+  const p = (t) => v[Math.floor(t * (v.length - 1))]?.toFixed(2)
+  out[name] = { n: v.length, min: p(0), p10: p(0.1), p50: p(0.5), p90: p(0.9), max: p(1) }
+}
+window.__info = out; window.__ready = true
+</script></body></html>

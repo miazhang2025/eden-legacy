@@ -1,0 +1,43 @@
+<!doctype html><html><body style="margin:0;background:#222;color:#fff;font:12px sans-serif">
+<canvas id="c" width="1500" height="1500"></canvas>
+<script type="module">
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+// 材质总览：每个 material name 单独渲染一格，标注名字、mesh 数、尺寸（场景归一化后的单位）
+const q = new URLSearchParams(location.search)
+const cfg = await (await fetch(`/src/config/scenes/${q.get('s')}.json`)).json()
+const loader = new GLTFLoader(); const d = new DRACOLoader(); d.setDecoderPath('/draco/'); loader.setDRACOLoader(d)
+const gltf = await loader.loadAsync(cfg.env.model)
+const root = new THREE.Group(); root.scale.setScalar(cfg.env.scale); root.add(gltf.scene); root.updateMatrixWorld(true)
+const byMat = new Map()
+root.traverse(o => { if (!o.isMesh) return; const k = o.material.name || '(unnamed)'; if (!byMat.has(k)) byMat.set(k, []); byMat.get(k).push(o) })
+const names = [...byMat.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+const COLS = 6, CELL = 250, ROWS = Math.ceil(names.length / COLS)
+const canvas = document.getElementById('c'); canvas.height = ROWS * CELL
+const renderer = new THREE.WebGLRenderer({ canvas, preserveDrawingBuffer: true, antialias: true })
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setScissorTest(true)
+const labels = []
+names.forEach((name, i) => {
+  const meshes = byMat.get(name)
+  const scene = new THREE.Scene(); scene.background = new THREE.Color('#333')
+  scene.add(new THREE.HemisphereLight('#fff', '#555', 3))
+  const box = new THREE.Box3()
+  for (const m of meshes) { const c = m.clone(); c.applyMatrix4(m.matrixWorld.clone().multiply(m.matrix.clone().invert())); c.matrix.copy(m.matrixWorld); c.matrixAutoUpdate = false; scene.add(c); box.expandByObject(m) }
+  const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3())
+  const r = size.length() / 2 || 1
+  const cam = new THREE.PerspectiveCamera(35, 1, r * 0.01, r * 20)
+  cam.position.copy(center).add(new THREE.Vector3(1, 0.8, 1.2).normalize().multiplyScalar(r * 2.6)); cam.lookAt(center)
+  const x = (i % COLS) * CELL, y = Math.floor(i / COLS) * CELL
+  renderer.setViewport(x, canvas.height - y - CELL, CELL, CELL); renderer.setScissor(x, canvas.height - y - CELL, CELL, CELL)
+  renderer.render(scene, cam)
+  labels.push({ x, y, text: `${name} · ${meshes.length}mesh · ${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)}`, alpha: meshes[0].material.transparent || meshes[0].material.alphaTest > 0 })
+})
+const out = document.createElement('canvas'); out.width = canvas.width; out.height = canvas.height
+const ctx = out.getContext('2d'); ctx.drawImage(canvas, 0, 0)
+ctx.font = 'bold 14px sans-serif'
+for (const l of labels) { ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(l.x, l.y, CELL, 22); ctx.fillStyle = l.alpha ? '#ff0' : '#fff'; ctx.fillText(l.text, l.x + 4, l.y + 16) }
+document.body.innerHTML = ''; document.body.appendChild(out); out.id = 'out'
+window.__info = { count: names.length }
+window.__ready = true
+</script></body></html>

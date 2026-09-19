@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "scene": "ocean",
+  "camera": {
+    "fov": 45,
+    "near": 0.1,
+    "far": 300,
+    "followDistance": 6,
+    "followHeight": 2.2,
+    "lookAtOffset": 1.2,
+    "damping": 0.12,
+    "rotateSpeed": 0.005,
+    "pitchMin": -0.2,
+    "pitchMax": 0.9,
+    "minGroundClearance": 0.4,
+    "occlusionPadding": 0.3,
+    "minDistance": 0.5,
+    "initialPitch": 0.25
+  },
+  "env": {
+    "model": "/models/env/ocean.glb",
+    "collider": "/models/colliders/ocean.glb",
+    "scale": 1.51,
+    "position": [
+      -3.06,
+      1.55,
+      7.37
+    ],
+    "rotationY": 0
+  },
+  "character": {
+    "moveSpeed": 3.2,
+    "sprintMultiplier": 1.8,
+    "turnSpeed": 10,
+    "radius": 0.35,
+    "height": 1.7,
+    "color": "#e0f0ff",
+    "spawn": [
+      20,
+      0,
+      -11
+    ],
+    "spawnYaw": 1.5708,
+    "stepHeight": 0.45,
+    "maxDrop": 1.2,
+    "groundSmoothing": 0.08
+  },
+  "render": {
+    "exposure": 1,
+    "pixelRatioMax": 2
+  },
+  "background": "#0f2438",
+  "fog": {
+    "type": "exp2",
+    "color": "#1b3a5c",
+    "density": 0.025,
+    "near": 10,
+    "far": 80
+  },
+  "lights": {
+    "ambient": {
+      "color": "#3f5f8a",
+      "intensity": 0.5
+    },
+    "directional": {
+      "color": "#b9d9ff",
+      "intensity": 1.2,
+      "position": [
+        8,
+        14,
+        6
+      ]
+    },
+    "points": []
+  },
+  "bounds": {
+    "min": [
+      -35,
+      -20,
+      -35
+    ],
+    "max": [
+      35,
+      40,
+      35
+    ]
+  },
+  "materials": {},
+  "audio": {
+    "master": {
+      "volume": 1,
+      "mute": false
+    },
+    "ambience": {
+      "volume": 0.8,
+      "mute": false,
+      "fadeIn": 2,
+      "fadeOut": 1.5
+    },
+    "sfx": {
+      "volume": 1,
+      "mute": false,
+      "collectVolume": 0.9
+    }
+  },
+  "placeholder": {
+    "groundColor": "#2b4a66",
+    "groundSize": 60,
+    "zoneColor": "#ffffff",
+    "zoneOpacity": 0,
+    "assetRoughness": 0.45,
+    "assetMetalness": 0.1
+  },
+  "flow": {
+    "zoneCenter": [
+      9,
+      0,
+      -12
+    ],
+    "zoneRadius": 6,
+    "proximity": 2.2,
+    "othersFadeOut": true,
+    "selectGlowDuration": 0.8,
+    "fadeDuration": 1.2,
+    "resolveDelay": 0.6,
+    "idleEmissive": 0,
+    "activeEmissive": 0.6,
+    "inspectEmissive": 1.4,
+    "selectedEmissive": 4,
+    "breatheSpeed": 1.6,
+    "floatAmplitude": 0.12,
+    "floatSpeed": 1.1,
+    "clickDragThreshold": 6,
+    "breatheDepth": 0.25,
+    "emissiveDamping": 0.15,
+    "spinSpeed": 0.3,
+    "assetLift": 0.8
+  },
+  "mobile": {
+    "pixelRatioMax": 1.5,
+    "joystickRadius": 56,
+    "joystickSensitivity": 1,
+    "lookSensitivity": 1.6
+  }
+}

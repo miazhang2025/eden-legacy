@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "scene": "global",
+  "transition": {
+    "fadeOut": 0.6,
+    "fadeIn": 0.8,
+    "color": "#000000"
+  },
+  "quality": {
+    "desktopDefault": "high",
+    "mobileDefault": "low",
+    "tiers": {
+      "low": {
+        "pixelRatioMax": 1.25,
+        "water": "low",
+        "windLayers": 1,
+        "sss": "off",
+        "crystal": "none",
+        "shadows": "off",
+        "shadowMapSize": 512,
+        "particles": 0.4,
+        "post": "basic"
+      },
+      "mid": {
+        "pixelRatioMax": 1.5,
+        "water": "mid",
+        "windLayers": 2,
+        "sss": "single",
+        "crystal": "main",
+        "shadows": "on",
+        "shadowMapSize": 1024,
+        "particles": 0.7,
+        "post": "mid"
+      },
+      "high": {
+        "pixelRatioMax": 2,
+        "water": "high",
+        "windLayers": 3,
+        "sss": "full",
+        "crystal": "all",
+        "shadows": "soft",
+        "shadowMapSize": 2048,
+        "particles": 1,
+        "post": "full"
+      }
+    },
+    "frameGuard": {
+      "enabled": true,
+      "targetFpsDesktop": 60,
+      "targetFpsMobile": 30,
+      "threshold": 0.8,
+      "window": 2,
+      "warmup": 3
+    }
+  }
+}

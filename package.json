@@ -1,0 +1,49 @@
+{
+  "name": "eden-legacy",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "models": "node scripts/optimize-models.mjs",
+    "bake:theatre": "node scripts/bake-theatre.ts",
+    "check:bundle": "node scripts/check-bundle.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
+    "@react-three/postprocessing": "2.19",
+    "detect-gpu": "^5.0.70",
+    "postprocessing": "^6.39.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.4",
+    "three": "^0.172.0",
+    "three-custom-shader-material": "^6.4.0",
+    "three-mesh-bvh": "^0.8.3",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.5.0",
+    "@gltf-transform/core": "^4.5.0",
+    "@gltf-transform/extensions": "^4.5.0",
+    "@gltf-transform/functions": "^4.5.0",
+    "@theatre/core": "^0.7.2",
+    "@theatre/r3f": "^0.7.2",
+    "@theatre/studio": "^0.7.2",
+    "@tweakpane/core": "^2.0.5",
+    "@tweakpane/plugin-essentials": "^0.2.1",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@types/three": "^0.172.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "draco3dgltf": "^1.5.7",
+    "meshoptimizer": "^1.2.0",
+    "tweakpane": "^4.0.5",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.0"
+  }
+}

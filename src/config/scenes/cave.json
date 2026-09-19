@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "scene": "cave",
+  "camera": {
+    "fov": 45,
+    "near": 0.1,
+    "far": 300,
+    "followDistance": 6,
+    "followHeight": 2.2,
+    "lookAtOffset": 1.2,
+    "damping": 0.12,
+    "rotateSpeed": 0.005,
+    "pitchMin": -0.2,
+    "pitchMax": 0.9,
+    "minGroundClearance": 0.4,
+    "occlusionPadding": 0.3,
+    "minDistance": 0.5,
+    "initialPitch": 0.25
+  },
+  "env": {
+    "model": "/models/env/garden.glb",
+    "collider": "/models/colliders/garden.glb",
+    "scale": 7.18,
+    "position": [
+      21.46,
+      -10.91,
+      -14.59
+    ],
+    "rotationY": 0
+  },
+  "character": {
+    "moveSpeed": 3.2,
+    "sprintMultiplier": 1.8,
+    "turnSpeed": 10,
+    "radius": 0.35,
+    "height": 1.7,
+    "color": "#e8e0ff",
+    "spawn": [
+      -1,
+      0,
+      22
+    ],
+    "spawnYaw": 0,
+    "stepHeight": 0.45,
+    "maxDrop": 1.2,
+    "groundSmoothing": 0.08
+  },
+  "render": {
+    "exposure": 1,
+    "pixelRatioMax": 2
+  },
+  "background": "#1a1430",
+  "fog": {
+    "type": "exp2",
+    "color": "#2a1f4d",
+    "density": 0.025,
+    "near": 10,
+    "far": 80
+  },
+  "lights": {
+    "ambient": {
+      "color": "#4a3f7a",
+      "intensity": 0.5
+    },
+    "directional": {
+      "color": "#cbb9ff",
+      "intensity": 1.2,
+      "position": [
+        8,
+        14,
+        6
+      ]
+    },
+    "points": []
+  },
+  "bounds": {
+    "min": [
+      -19,
+      -20,
+      -28
+    ],
+    "max": [
+      21,
+      40,
+      30
+    ]
+  },
+  "materials": {},
+  "audio": {
+    "master": {
+      "volume": 1,
+      "mute": false
+    },
+    "ambience": {
+      "volume": 0.8,
+      "mute": false,
+      "fadeIn": 2,
+      "fadeOut": 1.5
+    },
+    "sfx": {
+      "volume": 1,
+      "mute": false,
+      "collectVolume": 0.9
+    }
+  },
+  "placeholder": {
+    "groundColor": "#3a3150",
+    "groundSize": 60,
+    "zoneColor": "#ffffff",
+    "zoneOpacity": 0,
+    "assetRoughness": 0.45,
+    "assetMetalness": 0.1
+  },
+  "flow": {
+    "zoneCenter": [
+      -14,
+      0,
+      5
+    ],
+    "zoneRadius": 7,
+    "proximity": 2.2,
+    "othersFadeOut": true,
+    "selectGlowDuration": 0.8,
+    "fadeDuration": 1.2,
+    "resolveDelay": 0.6,
+    "idleEmissive": 0,
+    "activeEmissive": 0.6,
+    "inspectEmissive": 1.4,
+    "selectedEmissive": 4,
+    "breatheSpeed": 1.6,
+    "floatAmplitude": 0.12,
+    "floatSpeed": 1.1,
+    "clickDragThreshold": 6,
+    "breatheDepth": 0.25,
+    "emissiveDamping": 0.15,
+    "spinSpeed": 0.3,
+    "assetLift": 0.8
+  },
+  "mobile": {
+    "pixelRatioMax": 1.5,
+    "joystickRadius": 56,
+    "joystickSensitivity": 1,
+    "lookSensitivity": 1.6
+  }
+}

@@ -1,0 +1,55 @@
+<!doctype html><html><body style="margin:0;background:#111">
+<canvas id="c" width="1000" height="1000" style="position:absolute"></canvas>
+<canvas id="o" width="1000" height="1000" style="position:absolute"></canvas>
+<script type="module">
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+import { acceleratedRaycast, computeBoundsTree } from 'three-mesh-bvh'
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree
+THREE.Mesh.prototype.raycast = acceleratedRaycast
+const q = new URLSearchParams(location.search)
+const cfg = await (await fetch(`/src/config/scenes/${q.get('s')}.json`)).json()
+const loader = new GLTFLoader(); const d = new DRACOLoader(); d.setDecoderPath('/draco/'); loader.setDRACOLoader(d)
+const wrap = (o) => { const g = new THREE.Group(); g.scale.setScalar(cfg.env.scale); g.position.fromArray(cfg.env.position); g.rotation.y = cfg.env.rotationY; g.add(o); g.updateMatrixWorld(true); return g }
+const render = wrap((await loader.loadAsync(cfg.env.model)).scene)
+const col = wrap((await loader.loadAsync(cfg.env.collider)).scene)
+col.traverse(o => o.isMesh && o.geometry.computeBoundsTree())
+const HALF = +(q.get('half') || 32)
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), preserveDrawingBuffer: true })
+renderer.outputColorSpace = THREE.SRGBColorSpace
+const scene = new THREE.Scene(); scene.add(render); scene.add(new THREE.HemisphereLight('#fff', '#555', 3))
+const cam = new THREE.OrthographicCamera(-HALF, HALF, HALF, -HALF, 0.1, 500); cam.position.set(0, 200, 0); cam.up.set(0, 0, -1); cam.lookAt(0, 0, 0)
+renderer.render(scene, cam)
+// 可达区域 flood fill（与 CharacterController 同规则）
+const ray = new THREE.Raycaster(); ray.firstHitOnly = true
+const ground = (x, z, fromY, far) => { ray.set(new THREE.Vector3(x, fromY, z), new THREE.Vector3(0, -1, 0)); ray.far = far; const h = ray.intersectObject(col, true)[0]; return h ? h.point.y : null }
+const c = cfg.character, STEP = 0.5
+const toPx = (x, z) => [(x + HALF) / (2 * HALF) * 1000, (z + HALF) / (2 * HALF) * 1000]
+const ctx = document.getElementById('o').getContext('2d')
+const sx = +(q.get('x') ?? c.spawn[0]), sz = +(q.get('z') ?? c.spawn[2])
+const sy = ground(sx, sz, 1e4, Infinity)
+const seen = new Map(); const key = (i, j) => i + ',' + j
+const queue = []
+if (sy !== null) { queue.push([Math.round(sx / STEP), Math.round(sz / STEP), sy]); seen.set(key(queue[0][0], queue[0][1]), sy) }
+while (queue.length) {
+  const [i, j, y] = queue.shift()
+  for (const [di, dj] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const ni = i + di, nj = j + dj, k = key(ni, nj)
+    if (seen.has(k) || Math.abs(ni * STEP) > HALF || Math.abs(nj * STEP) > HALF) continue
+    const g = ground(ni * STEP, nj * STEP, y + c.stepHeight, c.stepHeight + c.maxDrop)
+    if (g === null) continue
+    seen.set(k, g); queue.push([ni, nj, g])
+  }
+}
+ctx.fillStyle = 'rgba(0,255,120,0.28)'
+for (const k of seen.keys()) { const [i, j] = k.split(',').map(Number); const [px, pz] = toPx(i * STEP - STEP / 2, j * STEP - STEP / 2); ctx.fillRect(px, pz, 1000 / (2 * HALF) * STEP + 0.5, 1000 / (2 * HALF) * STEP + 0.5) }
+ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif'
+for (let v = -HALF; v <= HALF; v += 5) { const [p] = toPx(v, 0); ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, 1000); ctx.stroke(); ctx.fillText(v, p + 2, 12); ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(1000, p); ctx.stroke(); ctx.fillText(v, 2, p - 2) }
+const dot = (x, z, color, r = 6) => { const [px, pz] = toPx(x, z); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(px, pz, r, 0, 7); ctx.fill() }
+dot(sx, sz, '#ff0')
+const f = cfg.flow; const [zx, zz] = toPx(f.zoneCenter[0], f.zoneCenter[2]); ctx.strokeStyle = '#f0f'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(zx, zz, f.zoneRadius / (2 * HALF) * 1000, 0, 7); ctx.stroke()
+for (const p of JSON.parse(q.get('assets') || '[]')) dot(p[0], p[1], '#0ff', 5)
+window.__info = { reachableCells: seen.size, spawnGround: sy }
+window.__ready = true
+</script></body></html>
