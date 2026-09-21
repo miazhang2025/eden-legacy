@@ -1,5 +1,5 @@
 // 环境模型处理流水线（spec §4.3）
-//   art/env/<name>.glb  ──►  public/models/env/<name>.glb        渲染用：Draco + WebP（KTX2 待装 toktx 后替换）
+//   art/env/<name>.glb  ──►  public/models/env/<name>.glb        渲染用：Draco + KTX2（ETC1S；没装 KTX-Software 时回落 WebP）
 //                       └─►  public/models/colliders/<name>.glb  碰撞用：只留地形类大物体，减面 ≥90%，无材质贴图
 //
 // 用法：npm run models            处理 art/env 下全部模型
@@ -15,6 +15,19 @@ import {
 import draco3d from 'draco3dgltf'
 import { MeshoptSimplifier } from 'meshoptimizer'
 import sharp from 'sharp'
+import { checkKTXSoftware, toktx } from '@gltf-transform/cli'
+import { bakeGrassMask } from './bake-grass-mask.mjs'
+
+// KTX-Software 的 bin 目录（默认装在 ~/tools/KTX，可用环境变量 KTX_BIN 覆盖）
+const KTX_BIN = process.env.KTX_BIN ?? join(process.env.USERPROFILE ?? process.env.HOME ?? '', 'tools', 'KTX', 'bin')
+process.env.PATH = `${KTX_BIN}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}`
+let hasKTX = false
+try {
+  await checkKTXSoftware({ debug() {}, info() {}, warn() {}, error() {} })
+  hasKTX = true
+} catch {
+  console.warn('⚠ 没找到 KTX-Software（ktx / toktx），贴图回落为 WebP：下载体积会变小，但显存占用不降。')
+}
 
 const SRC = 'art/env'
 const OUT_RENDER = 'public/models/env'
@@ -54,7 +67,10 @@ async function buildRender(src, name) {
     instance({ min: 2 }),
     weld(),
     prune(),
-    textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 85 }),
+    // KTX2 / ETC1S：GPU 端保持压缩格式，显存约为未压缩的 1/5（spec §12.3 纹理预算）
+    hasKTX
+      ? toktx({ encoder: sharp, mode: 'etc1s', quality: 200, compression: 2 })
+      : textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 85 }),
     draco(),
   )
   const out = join(OUT_RENDER, `${name}.glb`)
@@ -127,5 +143,7 @@ for (const f of files) {
   console.log(`  collider → ${col.out}  ${mb(statSync(col.out).size)}  ${Math.round(col.triangles)} 三角面`)
   console.log(`    保留 ${col.kept.length} 个 mesh：${col.kept.join(', ')}`)
   console.log(`    排除 ${col.dropped.length} 个（小物件/水面）`)
+  const grass = await bakeGrassMask(await io.read(src), name, OUT_RENDER)
+  if (grass) console.log(`  grass    → ${grass.png}  草地覆盖 ${(grass.coverage * 100).toFixed(0)}%`)
 }
 

@@ -5,12 +5,13 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { acceleratedRaycast, computeBoundsTree } from 'three-mesh-bvh'
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree
 THREE.Mesh.prototype.raycast = acceleratedRaycast
 const q = new URLSearchParams(location.search)
 const cfg = await (await fetch(`/src/config/scenes/${q.get('s')}.json`)).json()
-const loader = new GLTFLoader(); const d = new DRACOLoader(); d.setDecoderPath('/draco/'); loader.setDRACOLoader(d)
+const loader = new GLTFLoader(); const d = new DRACOLoader(); d.setDecoderPath('/draco/'); loader.setDRACOLoader(d); loader.setKTX2Loader(new KTX2Loader().setTranscoderPath('/basis/').detectSupport(new THREE.WebGLRenderer()))
 const wrap = (o) => { const g = new THREE.Group(); g.scale.setScalar(cfg.env.scale); g.position.fromArray(cfg.env.position); g.rotation.y = cfg.env.rotationY; g.add(o); g.updateMatrixWorld(true); return g }
 const render = wrap((await loader.loadAsync(cfg.env.model)).scene)
 const col = wrap((await loader.loadAsync(cfg.env.collider)).scene)

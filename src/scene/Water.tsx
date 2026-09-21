@@ -6,7 +6,7 @@ import { isTouchMode } from '../input/useInput'
 import { MAX_DEPTH, bakeDepthMap, createWaterMaterial, createWaterUniforms } from '../materials/WaterMaterial'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
 import { capQuality, useTier } from '../state/useQualityStore'
-import { hasCollider } from './collision'
+import { hasCollider, setWalkPlane } from './collision'
 import { LAYER_VEGETATION } from './envMaterials'
 
 const DEG = Math.PI / 180
@@ -14,6 +14,13 @@ const DEG = Math.PI / 180
 // 水面平面（spec §5.2C）。三个场景都可以有，由各自 config 的 water.enabled 控制。
 export function Water() {
   const enabled = useSceneCfg((c) => c.water.enabled)
+  const walkable = useSceneCfg((c) => c.water.walkable)
+  const level = useSceneCfg((c) => c.water.level)
+  // 走水：水面作为可站立的地面（spec §15-B 决定：ocean 浮岛之间可以走水）
+  useEffect(() => {
+    setWalkPlane(enabled && walkable ? level : null)
+    return () => setWalkPlane(null)
+  }, [enabled, walkable, level])
   if (!enabled) return null
   return <WaterSurface />
 }
@@ -106,6 +113,8 @@ function WaterSurface() {
     u.uDepthBounds.value.set(cx - c.size / 2, cz - c.size / 2, c.size, c.size)
     u.uMaxDepth.value = MAX_DEPTH
     material.roughness = c.roughness
+    // 环境反射也随 reflectionIntensity 缩放（没有海底的开放水面，全强度反射会把远处水面冲成天空色）
+    material.envMapIntensity = c.reflectionIntensity
 
     const m = mesh.current
     if (reflector && m) {

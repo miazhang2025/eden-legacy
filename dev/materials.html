@@ -4,10 +4,11 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 // 材质总览：每个 material name 单独渲染一格，标注名字、mesh 数、尺寸（场景归一化后的单位）
 const q = new URLSearchParams(location.search)
 const cfg = await (await fetch(`/src/config/scenes/${q.get('s')}.json`)).json()
-const loader = new GLTFLoader(); const d = new DRACOLoader(); d.setDecoderPath('/draco/'); loader.setDRACOLoader(d)
+const loader = new GLTFLoader(); const d = new DRACOLoader(); d.setDecoderPath('/draco/'); loader.setDRACOLoader(d); loader.setKTX2Loader(new KTX2Loader().setTranscoderPath('/basis/').detectSupport(new THREE.WebGLRenderer()))
 const gltf = await loader.loadAsync(cfg.env.model)
 const root = new THREE.Group(); root.scale.setScalar(cfg.env.scale); root.add(gltf.scene); root.updateMatrixWorld(true)
 const byMat = new Map()

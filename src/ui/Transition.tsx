@@ -26,6 +26,9 @@ export const useTransition = create<TransitionState>()((set, get) => ({
   reveal: () => set({ covered: false, busy: false }),
 }))
 
+// DEV：暴露给自动化测试脚本
+if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__transition = useTransition
+
 /** 2D 页面挂载即 reveal；3D 页面在 Canvas 内容就绪后调用 */
 export function useRevealOnMount() {
   useEffect(() => {

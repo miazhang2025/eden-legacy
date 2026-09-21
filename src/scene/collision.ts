@@ -22,19 +22,32 @@ export function registerCollider(root: Object3D) {
 
 export const hasCollider = () => colliders.length > 0
 
+/** 可行走的水面高度（water.walkable 时由 Water.tsx 设置），null = 水面不能走 */
+let walkPlane: number | null = null
+export function setWalkPlane(level: number | null) {
+  walkPlane = level
+}
+
 const ray = new Raycaster()
 ray.firstHitOnly = true
 const DOWN = new Vector3(0, -1, 0)
 const origin = new Vector3()
 
-/** 从 (x, fromY, z) 向下找地面，返回地面高度；maxDist 内未命中返回 null */
-export function groundHeight(x: number, z: number, fromY: number, maxDist = Infinity): number | null {
+/** 只看地形：从 (x, fromY, z) 向下找碰撞体，maxDist 内未命中返回 null */
+export function terrainHeight(x: number, z: number, fromY: number, maxDist = Infinity): number | null {
   if (!colliders.length) return 0
   origin.set(x, fromY, z)
   ray.set(origin, DOWN)
   ray.far = maxDist
   const hit = ray.intersectObjects(colliders, true)[0]
   return hit ? hit.point.y : null
+}
+
+/** 可站立的地面：地形与可行走水面中较高的那个（水面在 [fromY - maxDist, fromY] 内才算） */
+export function groundHeight(x: number, z: number, fromY: number, maxDist = Infinity): number | null {
+  const t = terrainHeight(x, z, fromY, maxDist)
+  if (walkPlane === null || walkPlane > fromY || walkPlane < fromY - maxDist) return t
+  return t === null ? walkPlane : Math.max(t, walkPlane)
 }
 
 /** 从高处向下找地面（用于出生点、资产贴地） */

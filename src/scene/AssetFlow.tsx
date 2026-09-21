@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { AudioBus } from '../audio/AudioBus'
+import { triggerConfirmGust } from '../materials/uniforms'
 import type { SceneId } from '../config/schema'
 import { assetsForScene } from '../data/assets'
 import { assetTransform } from '../state/useAssetOverrides'
@@ -39,6 +40,8 @@ export function AssetFlow({ sceneId }: { sceneId: SceneId }) {
       if (s.phase === 'INSPECTING' && s.assetId !== prev.assetId) AudioBus.playSfx('assetNear')
       if (s.phase === 'CONFIRMED' && s.assetId) {
         AudioBus.playSfx('collect')
+        // 采集确认时刮一阵风（spec §5.2A）
+        triggerConfirmGust()
         useRunStore.getState().select(sceneId, s.assetId)
         const f = getSceneCfg().flow
         const total = f.selectGlowDuration + f.fadeDuration + f.resolveDelay

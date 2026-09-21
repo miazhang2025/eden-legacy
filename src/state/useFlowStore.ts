@@ -48,3 +48,6 @@ export const useFlowStore = create<FlowState>()((set, get) => ({
   },
   exit: () => set({ phase: 'EXIT' }),
 }))
+
+// DEV：暴露给自动化测试脚本
+if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__flowStore = useFlowStore

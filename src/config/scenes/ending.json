@@ -94,11 +94,107 @@
   },
   "reveal": {
     "fadeDuration": 1.5,
-    "textDelay": 1
+    "textDelay": 1,
+    "boxScaleFrom": 0.82,
+    "boxDuration": 1.4,
+    "specimenDuration": 0.9,
+    "specimenStagger": 0.35,
+    "specimenFrom": [
+      0,
+      0.45,
+      -0.6
+    ]
   },
   "specimen": {
     "emissiveIntensity": 0.25,
     "roughness": 0.45,
-    "metalness": 0.1
+    "metalness": 0.1,
+    "hoverEmissive": 0.9
+  },
+  "interaction": {
+    "yawLimitDeg": 25,
+    "pitchLimitDeg": 12,
+    "dragSensitivity": 0.2,
+    "damping": 0.18,
+    "zoomMin": 0.75,
+    "zoomMax": 1.25,
+    "zoomSpeed": 0.0012,
+    "returnDelay": 4,
+    "idleSwayDeg": 1.5,
+    "idleSwaySpeed": 0.35
+  },
+  "photo": {
+    "scale": 2,
+    "margin": 80,
+    "background": "#14110d",
+    "borderWidth": 2,
+    "borderColor": "#8a6a2f",
+    "includeText": true,
+    "titleSize": 44,
+    "descSize": 18,
+    "textColor": "#f4efe6",
+    "descColor": "#bfb7aa",
+    "textGap": 40,
+    "includeLogo": false,
+    "logo": "/2d/logo.png",
+    "logoSize": 96
+  },
+  "environment": {
+    "intensity": 1.1,
+    "rotationY": 0,
+    "topColor": "#e8dcc8",
+    "bottomColor": "#2a2018",
+    "keyIntensity": 6,
+    "keySize": 5
+  },
+  "shadows": {
+    "enabled": true,
+    "bias": -0.0008,
+    "normalBias": 0.02,
+    "radius": 3,
+    "cameraSize": 6,
+    "cameraFar": 40
+  },
+  "post": {
+    "enabled": true,
+    "toneMapping": "aces",
+    "bloom": {
+      "enabled": true,
+      "intensity": 0.5,
+      "threshold": 0.85,
+      "smoothing": 0.3,
+      "radius": 0.55
+    },
+    "vignette": {
+      "enabled": true,
+      "offset": 0.25,
+      "darkness": 0.7
+    },
+    "chromaticAberration": {
+      "enabled": false,
+      "offset": 0.0006
+    },
+    "dof": {
+      "enabled": false,
+      "focusDistance": 9,
+      "focalLength": 4,
+      "bokehScale": 2
+    },
+    "noise": {
+      "enabled": true,
+      "opacity": 0.03
+    },
+    "grade": {
+      "enabled": true,
+      "hue": 0,
+      "saturation": 0.04,
+      "contrast": 0.06,
+      "brightness": 0
+    },
+    "ssao": {
+      "enabled": false,
+      "intensity": 1.5,
+      "radius": 0.3
+    }
   }
 }

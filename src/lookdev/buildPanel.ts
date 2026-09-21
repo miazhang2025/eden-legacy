@@ -10,7 +10,7 @@ import {
   MATERIAL_FIELDS,
   isLeaf,
   type ArrayLeaf,
-  type ConfigId,
+  type StoreId,
   type Leaf,
   type MaterialOverride,
 } from '../config/schema'
@@ -28,7 +28,7 @@ interface SyncEntry {
 }
 
 export interface BuildContext {
-  id: ConfigId
+  id: StoreId
   getConfig(): Json
   update(recipe: (draft: Json) => void): void
   /** 结构变化（增删数组项、材质表变化）时整体重建面板 */

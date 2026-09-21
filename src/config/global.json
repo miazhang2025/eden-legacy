@@ -19,6 +19,7 @@
         "shadows": "off",
         "shadowMapSize": 512,
         "particles": 0.4,
+        "grass": 0.2,
         "post": "basic"
       },
       "mid": {
@@ -30,6 +31,7 @@
         "shadows": "on",
         "shadowMapSize": 1024,
         "particles": 0.7,
+        "grass": 0.5,
         "post": "mid"
       },
       "high": {
@@ -41,6 +43,7 @@
         "shadows": "soft",
         "shadowMapSize": 2048,
         "particles": 1,
+        "grass": 1,
         "post": "full"
       }
     },

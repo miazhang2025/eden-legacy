@@ -7,6 +7,7 @@ import { createCrystalMaterial } from '../materials/CrystalMaterial'
 import { shared } from '../materials/uniforms'
 import { bakeVegetationAttributes, createVegetationMaterial, vegetationVertexShader } from '../materials/VegetationMaterial'
 import { patchCaustics } from '../materials/caustics'
+import { patchPond } from '../materials/pond'
 import { useSceneCfg } from '../state/useConfigStore'
 import { useTier } from '../state/useQualityStore'
 import {
@@ -99,6 +100,7 @@ export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
     return r
   }, [collected, overrides])
   const rolesKey = JSON.stringify(roles)
+  const pondMaterial = cfg.pond.material
   const stiffness = cfg.wind.stiffnessSource
   const thickness = cfg.sss.thicknessSource
 
@@ -143,7 +145,11 @@ export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
         c.meshes.forEach((mesh, i) => assign.push({ mesh, material: c.originals[i], layer: 0, visible: !waterEnabled }))
       } else {
         // 静态：水下地形投射焦散（uniform 控制开关，未开水面时不生效）
-        for (const s of c.sources) patchCaustics(s)
+        for (const s of c.sources) {
+          patchCaustics(s)
+          // 贴图池塘：只给画有池塘的那张地形材质打补丁（开关由 uniform 控制）
+          if (c.name === pondMaterial) patchPond(s)
+        }
         c.meshes.forEach((mesh, i) => assign.push({ mesh, material: c.originals[i], layer: 0, visible: true }))
       }
 
@@ -162,7 +168,7 @@ export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
     return { entries, emitters, assign, created }
     // rolesKey 代表 roles 的内容
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collected, rolesKey, stiffness, thickness, waterEnabled])
+  }, [collected, rolesKey, stiffness, thickness, waterEnabled, pondMaterial])
   const entries = plan.entries
 
   useLayoutEffect(() => {

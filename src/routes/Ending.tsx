@@ -5,7 +5,13 @@ import { AudioBus } from '../audio/AudioBus'
 import { copy } from '../data/copy'
 import { resolveBox } from '../data/specimenBoxes'
 import { exportPhoto } from '../ending/ExportPhoto'
+import { BoxInteraction } from '../ending/BoxInteraction'
+import { EndingStage } from '../ending/EndingStage'
+import { startReveal } from '../ending/reveal'
+import { PostFX } from '../scene/PostFX'
 import { SpecimenBox } from '../ending/SpecimenBox'
+import { SpecimenTooltip } from '../ending/SpecimenTooltip'
+import { useEndingUi } from '../ending/useEndingUi'
 import { ALL_COMBOS, selectionsForCombo } from '../data/specimenBoxes'
 import { RegisterCanvas } from '../scene/activeCanvas'
 import { useConfigStore, useEndingCfg } from '../state/useConfigStore'
@@ -33,14 +39,16 @@ function EndingInner() {
   }, [box])
   const camera = useEndingCfg((c) => c.camera)
   const background = useEndingCfg((c) => c.background)
-  const lights = useEndingCfg((c) => c.lights)
   const reveal = useEndingCfg((c) => c.reveal)
+  const post = useEndingCfg((c) => c.post)
   const [gl, setGl] = useState<RootState['gl'] | null>(null)
+  const exporting = useEndingUi((s) => s.exporting)
   const [shown, setShown] = useState(false)
   const [textShown, setTextShown] = useState(false)
 
   useEffect(() => {
     useConfigStore.getState().setActive('ending')
+    startReveal()
     AudioBus.playAmbience('ending')
     AudioBus.playSfx('boxReveal')
     const a = requestAnimationFrame(() => setShown(true))
@@ -69,6 +77,7 @@ function EndingInner() {
         style={{ opacity: shown ? 1 : 0, transitionDuration: `${reveal.fadeDuration}s` }}
       >
         <Canvas
+          shadows
           camera={{ fov: camera.fov, position: camera.position }}
           gl={{ antialias: true, preserveDrawingBuffer: true }}
           onCreated={(s) => {
@@ -77,14 +86,12 @@ function EndingInner() {
           }}
         >
           <color attach="background" args={[background]} />
-          <ambientLight color={lights.ambient.color} intensity={lights.ambient.intensity} />
-          <directionalLight
-            color={lights.directional.color}
-            intensity={lights.directional.intensity}
-            position={lights.directional.position}
-          />
-          <SpecimenBox selections={selections} />
+          <EndingStage />
+          <BoxInteraction>
+            <SpecimenBox selections={selections} />
+          </BoxInteraction>
           <RegisterCanvas />
+          <PostFX post={post} />
           {TheatreEndingEditor && (
             <Suspense fallback={null}>
               <TheatreEndingEditor />
@@ -93,13 +100,18 @@ function EndingInner() {
         </Canvas>
       </div>
       <footer className={`ending__actions ${textShown ? 'is-visible' : ''}`}>
-        <button className="btn" disabled={!gl} onClick={() => gl && exportPhoto(gl, box.id)}>
+        <button
+          className="btn"
+          disabled={!gl || exporting}
+          onClick={() => void exportPhoto(box, useConfigStore.getState().endingEffective.photo)}
+        >
           {copy('ending.button.export')}
         </button>
         <button className="btn btn--primary" onClick={restart}>
           {copy('ending.button.restart')}
         </button>
       </footer>
+      <SpecimenTooltip />
       {TheatreSaveButton && (
         <Suspense fallback={null}>
           <TheatreSaveButton id="ending" />

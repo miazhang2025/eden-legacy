@@ -21,14 +21,17 @@ const lastValid = new Vector3()
  *  - 前方膝盖高度的短射线命中碰撞体 → 阻挡（墙、岩石）
  *  - 目标点向下射线在 [当前+stepHeight, 当前-maxDrop] 内未命中 → 阻挡（陡坡过高 / 悬崖边 / 地形外）
  */
-function tryMove(dx: number, dz: number, c: SceneConfig['character']): number | null {
+function tryMove(dx: number, dz: number, c: SceneConfig['character'], w: SceneConfig['water']): number | null {
   const len = Math.hypot(dx, dz)
   if (len < 1e-6) return null
   const p = rig.position
   stepDir.set(dx / len, 0, dz / len)
   probe.set(p.x, p.y + c.stepHeight + 0.05, p.z)
   if (isBlocked(probe, stepDir, len + c.radius)) return null
-  return groundHeight(p.x + dx, p.z + dz, p.y + c.stepHeight, c.stepHeight + c.maxDrop)
+  const g = groundHeight(p.x + dx, p.z + dz, p.y + c.stepHeight, c.stepHeight + c.maxDrop)
+  // 水深超过 blockDepth 的区域不可进入（浅水 / 汀步可以走）
+  if (g !== null && w.enabled && w.blockDepth > 0 && w.level - g > w.blockDepth) return null
+  return g
 }
 
 // 第三人称角色：射线贴地 + 手写碰撞 + bounds clamp（spec §5.1 / §6.1）
@@ -69,12 +72,12 @@ export function CharacterController() {
       dir.normalize().multiplyScalar(speed * dt)
 
       // 先试整步，不行再沿单轴滑动（贴墙走）
-      if (tryMove(dir.x, dir.z, c) !== null) {
+      if (tryMove(dir.x, dir.z, c, cfg.water) !== null) {
         rig.position.x += dir.x
         rig.position.z += dir.z
-      } else if (tryMove(dir.x, 0, c) !== null) {
+      } else if (tryMove(dir.x, 0, c, cfg.water) !== null) {
         rig.position.x += dir.x
-      } else if (tryMove(0, dir.z, c) !== null) {
+      } else if (tryMove(0, dir.z, c, cfg.water) !== null) {
         rig.position.z += dir.z
       }
 

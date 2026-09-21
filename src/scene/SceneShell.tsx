@@ -9,6 +9,15 @@ import { isTouchMode, useInputListeners } from '../input/useInput'
 import { useConfigStore, useSceneCfg } from '../state/useConfigStore'
 import { useDebugStore } from '../state/useDebugStore'
 import { RegisterCanvas } from './activeCanvas'
+import { SharedUniformDriver } from '../materials/uniforms'
+import { FrameGuard, useTier } from '../state/useQualityStore'
+import { LAYER_PARTICLES, LAYER_VEGETATION } from './envMaterials'
+import { Lighting } from './Lighting'
+import { Grass } from './Grass'
+import { Particles } from './Particles'
+import { Sky } from './Sky'
+import { PostFX } from './PostFX'
+import { Water } from './Water'
 import { AssetInfoCard } from '../ui/AssetInfoCard'
 import { CollectPrompt } from '../ui/CollectPrompt'
 import { useTransition } from '../ui/Transition'
@@ -27,10 +36,10 @@ function RevealWhenReady() {
   return null
 }
 
+/** 背景 / 雾 / 曝光（灯光与环境光见 Lighting.tsx） */
 function Atmosphere() {
   const background = useSceneCfg((c) => c.background)
   const fog = useSceneCfg((c) => c.fog)
-  const lights = useSceneCfg((c) => c.lights)
   const exposure = useSceneCfg((c) => c.render.exposure)
   const gl = useThree((s) => s.gl)
 
@@ -43,22 +52,6 @@ function Atmosphere() {
       <color attach="background" args={[background]} />
       {fog.type === 'exp2' && <fogExp2 key="exp2" attach="fog" args={[fog.color, fog.density]} />}
       {fog.type === 'linear' && <fog key="linear" attach="fog" args={[fog.color, fog.near, fog.far]} />}
-      <ambientLight color={lights.ambient.color} intensity={lights.ambient.intensity} />
-      <directionalLight
-        color={lights.directional.color}
-        intensity={lights.directional.intensity}
-        position={lights.directional.position}
-      />
-      {lights.points.map((l) => (
-        <pointLight
-          key={l.name}
-          color={l.color}
-          intensity={l.intensity}
-          distance={l.distance}
-          decay={l.decay}
-          position={l.position}
-        />
-      ))}
     </>
   )
 }
@@ -103,21 +96,39 @@ export function SceneShell({ sceneId }: { sceneId: SceneId }) {
   const fov = useConfigStore((s) => s.configs[sceneId].camera.fov)
   const touch = isTouchMode()
   const freeFly = useDebugStore((s) => s.freeFly)
-  // 移动端 pixelRatio 上限单独控制（完整质量档位见 M5 / spec §12）
-  const pixelRatioMax = useConfigStore((s) =>
+  const tier = useTier()
+  // pixelRatio 上限：取质量档位与场景 config（桌面 render / 移动端 mobile）中较小的（spec §12.1）
+  const configMax = useConfigStore((s) =>
     touch ? s.configs[sceneId].mobile.pixelRatioMax : s.configs[sceneId].render.pixelRatioMax,
   )
+  const pixelRatioMax = Math.min(configMax, tier.pixelRatioMax)
 
   // 等 store 切到本场景后再挂载子组件（子组件通过 useSceneCfg 读当前场景）
   if (current !== sceneId) return null
 
   return (
     <div className="scene-root">
-      <Canvas dpr={[1, pixelRatioMax]} camera={{ fov }} gl={{ antialias: true }}>
+      <Canvas
+        dpr={[1, pixelRatioMax]}
+        camera={{ fov }}
+        gl={{ antialias: true }}
+        shadows
+        onCreated={({ camera }) => {
+          // 主相机看得到植被层与粒子层（实时反射相机默认只看地形层）
+          camera.layers.enable(LAYER_VEGETATION)
+          camera.layers.enable(LAYER_PARTICLES)
+        }}
+      >
         <Suspense fallback={null}>
           {/* 渲染顺序：环境 → 地形 → 水面 → 粒子 → 角色 → 采集资产 → 后处理 */}
+          <SharedUniformDriver />
           <Atmosphere />
+          <Sky />
+          <Lighting />
           <Terrain />
+          <Grass />
+          <Water />
+          <Particles />
           <CollectZone />
           <CharacterController />
           {/* DEV 调试：自由飞行相机替代跟随相机 */}
@@ -125,6 +136,8 @@ export function SceneShell({ sceneId }: { sceneId: SceneId }) {
           <AssetFlow sceneId={sceneId} />
           <InputBinder />
           <RegisterCanvas />
+          <FrameGuard />
+          <PostFX />
           <RevealWhenReady />
         </Suspense>
         {TheatreSceneEditor && (

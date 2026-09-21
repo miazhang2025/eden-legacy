@@ -10,7 +10,7 @@ import {
   Vector2,
   Vector4,
 } from 'three'
-import { groundHeight } from '../scene/collision'
+import { terrainHeight } from '../scene/collision'
 import { createCSM, type EdenCSM } from './csm'
 import { shared } from './uniforms'
 import noise from './chunks/noise.glsl?raw'
@@ -150,7 +150,7 @@ export function bakeDepthMap(level: number, cx: number, cz: number, size: number
     for (let i = 0; i < res; i++) {
       const x = x0 + ((i + 0.5) / res) * size
       const z = z0 + ((j + 0.5) / res) * size
-      const g = groundHeight(x, z, level + 0.01, MAX_DEPTH)
+      const g = terrainHeight(x, z, level + 0.01, MAX_DEPTH)
       const depth = g === null ? MAX_DEPTH : Math.max(0, level - g)
       const k = (j * res + i) * 4
       data[k] = Math.round((depth / MAX_DEPTH) * 255)

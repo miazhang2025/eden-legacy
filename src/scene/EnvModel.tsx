@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
+import { useThree } from '@react-three/fiber'
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { Mesh, type Group, type Material, type Object3D, type Texture } from 'three'
 import { useConfigStore, useSceneCfg } from '../state/useConfigStore'
 import { registerCollider } from './collision'
@@ -9,6 +11,17 @@ import { useEnvMaterials } from './envMaterials'
 export const DRACO_PATH = `${import.meta.env.BASE_URL}draco/`
 
 const url = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
+
+/** KTX2 / Basis 贴图解码器（自托管 public/basis，全局只建一个，需要渲染器来判断 GPU 支持的压缩格式） */
+let ktx2: KTX2Loader | null = null
+function useKTX2Extension() {
+  const gl = useThree((s) => s.gl)
+  ktx2 ??= new KTX2Loader().setTranscoderPath(`${import.meta.env.BASE_URL}basis/`).detectSupport(gl)
+  // drei 的 GLTFLoader 类型来自 three-stdlib，只声明用到的方法
+  return (loader: { setKTX2Loader(l: never): unknown }) => {
+    loader.setKTX2Loader(ktx2 as never)
+  }
+}
 
 /** 场景切换时释放 GPU 资源并清出 useGLTF 缓存，避免三个场景叠加爆显存（spec §12.3） */
 function useDisposeOnUnmount(path: string, root: Object3D) {
@@ -39,7 +52,7 @@ export function useEnvTransform() {
 
 /** 渲染用环境模型 */
 export function EnvModel({ path }: { path: string }) {
-  const { scene } = useGLTF(url(path), DRACO_PATH)
+  const { scene } = useGLTF(url(path), DRACO_PATH, undefined, useKTX2Extension())
   const t = useEnvTransform()
   const sceneId = useConfigStore((s) => s.scene)
   useDisposeOnUnmount(path, scene)
@@ -71,7 +84,10 @@ export function ColliderModel({ path }: { path: string }) {
   )
 }
 
+/**
+ * Landing 期间预热：只预取文件进 HTTP 缓存。
+ * （useGLTF.preload 需要在有渲染器时才能配置 KTX2 解码器，Landing 是纯 2D 页面，没有渲染器）
+ */
 export function preloadEnv(model: string, collider: string) {
-  if (model) useGLTF.preload(url(model), DRACO_PATH)
-  if (collider) useGLTF.preload(url(collider), DRACO_PATH)
+  for (const p of [model, collider]) if (p) void fetch(url(p)).catch(() => {})
 }

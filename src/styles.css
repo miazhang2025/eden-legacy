@@ -283,3 +283,42 @@ body,
   flex-direction: column;
   gap: 6px;
 }
+
+/* ---------- Ending：标本提示框 ---------- */
+.ending__stage canvas {
+  touch-action: none;
+  cursor: grab;
+}
+.ending__stage canvas:active {
+  cursor: grabbing;
+}
+.specimen-tooltip {
+  position: fixed;
+  z-index: 50;
+  max-width: min(280px, 60vw);
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid rgba(244, 239, 230, 0.18);
+  backdrop-filter: blur(8px);
+  transform: translate(14px, 14px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.specimen-tooltip.is-visible {
+  opacity: 1;
+}
+.specimen-tooltip strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 17px;
+  letter-spacing: 0.12em;
+}
+.specimen-tooltip span {
+  color: var(--fg-dim);
+  font-size: 13px;
+  line-height: 1.7;
+}

@@ -201,6 +201,8 @@ interface CollectableAssetDef {
 
 **关于 garden 的池塘**：slide 原写「无水体、无水面反射」，作废。garden.glb 里的池塘按完整水体处理（反射 + 折射 + 焦散，见 §5.2），只是尺度小、反射分辨率可以比 ocean 低。
 
+> **M5 实测更正**：garden.glb 里**没有池塘水面几何，也没有凹陷**。池塘是画在地形贴图上的一块平面（北池塘整片高 1.71，南池塘 1.19–1.21，与周围草地几乎同高）。名为「水」的 mesh 是出生点附近一个竖直的、完全透明（alpha = 0）的物体，与池塘无关。因此 garden 的水面默认关闭，见 §15-H。
+
 **模型处理流水线（已实现：`npm run models`，脚本 `scripts/optimize-models.mjs`）**
 - 原始模型放 `art/env/<scene>.glb`（不进部署包），脚本生成 `public/models/env/<scene>.glb`（渲染）与 `public/models/colliders/<scene>.glb`（碰撞）。
 - 实测：两个模型的高模主要是花草类小物件（单株 2–3 万面），地形本身面数不高。碰撞体按「剔除小物件 + 三角面上限 20k」生成，而非固定减面 90%；与渲染模型的高度差 p95 < 2cm。
@@ -310,6 +312,19 @@ src/materials/
 
 - cave 的晶簇、ocean 的贝壳/晶体用：`transmission` + `thickness` + `ior` + `attenuationColor`，加一层假内部辉光（fresnel × emissive）。
 - transmission 是真贵的那个，只给**数量少、体积大**的主体晶体用；小碎晶用不透明 + 高 envMapIntensity 伪装。这条是硬规则。
+
+### 5.2b 已实现（M5）
+
+- **材质角色**：模型材质名没有按 `veg_` / `crystal_` / `water_` 前缀导出，所以角色做成 config 字段 `materials.<name>.role`（`static | vegetation | crystal | water | emitter`），面板里每个材质有 role 下拉框；没配时按名字前缀推断。当前分类：
+  - garden / cave：7、13、14、16–20、22、25、28–30、42–52、stem = vegetation；其余 static。
+  - ocean：9–13（玻璃球 / 玻璃管）、16（巨贝）、19–20（水晶簇）= crystal；14、15、24–36（珊瑚 / 海葵）= vegetation；21–23（细丝喷发）= emitter；其余 static。
+- **emitter**：隐藏模型里的几何，取包围盒中心作为发射点，交给 `role: modelEmitters` 的粒子池。
+- **植被**：风动三层 + 假 SSS 都在 `VegetationMaterial`；阴影深度材质带同样的风动位移，阴影会跟着摆。柔软度 / 厚度在加载时烘成顶点属性（没有顶点色时按 mesh 内世界高度归一化）。
+- **晶体**：是否 transmission 由档位与尺寸决定（包围盒最长边 ≥ `crystal.mainMinSize` 算主体）。
+- **水面**：`Water.tsx` 是一张平面；水深来自一次性从碰撞体烘的高度图（不需要每帧深度 pass）；mid 起用 three 的 Reflector 做平面反射（反射相机只看第 0 层 = 地形，植被在第 1 层、粒子在第 2 层）；high 用 physical transmission 做屏幕空间折射，并给静态地形材质注入焦散。
+- **环境光**：默认程序化（渐变天空球 + 主光方向的亮斑，渲染一次成环境贴图，不需要下载）；`environment.mode = 'hdri'` 时读 `public/hdri/` 下的文件。
+- **引导**：`beaconZone`（采集区中心的发光粒子团）与 `beaconAsset`（进入采集区后四个资产周围点亮）两个粒子池，强度随距离与流程阶段变化（config `beacon` 段）。采集确认时 `burst` 池在被选资产处爆发一次，同时刮一阵风（`wind.confirmGust*`）。
+- 各效果的 `enabled` 开关、档位上限都能在面板调；`quality` 字段目前只有水面有（其它效果由全局档位表控制）。
 
 ### 5.3 粒子系统（自研，WebGL）
 
@@ -423,6 +438,9 @@ IDLE → PROMPTED → INSPECTING(assetId) → CONFIRMED(assetId) → RESOLVED �
    - slot 与场景的映射固定：`slotA = cave, slotB = ocean, slotC = garden`（不随选择变化）；
    - 每个资产用它的 `specimenScale` 而不是场景里的 scale。
 3. 标本盒整体淡入 → 显示标本盒名称 + 一句简短描述。
+
+**已实现（M6）**：入场是自己写的时间线（`ending/reveal.ts`，不用 Theatre 时间轴，见 ADR-003）：画布 CSS 淡入 → 标本盒从 `reveal.boxScaleFrom` 放到 1 → 三件标本按 `specimenStagger` 依次从 `specimenFrom` 偏移落位并淡入 → `textDelay` 后文字与按钮淡入。
+Ending 页有自己的灯光舞台（`ending/EndingStage.tsx`）：影棚式上下渐变环境贴图 + 主光方向的柔光板（渲染一次），主光投影（标本在背板上落影），以及独立的后处理段 `post`（与场景共用 `PostFX`，配置分开）。相关参数在 `ending.json` 的 `reveal` / `environment` / `shadows` / `post` 段。
 4. 结束：出现「导出照片」和「重新开始」。
 
 ### 8.2 标本盒命名与变体规则（`data/specimenBoxes.ts`）
@@ -457,6 +475,8 @@ interface BoxResult {
 - 鼠标 hover 单个标本 → 显示该资产的名称/描述小 tooltip。
 - 2D 部分：画框外的版式、文字、按钮都是 DOM 层，3D canvas 嵌在中间区域。
 
+**已实现（M6）**：`ending/BoxInteraction.tsx` 包住标本盒——拖拽旋转 yaw / pitch 各限制在 ±N 度（`interaction.yawLimitDeg / pitchLimitDeg`），滚轮沿视线方向缩放（`zoomMin / zoomMax`），带阻尼；松手 `returnDelay` 秒后缓慢回正；静止时轻微呼吸摆动（`idleSwayDeg`）。悬停标本显示名称 / 描述提示框并增强自发光（`specimen.hoverEmissive`）；触屏上点按切换提示框。参数都在 `ending.json` 的 `interaction` / `specimen` 段，面板可调。
+
 ### 8.4 照片导出 `ExportPhoto.ts`
 
 - renderer 用 `preserveDrawingBuffer: true`（或导出时手动 `gl.render()` 后立刻 `toDataURL`）。
@@ -467,6 +487,8 @@ interface BoxResult {
   4. `toBlob('image/png')` → 下载，文件名 `specimen-<boxSlug>-<timestamp>.png`；
   5. 恢复 UI。
 - 导出尺寸、边距、是否带文字、是否带 logo 全部进 `ending.json`。
+
+**已实现（M6）**：参数在 `ending.json` 的 `photo` 段（倍率、边距、底色、边框、标题 / 描述字号与颜色、logo 路径与大小）。3D 帧用「临时提高像素比渲染一帧并立刻读取」的方式获取（同一任务内完成，屏幕上看不到放大的画布），不依赖离屏 RT，色调映射与屏幕一致。导出的是当前视角（包括用户拖拽 / 缩放后的状态）。logo 默认关闭（`public/2d/logo.png` 到位后打开 `includeLogo`）。
 
 ---
 
@@ -660,6 +682,8 @@ dev 环境挂 studio → gizmo 拖拽 → 保存 state
 | 粒子数 | ×0.4 | ×0.7 | ×1.0 |
 | 后处理 | bloom + 调色 | + vignette + grain | 全开（含 DOF） |
 
+**已实现（M5）**：档位表在 `src/config/global.json` 的 `quality.tiers`（面板「Global」区块可调、可导出）。判定顺序：`?quality=low|mid|high` 强制（同时锁定，不自动降档）> 设备默认（移动端 `mobileDefault`、桌面 `desktopDefault`）> `detect-gpu` 细化（跑分表自托管在 `public/benchmarks/`，只会往下调）。面板「调试」里可切换档位、关闭自动降档。
+
 ### 12.2 帧率守门
 
 - 目标：桌面 60fps，移动端 30fps。
@@ -726,6 +750,17 @@ dev 环境挂 studio → gizmo 拖拽 → 保存 state
 17. **category key**：`ore / mushroom / shell / fish / flower / butterfly`（蝶蛾归入 `butterfly`）。
 18. **工程**：npm；项目用 git 仓库管理，CI 用 GitHub Actions（至少跑 build + `check:bundle`）；质量档位检测使用 `detect-gpu`。
 19. **引导**：不做光柱，用发光粒子（§5.1）。
+20. **ocean 走水**（§15-B）：浮岛之间可以在水面上走。实现：`water.walkable = true` 时水面作为可站立的地面（地形与水面取高者），水面抬到浮岛底部（`water.level = 0.6`），bounds 扩到覆盖所有浮岛。浮岛整体下移 1.2（`env.position.y = 0.35`），岛底都没入水面 0.36–0.83，看不到水面与岛之间的缝。
+21. **角色 / 尺度**（§15-C/D）：暂保持现状（第三人称胶囊体、按最长边 60 单位归一化）。将来要换第一人称：加一个 `camera.mode: 'third' | 'first'` 与眼睛高度相机即可，移动 / 碰撞 / 采集判定不受影响；需要另定的是鼠标锁定下「点击资产收藏」的交互（准星或按键）。
+22. **KTX2**：已安装 KTX-Software 4.4.2（`~/tools/KTX`，可用环境变量 `KTX_BIN` 覆盖），`npm run models` 输出 ETC1S 贴图。garden 贴图显存约 320MB → 约 40MB。运行时 KTX2 / Basis 解码器自托管在 `public/basis/`。
+23. **garden 池塘**（§15-H）：用 shader 做水，不改模型。地形材质（`pond.material = '8'`）按「与池塘色的距离」生成遮罩，遮罩内叠流动波纹法线、低粗糙度反射、偏水色与菲涅尔天空色。参数在 config `pond` 段。池塘仍可行走（贴图池塘没有深度）。
+25. **garden 程序化草**：一个 draw call 的草叶网格，跟随相机、按世界格对齐（叶子钉在世界里不滑动），位置 / 高度 / 朝向 / 颜色全在 vertex shader 里由格子哈希算出，CPU 每帧只推相机位置。
+    - 哪里长草：`npm run models` 离线从原始地形贴图烘一张密度图（`public/models/env/garden.grass.png` + 同名 `.json` 范围），绿色处长草，池塘 / 汀步石 / 石拱 / 大花下不长。
+    - 贴地：加载时从碰撞体烘一张高度图（256²，一次性）。
+    - 风：复用植被的风动 uniform（`grass.windInfluence` 缩放）；背光透光复用假 SSS。
+    - 性能：不投射阴影、不进水面反射（植被层）；远处按 `radius × fadeStart` 起缩小消失；数量 = `grass.count`（high 档 11 万片）× 档位表 `grass` 倍率（low 0.2 / mid 0.5 / high 1）。
+    - cave 暂用 garden 模型但默认不开草（洞穴里不该有草坪）。
+24. **天空盒**：HDRI 到位前用程序化天空（config `sky` 段：四段渐变 + 地平线雾带 + 太阳光晕 + 可选月亮 / 天体）。程序化环境光也用同一个天空 shader 渲染，光照与看到的天空一致。garden / ocean 的初始配色取自参考图；HDRI 到位后把 `environment.mode` 改为 `hdri` 并填 `hdri` 路径即可。
 
 ## 15. 仍未解决的问题
 
@@ -736,10 +771,11 @@ dev 环境挂 studio → gizmo 拖拽 → 保存 state
 - **F. 回退与重进**（待定）：采集后浏览器后退回到已完成场景怎么处理；未完成 cave 直接访问 `/ocean` 是否重定向；Ending「重新开始」回 Landing 还是 cave。
 - **G. 导出照片的画框**（待定）：`frame.mode = '3d'` 时画框已在 3D 帧里，§8.4 第 3 步的 2D 边框是否还要叠加。
 - **M2 实测补充**：
-  - B：ocean.glb 由 7 块互不相连的浮空岛组成，模型内无水面。当前按默认方案只让玩家在最大的一块（约 22×15 单位）上活动，采集区与四个资产都摆在这块岛上。
+  - B（**已决定：走水，见 §14-20**）：ocean.glb 由 7 块互不相连的浮空岛组成，模型内无水面。当前按默认方案只让玩家在最大的一块（约 22×15 单位）上活动，采集区与四个资产都摆在这块岛上。
   - D：两个模型尺度差约 5 倍（garden 最长边 8.4，ocean 39.8）。当前按「最长边 ≈ 60 单位」分别归一化（config `env.scale`），结果是 garden 里 1.7m 高的角色和雏菊差不多高、罂粟花高数倍 —— 需确认这是想要的「微缩」感，还是要把角色 / 地形尺度改掉。
   - E：两个模型均无顶点色，风动遮罩将回落到局部 Y 归一化。
   - garden 的池塘底部目前可以行走（水面网格不在碰撞体里），M5 做水面时一并加「水域不可进入」的规则。
+- **H. garden 池塘**（新增，M5）——**已决定：用 shader 做水，见 §14-23**。原问题：模型里没有池塘水面几何，也没有凹陷（见 §4.3 更正），水面系统无法判断哪里是水。要做真水面，需要美术二选一：(a) 把池塘挖成真实凹陷，再在池塘高度放水面平面（config `water.level`）；(b) 单独导出一个池塘水面面片，材质名以 `water_` 开头，会自动套用水面材质。在此之前 garden 的 `water.enabled = false`，池塘区域也可以行走。
 - **E. 顶点色**：§5.2 约定顶点色 R = 风柔软度、G = 厚度。现有两个 glb 的植被刷了顶点色吗？没刷的话我先用局部 Y 归一化顶替，但效果会明显差一截（整株一起摆而不是根部固定），建议后续在 Blender 里补刷。
 
 ---

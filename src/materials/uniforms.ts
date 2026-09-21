@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { Color, Vector2, Vector3 } from 'three'
 import { getSceneCfg } from '../state/useConfigStore'
 import { getTier } from '../state/useQualityStore'
+import { updatePondUniforms } from './pond'
 
 // 场景级共享 uniform 注册表（spec §5.2）：所有自定义材质引用同一批 uniform 对象，
 // 由 <SharedUniformDriver /> 一个 useFrame 统一推送，不让每个材质各跑一个。
@@ -118,6 +119,8 @@ export function SharedUniformDriver() {
     shared.uCausticsIntensity.value = water.causticsIntensity
     shared.uCausticsScale.value = water.causticsScale
     shared.uCausticsSpeed.value = water.causticsSpeed
+
+    updatePondUniforms(cfg)
   })
   return null
 }

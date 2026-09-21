@@ -2,7 +2,7 @@
   "version": 1,
   "scene": "garden",
   "camera": {
-    "fov": 45,
+    "fov": 24,
     "near": 0.1,
     "far": 300,
     "followDistance": 6,
@@ -13,7 +13,7 @@
     "pitchMin": -0.2,
     "pitchMax": 0.9,
     "minGroundClearance": 0.4,
-    "occlusionPadding": 0.3,
+    "occlusionPadding": 0.35000000000000003,
     "minDistance": 0.5,
     "initialPitch": 0.25
   },
@@ -30,10 +30,10 @@
   },
   "character": {
     "moveSpeed": 3.2,
-    "sprintMultiplier": 1.8,
+    "sprintMultiplier": 2.7,
     "turnSpeed": 10,
-    "radius": 0.35,
-    "height": 1.7,
+    "radius": 0.21999999999999997,
+    "height": 0.8999999999999999,
     "color": "#fff8e8",
     "spawn": [
       -1,
@@ -46,29 +46,29 @@
     "groundSmoothing": 0.08
   },
   "render": {
-    "exposure": 1,
-    "pixelRatioMax": 2
+    "exposure": 1.1,
+    "pixelRatioMax": 3
   },
-  "background": "#1f3322",
+  "background": "#d6cde3",
   "fog": {
     "type": "exp2",
-    "color": "#3b5a3a",
-    "density": 0.025,
+    "color": "#cdbfdf",
+    "density": 0.012,
     "near": 10,
     "far": 80
   },
   "lights": {
     "ambient": {
-      "color": "#6a7f5a",
-      "intensity": 0.5
+      "color": "#594379",
+      "intensity": 0.32999999999999996
     },
     "directional": {
-      "color": "#fff1cf",
-      "intensity": 1.2,
+      "color": "#c59b98",
+      "intensity": 2.93,
       "position": [
-        8,
-        14,
-        6
+        20,
+        20,
+        100
       ]
     },
     "points": []
@@ -85,7 +85,636 @@
       30
     ]
   },
-  "materials": {},
+  "sky": {
+    "enabled": true,
+    "topColor": "#eae1f8",
+    "midColor": "#fbd7ed",
+    "horizonColor": "#b6a3d4",
+    "bottomColor": "#8f86a8",
+    "midHeight": 0.17999999999999997,
+    "horizonWidth": 0.07,
+    "sunColor": "#fff0e8",
+    "sunSize": 0,
+    "sunIntensity": 0.65,
+    "sunGlow": 0.25,
+    "sunGlowSpread": 6,
+    "moon": {
+      "enabled": false,
+      "color": "#f4eef8",
+      "azimuth": 30,
+      "elevation": 20,
+      "size": 0.08,
+      "softness": 0.3,
+      "intensity": 1
+    }
+  },
+  "environment": {
+    "mode": "procedural",
+    "hdri": "",
+    "intensity": 1.1,
+    "rotationY": 0,
+    "background": false,
+    "sunIntensity": 2.5
+  },
+  "shadows": {
+    "enabled": true,
+    "bias": -0.0005,
+    "normalBias": 0.03,
+    "radius": 3,
+    "cameraSize": 35,
+    "cameraFar": 160
+  },
+  "wind": {
+    "enabled": true,
+    "directionDeg": -98,
+    "strength": 0.08999999999999998,
+    "speed": 1.2,
+    "scale": 0.03,
+    "gustStrength": 0.24,
+    "gustFrequency": 0.25,
+    "gustScale": 0.04,
+    "flutterStrength": 0.03,
+    "flutterFrequency": 9,
+    "headSway": 0.05,
+    "stiffnessSource": "localY",
+    "stiffnessPower": 2.95,
+    "confirmGustStrength": 2.5,
+    "confirmGustDuration": 1.5
+  },
+  "sss": {
+    "enabled": true,
+    "color": "#c8f0a0",
+    "scale": 0.8,
+    "power": 4,
+    "distortion": 0.25,
+    "ambient": 0.05,
+    "thickness": 1,
+    "thicknessSource": "constant",
+    "pointLight": ""
+  },
+  "crystal": {
+    "enabled": true,
+    "transmission": 1,
+    "thickness": 1,
+    "ior": 1.45,
+    "roughness": 0.05,
+    "attenuationColor": "#bfe8ff",
+    "attenuationDistance": 2,
+    "glowColor": "#9ad8ff",
+    "glowIntensity": 0.6,
+    "fresnelPower": 3,
+    "mainMinSize": 1.8,
+    "opaqueEnvMapIntensity": 2
+  },
+  "water": {
+    "enabled": false,
+    "quality": "high",
+    "level": 1.26,
+    "center": [
+      0,
+      0,
+      0
+    ],
+    "size": 80,
+    "shallowColor": "#5a8f86",
+    "deepColor": "#1c3b3f",
+    "depthFalloff": 1.2,
+    "normalScale": 0.4,
+    "normalStrength": 0.35,
+    "flowSpeed": 0.08,
+    "flowDirectionDeg": 30,
+    "fresnelPower": 4,
+    "roughness": 0.06,
+    "reflectionIntensity": 0.8,
+    "reflectionResolution": 512,
+    "reflectionLayers": "terrain",
+    "refractionStrength": 0.3,
+    "foamWidth": 0.25,
+    "foamColor": "#e8f4ee",
+    "causticsIntensity": 0.6,
+    "causticsScale": 0.35,
+    "causticsSpeed": 0.6,
+    "opacity": 0.85,
+    "blockDepth": 0.6,
+    "walkable": false
+  },
+  "pond": {
+    "enabled": true,
+    "material": "8",
+    "maskColor": "#210a3f",
+    "tolerance": 0.1,
+    "softness": 0.06,
+    "color": "#3f2667",
+    "tint": 0.29,
+    "roughness": 0.51,
+    "normalScale": 1.34,
+    "normalStrength": 0.7000000000000001,
+    "flowSpeed": 0.15,
+    "flowDirectionDeg": -20,
+    "fresnelPower": 4.3,
+    "reflection": 0.36000000000000004
+  },
+  "grass": {
+    "enabled": true,
+    "mask": "/models/env/garden.grass.png",
+    "count": 178000,
+    "radius": 13,
+    "fadeStart": 0.89,
+    "densityThreshold": 0.24,
+    "bladeHeight": [
+      0.15,
+      0.18
+    ],
+    "bladeWidth": 0.027,
+    "bend": 0.21,
+    "baseColor": "#2d5f4a",
+    "tipColor": "#91af7c",
+    "colorVariation": 0.41000000000000003,
+    "normalUp": 0.20999999999999996,
+    "windInfluence": 0.12999999999999998,
+    "sss": 0.48999999999999994,
+    "receiveShadow": true
+  },
+  "beacon": {
+    "falloffNear": 21,
+    "falloffFar": 40,
+    "zoneFarIntensity": 1.6,
+    "zoneNearIntensity": 0.8,
+    "zoneInsideIntensity": 0.25,
+    "assetFarIntensity": 1.2,
+    "assetNearIntensity": 0.5
+  },
+  "particles": [
+    {
+      "name": "pollen",
+      "enabled": true,
+      "role": "ambient",
+      "maxParticles": 500,
+      "emitterShape": "box",
+      "emitterRadius": 1,
+      "emitterSize": [
+        30,
+        8,
+        30
+      ],
+      "emitterAngle": 0.4,
+      "emitterHeight": 0,
+      "emitterDirection": [
+        0,
+        1,
+        0
+      ],
+      "emitterSurfaceOnly": false,
+      "startPositionAsDirection": false,
+      "lifetime": [
+        6,
+        12
+      ],
+      "speed": [
+        0.05,
+        0.25
+      ],
+      "directionSpread": 1.5,
+      "gravity": [
+        0,
+        0,
+        0
+      ],
+      "friction": {
+        "intensity": 0,
+        "easing": "linear"
+      },
+      "turbulence": {
+        "intensity": 0.8,
+        "frequency": 0.15,
+        "speed": 0.25
+      },
+      "size": [
+        0.025,
+        0.06
+      ],
+      "colorStart": "#fff2b0",
+      "colorEnd": "#ffe08a",
+      "intensity": 1.4,
+      "blending": "additive",
+      "appearance": "gradient",
+      "fadeSizeCurve": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "fadeOpacityCurve": [
+        0,
+        1,
+        1,
+        0
+      ],
+      "velocityCurve": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0
+      ],
+      "rotationSpeed": [
+        0,
+        0
+      ],
+      "softDistance": 0.8,
+      "groundFade": 0,
+      "followCamera": true,
+      "depthTest": true,
+      "renderOrder": 0,
+      "emitters": []
+    },
+    {
+      "name": "beaconZone",
+      "enabled": true,
+      "role": "beaconZone",
+      "maxParticles": 260,
+      "emitterShape": "sphere",
+      "emitterRadius": 3.2,
+      "emitterSize": [
+        20,
+        6,
+        20
+      ],
+      "emitterAngle": 0.4,
+      "emitterHeight": 0,
+      "emitterDirection": [
+        0,
+        1,
+        0
+      ],
+      "emitterSurfaceOnly": false,
+      "startPositionAsDirection": false,
+      "lifetime": [
+        3,
+        6
+      ],
+      "speed": [
+        0.05,
+        0.3
+      ],
+      "directionSpread": 1.2,
+      "gravity": [
+        0,
+        0,
+        0
+      ],
+      "friction": {
+        "intensity": 0,
+        "easing": "linear"
+      },
+      "turbulence": {
+        "intensity": 0.6,
+        "frequency": 0.25,
+        "speed": 0.4
+      },
+      "size": [
+        0.08,
+        0.2
+      ],
+      "colorStart": "#ffe9a8",
+      "colorEnd": "#ffb86b",
+      "intensity": 2.2,
+      "blending": "additive",
+      "appearance": "gradient",
+      "fadeSizeCurve": [
+        0.4,
+        1,
+        1,
+        0.6
+      ],
+      "fadeOpacityCurve": [
+        0,
+        1,
+        1,
+        0
+      ],
+      "velocityCurve": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0
+      ],
+      "rotationSpeed": [
+        0,
+        0
+      ],
+      "softDistance": 1,
+      "groundFade": 0.4,
+      "followCamera": false,
+      "depthTest": true,
+      "renderOrder": 0,
+      "emitters": []
+    },
+    {
+      "name": "beaconAsset",
+      "enabled": true,
+      "role": "beaconAsset",
+      "maxParticles": 240,
+      "emitterShape": "sphere",
+      "emitterRadius": 0.9,
+      "emitterSize": [
+        20,
+        6,
+        20
+      ],
+      "emitterAngle": 0.4,
+      "emitterHeight": 0,
+      "emitterDirection": [
+        0,
+        1,
+        0
+      ],
+      "emitterSurfaceOnly": false,
+      "startPositionAsDirection": false,
+      "lifetime": [
+        1.5,
+        3.5
+      ],
+      "speed": [
+        0.05,
+        0.25
+      ],
+      "directionSpread": 1.4,
+      "gravity": [
+        0,
+        0,
+        0
+      ],
+      "friction": {
+        "intensity": 0,
+        "easing": "linear"
+      },
+      "turbulence": {
+        "intensity": 0.25,
+        "frequency": 0.6,
+        "speed": 0.6
+      },
+      "size": [
+        0.04,
+        0.1
+      ],
+      "colorStart": "#ffe9a8",
+      "colorEnd": "#ffb86b",
+      "intensity": 2,
+      "blending": "additive",
+      "appearance": "gradient",
+      "fadeSizeCurve": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "fadeOpacityCurve": [
+        0,
+        1,
+        1,
+        0
+      ],
+      "velocityCurve": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0
+      ],
+      "rotationSpeed": [
+        0,
+        0
+      ],
+      "softDistance": 0.6,
+      "groundFade": 0.2,
+      "followCamera": false,
+      "depthTest": true,
+      "renderOrder": 0,
+      "emitters": []
+    },
+    {
+      "name": "burst",
+      "enabled": true,
+      "role": "burst",
+      "maxParticles": 160,
+      "emitterShape": "sphere",
+      "emitterRadius": 0.3,
+      "emitterSize": [
+        20,
+        6,
+        20
+      ],
+      "emitterAngle": 0.4,
+      "emitterHeight": 0,
+      "emitterDirection": [
+        0,
+        1,
+        0
+      ],
+      "emitterSurfaceOnly": false,
+      "startPositionAsDirection": false,
+      "lifetime": [
+        1.2,
+        2.4
+      ],
+      "speed": [
+        0.8,
+        2.2
+      ],
+      "directionSpread": 0.6,
+      "gravity": [
+        0,
+        0.4,
+        0
+      ],
+      "friction": {
+        "intensity": 0.8,
+        "easing": "easeOut"
+      },
+      "turbulence": {
+        "intensity": 0.15,
+        "frequency": 0.8,
+        "speed": 1
+      },
+      "size": [
+        0.05,
+        0.14
+      ],
+      "colorStart": "#ffffff",
+      "colorEnd": "#ffe9a8",
+      "intensity": 3,
+      "blending": "additive",
+      "appearance": "gradient",
+      "fadeSizeCurve": [
+        1,
+        1,
+        0.8,
+        0.2
+      ],
+      "fadeOpacityCurve": [
+        1,
+        1,
+        0.7,
+        0
+      ],
+      "velocityCurve": [
+        1.6,
+        0.8,
+        0.3,
+        0.1
+      ],
+      "rotation": [
+        0,
+        0
+      ],
+      "rotationSpeed": [
+        0,
+        0
+      ],
+      "softDistance": 0.4,
+      "groundFade": 0,
+      "followCamera": false,
+      "depthTest": true,
+      "renderOrder": 0,
+      "emitters": []
+    }
+  ],
+  "post": {
+    "enabled": true,
+    "toneMapping": "aces",
+    "bloom": {
+      "enabled": true,
+      "intensity": 1.4100000000000001,
+      "threshold": 0.8300000000000001,
+      "smoothing": 0.73,
+      "radius": 0.5800000000000001
+    },
+    "vignette": {
+      "enabled": false,
+      "offset": 0.3,
+      "darkness": 0.4100000000000001
+    },
+    "chromaticAberration": {
+      "enabled": false,
+      "offset": 0.0002
+    },
+    "dof": {
+      "enabled": false,
+      "focusDistance": 25,
+      "focalLength": 6.8,
+      "bokehScale": 2
+    },
+    "noise": {
+      "enabled": false,
+      "opacity": 0.135
+    },
+    "grade": {
+      "enabled": true,
+      "hue": 5.204170427930421e-18,
+      "saturation": 0.15000000000000002,
+      "contrast": 0.11,
+      "brightness": -0.04
+    },
+    "ssao": {
+      "enabled": true,
+      "intensity": 1.5,
+      "radius": 0.4
+    }
+  },
+  "materials": {
+    "7": {
+      "role": "vegetation"
+    },
+    "9": {
+      "metalness": 0.66
+    },
+    "13": {
+      "role": "vegetation"
+    },
+    "14": {
+      "role": "vegetation"
+    },
+    "15": {
+      "role": "vegetation"
+    },
+    "16": {
+      "role": "vegetation"
+    },
+    "17": {
+      "role": "vegetation"
+    },
+    "18": {
+      "role": "vegetation"
+    },
+    "19": {
+      "role": "vegetation"
+    },
+    "20": {
+      "role": "vegetation"
+    },
+    "22": {
+      "roughness": 1
+    },
+    "25": {
+      "role": "vegetation"
+    },
+    "28": {
+      "role": "vegetation"
+    },
+    "29": {
+      "role": "vegetation"
+    },
+    "30": {
+      "role": "vegetation"
+    },
+    "42": {
+      "role": "vegetation"
+    },
+    "43": {
+      "role": "vegetation"
+    },
+    "44": {
+      "role": "vegetation"
+    },
+    "45": {
+      "role": "vegetation"
+    },
+    "46": {
+      "role": "vegetation"
+    },
+    "47": {
+      "role": "vegetation"
+    },
+    "48": {
+      "role": "vegetation"
+    },
+    "49": {
+      "role": "vegetation"
+    },
+    "50": {
+      "role": "vegetation"
+    },
+    "51": {
+      "role": "vegetation"
+    },
+    "52": {
+      "role": "vegetation"
+    },
+    "stem": {
+      "role": "vegetation"
+    }
+  },
   "audio": {
     "master": {
       "volume": 1,
@@ -128,7 +757,7 @@
     "inspectEmissive": 1.4,
     "selectedEmissive": 4,
     "breatheSpeed": 1.6,
-    "floatAmplitude": 0.12,
+    "floatAmplitude": 0.09999999999999999,
     "floatSpeed": 1.1,
     "clickDragThreshold": 6,
     "breatheDepth": 0.25,

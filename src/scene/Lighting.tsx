@@ -1,56 +1,18 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import { Environment, Lightformer } from '@react-three/drei'
-import { BackSide, Color, PCFShadowMap, PCFSoftShadowMap, ShaderMaterial, type Material, type Mesh } from 'three'
+import { PCFShadowMap, PCFSoftShadowMap, type Material, type Mesh } from 'three'
 import { useSceneCfg } from '../state/useConfigStore'
 import { useTier } from '../state/useQualityStore'
+import { EnvironmentSky } from './Sky'
 
 // 环境光 + 主光 + 点光 + 阴影（spec §9.3 Lights / Environment）
 
 const url = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 
-/** 渐变天空球：只在程序化环境贴图里渲染一次 */
-function SkyGradient({ sky, horizon, ground }: { sky: string; horizon: string; ground: string }) {
-  const material = useMemo(
-    () =>
-      new ShaderMaterial({
-        side: BackSide,
-        depthWrite: false,
-        uniforms: { uSky: { value: new Color() }, uHorizon: { value: new Color() }, uGround: { value: new Color() } },
-        vertexShader: /* glsl */ `
-          varying vec3 vDir;
-          void main() {
-            vDir = normalize(position);
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `,
-        fragmentShader: /* glsl */ `
-          uniform vec3 uSky;
-          uniform vec3 uHorizon;
-          uniform vec3 uGround;
-          varying vec3 vDir;
-          void main() {
-            float y = vDir.y;
-            vec3 c = y > 0.0 ? mix(uHorizon, uSky, pow(y, 0.6)) : mix(uHorizon, uGround, pow(-y, 0.4));
-            gl_FragColor = vec4(c, 1.0);
-          }
-        `,
-      }),
-    [],
-  )
-  material.uniforms.uSky.value.set(sky)
-  material.uniforms.uHorizon.value.set(horizon)
-  material.uniforms.uGround.value.set(ground)
-  useEffect(() => () => material.dispose(), [material])
-  return (
-    <mesh material={material} scale={100}>
-      <sphereGeometry args={[1, 32, 16]} />
-    </mesh>
-  )
-}
-
 function SceneEnvironment() {
   const env = useSceneCfg((c) => c.environment)
+  const sky = useSceneCfg((c) => c.sky)
   const sunPos = useSceneCfg((c) => c.lights.directional.position)
   const sunColor = useSceneCfg((c) => c.lights.directional.color)
   const rotation: [number, number, number] = [0, env.rotationY, 0]
@@ -66,13 +28,13 @@ function SceneEnvironment() {
       />
     )
   }
-  // 程序化：颜色 / 主光位置变化时重新渲染一次（frames=1，平时零开销）
-  const key = [env.skyColor, env.horizonColor, env.groundColor, env.sunIntensity, sunColor, ...sunPos].join('|')
+  // 程序化：用天空盒渲染一次环境贴图；天空 / 主光变化时重新渲染（frames=1，平时零开销）
+  const key = JSON.stringify([sky, env.sunIntensity, sunColor, sunPos])
   const len = Math.hypot(...sunPos) || 1
   const dir = sunPos.map((v) => (v / len) * 50) as [number, number, number]
   return (
     <Environment key={key} frames={1} resolution={256} environmentIntensity={env.intensity} environmentRotation={rotation}>
-      <SkyGradient sky={env.skyColor} horizon={env.horizonColor} ground={env.groundColor} />
+      <EnvironmentSky />
       <Lightformer form="circle" color={sunColor} intensity={env.sunIntensity} position={dir} scale={12} target={[0, 0, 0]} />
     </Environment>
   )
@@ -99,7 +61,7 @@ function useShadowSettings() {
     })
   }, [gl, scene, enabled, type])
 
-  return { enabled, mapSize: tier.shadowMapSize, soft: tier.shadows === 'soft', ...shadows }
+  return { ...shadows, enabled, mapSize: tier.shadowMapSize, soft: tier.shadows === 'soft' }
 }
 
 export function Lighting() {

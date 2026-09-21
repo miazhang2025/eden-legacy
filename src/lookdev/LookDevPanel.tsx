@@ -4,13 +4,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pane, type FolderApi } from 'tweakpane'
 import * as EssentialsPlugin from '@tweakpane/plugin-essentials'
-import { ENDING_SCHEMA, SCENE_SCHEMA, type ConfigId, type SceneId } from '../config/schema'
+import { ENDING_SCHEMA, GLOBAL_SCHEMA, SCENE_SCHEMA, type QualityTier, type SceneId, type StoreId } from '../config/schema'
 import { ALL_COMBOS } from '../data/specimenBoxes'
 import { captureActiveCanvas, getActiveCanvas } from '../scene/activeCanvas'
 import { debugSkipScene } from '../scene/AssetFlow'
 import { useMaterialRegistry } from '../scene/materialOverrides'
 import { useConfigStore } from '../state/useConfigStore'
 import { useDebugStore } from '../state/useDebugStore'
+import { useQualityStore } from '../state/useQualityStore'
 import { addFolder, buildNode, syncPanel, type BuildContext } from './buildPanel'
 import { downloadDataUrl, exportAll, exportOne, importJson, configForExport, toJson } from './exportConfig'
 import { measureToggle } from './measure'
@@ -26,7 +27,7 @@ const readOpen = () => {
   }
 }
 
-const isScene = (id: ConfigId): id is SceneId => id !== 'ending'
+const isScene = (id: StoreId): id is SceneId => id !== 'ending' && id !== 'global'
 
 /** 顶部工具区：文件操作、性能、调试 */
 function buildTools(pane: Pane, ctx: BuildContext, stopFns: Array<() => void>) {
@@ -133,6 +134,25 @@ function buildTools(pane: Pane, ctx: BuildContext, stopFns: Array<() => void>) {
 
   // ---------- 调试（不属于 config，不导出） ----------
   const debug = addFolder(pane, '调试', `lookdev.fold:${id}:__debug`)
+  // 质量档位：look dev 时可锁定在 high（关闭自动降档）
+  const q = useQualityStore.getState()
+  const qualityInfo = (s: typeof q) => [`来源：${s.source}`, ...s.log.slice(-3)].join('\n')
+  const quality = { tier: q.tier, auto: q.autoDowngrade, info: qualityInfo(q) }
+  debug
+    .addBinding(quality, 'tier', { label: '质量档位', options: { low: 'low', mid: 'mid', high: 'high' } })
+    .on('change', (ev) => useQualityStore.getState().setTier(ev.value as QualityTier, 'panel'))
+  debug
+    .addBinding(quality, 'auto', { label: '自动降档' })
+    .on('change', (ev) => useQualityStore.getState().setAutoDowngrade(ev.value))
+  debug.addBinding(quality, 'info', { readonly: true, label: '档位日志', multiline: true, rows: 3 })
+  stopFns.push(
+    useQualityStore.subscribe((s) => {
+      quality.tier = s.tier
+      quality.auto = s.autoDowngrade
+      quality.info = qualityInfo(s)
+      pane.refresh()
+    }),
+  )
   if (isScene(id)) {
     const d = { freeFly: useDebugStore.getState().freeFly }
     debug
@@ -195,6 +215,20 @@ export default function LookDevPanel() {
     const stops: Array<() => void> = []
     // 先构建参数树（收集开关列表供「测开销」用），再把工具区插到最上面
     buildNode(pane, isScene(id) ? SCENE_SCHEMA : ENDING_SCHEMA, [], ctx)
+    // 全局 config（页面过场 + 质量档位表 + 帧率守门）
+    const globalPane = new Pane({ container: container.current, title: 'Global（global.json）', expanded: false })
+    const gctx: BuildContext = {
+      ...ctx,
+      id: 'global',
+      getConfig: () => store().configs.global,
+      update: (recipe) => store().update('global', recipe),
+      syncs: [],
+      structure: [],
+      toggles: [],
+      materialFolders: new Map<string, FolderApi>(),
+    }
+    globalPane.addButton({ title: 'Export global.json' }).on('click', () => exportOne('global'))
+    buildNode(globalPane, GLOBAL_SCHEMA, [], gctx)
     const toolsHost = new Pane({ container: container.current, title: '工具' })
     toolsHost.registerPlugin(EssentialsPlugin)
     buildTools(toolsHost, ctx, stops)
@@ -202,12 +236,14 @@ export default function LookDevPanel() {
 
     const unsub = useConfigStore.subscribe((s, prev) => {
       if (s.configs[id] !== prev.configs[id]) syncPanel(pane, ctx, s.configs[id])
+      if (s.configs.global !== prev.configs.global) syncPanel(globalPane, gctx, s.configs.global)
     })
     return () => {
       unsub()
       stops.forEach((f) => f())
       toolsHost.dispose()
       pane.dispose()
+      globalPane.dispose()
     }
   }, [open, id, materialEntries, nonce])
 

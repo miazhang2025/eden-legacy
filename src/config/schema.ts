@@ -79,12 +79,18 @@ export interface SceneConfig {
     points: PointLightConfig[]
   }
   bounds: { min: Vec3; max: Vec3 }
+  /** 程序化天空盒（HDRI 到位前使用；程序化环境光也用它渲染） */
+  sky: SkyConfig
   environment: EnvironmentConfig
   shadows: ShadowConfig
   wind: WindConfig
   sss: SSSConfig
   crystal: CrystalConfig
   water: WaterConfig
+  /** 贴图池塘：地形贴图里画出来的水域，用 shader 按颜色遮罩做成水面（garden） */
+  pond: PondConfig
+  /** 程序化草：跟随相机的草叶网格，一个 draw call */
+  grass: GrassConfig
   /** 引导发光粒子的远近强度（spec §5.1） */
   beacon: BeaconConfig
   /** 粒子池（spec §5.3）：每个池一个 draw call，多个发射点共享 */
@@ -165,17 +171,47 @@ export interface MaterialOverride {
   attenuationColor?: string
 }
 
+export interface SkyConfig {
+  /** 关闭时背景用纯色 background */
+  enabled: boolean
+  topColor: string
+  midColor: string
+  horizonColor: string
+  bottomColor: string
+  /** 中段颜色所在高度（0 = 地平线，1 = 天顶） */
+  midHeight: number
+  /** 地平线雾带宽度 */
+  horizonWidth: number
+  /** 太阳（方向取主光 position） */
+  sunColor: string
+  /** 太阳圆盘角半径（弧度），0 = 不画圆盘 */
+  sunSize: number
+  sunIntensity: number
+  /** 太阳周围光晕的强度与扩散 */
+  sunGlow: number
+  sunGlowSpread: number
+  moon: {
+    enabled: boolean
+    color: string
+    /** 方位角 / 仰角（度） */
+    azimuth: number
+    elevation: number
+    /** 角半径（弧度） */
+    size: number
+    /** 边缘柔和度 0–1 */
+    softness: number
+    intensity: number
+  }
+}
+
 export interface EnvironmentConfig {
-  /** procedural = 程序生成的环境光（无需下载），hdri = 读 public/hdri 下的文件 */
+  /** procedural = 用天空盒渲染环境光（无需下载），hdri = 读 public/hdri 下的文件 */
   mode: 'procedural' | 'hdri'
   hdri: string
   intensity: number
   rotationY: number
-  /** hdri 模式下是否同时作为背景 */
+  /** hdri 模式下是否同时作为背景（否则背景仍是程序化天空） */
   background: boolean
-  skyColor: string
-  horizonColor: string
-  groundColor: string
   /** 环境光里对应主光方向的亮斑强度 */
   sunIntensity: number
 }
@@ -275,6 +311,58 @@ export interface WaterConfig {
   opacity: number
   /** 水深超过该值的区域不可行走（0 = 不限制） */
   blockDepth: number
+  /** 水面可以行走（ocean：在浮岛之间「走水」） */
+  walkable: boolean
+}
+
+export interface PondConfig {
+  enabled: boolean
+  /** 画有池塘的地形材质名 */
+  material: string
+  /** 池塘在贴图里的颜色，与之距离在 tolerance 内的像素视为水 */
+  maskColor: string
+  tolerance: number
+  softness: number
+  /** 水色与偏色强度 */
+  color: string
+  tint: number
+  roughness: number
+  normalScale: number
+  normalStrength: number
+  flowSpeed: number
+  flowDirectionDeg: number
+  fresnelPower: number
+  /** 掠射角叠加天空（地平线色）的强度 */
+  reflection: number
+}
+
+export interface GrassConfig {
+  enabled: boolean
+  /** 离线烘好的密度图（npm run models 生成，旁边有同名 .json 记录范围） */
+  mask: string
+  /** high 档的草叶数量（其它档位按档位表的 grass 倍率缩减） */
+  count: number
+  /** 以相机为中心的草地半径（世界单位） */
+  radius: number
+  /** 从 radius × fadeStart 开始逐渐缩小消失 */
+  fadeStart: number
+  /** 密度图低于该值的地方不长草 */
+  densityThreshold: number
+  bladeHeight: Vec2
+  bladeWidth: number
+  /** 叶尖弯曲程度（静态） */
+  bend: number
+  baseColor: string
+  tipColor: string
+  /** 每片叶子的明度随机幅度 */
+  colorVariation: number
+  /** 法线向上方混合的比例：越大越柔和（避免叶片正反面明暗跳变） */
+  normalUp: number
+  /** 风对草的影响倍率（共用风动参数） */
+  windInfluence: number
+  /** 背光透光（共用假 SSS 参数）的倍率 */
+  sss: number
+  receiveShadow: boolean
 }
 
 export interface BeaconConfig {
@@ -403,8 +491,70 @@ export interface EndingConfig {
   }
   slots: { slotA: SlotConfig; slotB: SlotConfig; slotC: SlotConfig }
   /** 标本（占位几何体）的材质 */
-  specimen: { emissiveIntensity: number; roughness: number; metalness: number }
-  reveal: { fadeDuration: number; textDelay: number }
+  specimen: { emissiveIntensity: number; roughness: number; metalness: number; hoverEmissive: number }
+  /** 入场：画布淡入 + 标本盒放大 + 三件标本依次落位（自己写，不用 Theatre 时间轴，见 ADR-003） */
+  reveal: {
+    fadeDuration: number
+    textDelay: number
+    /** 标本盒从多大放到 1（1 = 不缩放） */
+    boxScaleFrom: number
+    boxDuration: number
+    /** 每件标本的入场时长与相互错开的间隔 */
+    specimenDuration: number
+    specimenStagger: number
+    /** 标本入场时的起始偏移（相对各自 slot） */
+    specimenFrom: Vec3
+  }
+  /** 影棚环境光：上下两色的渐变球 + 一块柔光板，渲染一次作为环境贴图 */
+  environment: {
+    intensity: number
+    rotationY: number
+    topColor: string
+    bottomColor: string
+    /** 柔光板（放在主光方向）的强度与大小 */
+    keyIntensity: number
+    keySize: number
+  }
+  shadows: ShadowConfig
+  post: PostConfig
+  /** 标本盒的有限交互（spec §8.3）：不做自由 orbit，不允许转到背面 */
+  interaction: {
+    yawLimitDeg: number
+    pitchLimitDeg: number
+    /** 每拖动 1 像素转多少度 */
+    dragSensitivity: number
+    /** 旋转 / 缩放的平滑时间常数（秒） */
+    damping: number
+    /** 相机距离倍率范围（1 = config 里的相机位置） */
+    zoomMin: number
+    zoomMax: number
+    zoomSpeed: number
+    /** 松手多久后缓慢回正（秒），0 = 不回正 */
+    returnDelay: number
+    /** 静止时的轻微呼吸摆动（度） */
+    idleSwayDeg: number
+    idleSwaySpeed: number
+  }
+  /** 照片导出（spec §8.4） */
+  photo: {
+    /** 相对屏幕画布的渲染倍率 */
+    scale: number
+    /** 边距（以 1 倍率的像素计） */
+    margin: number
+    background: string
+    borderWidth: number
+    borderColor: string
+    includeText: boolean
+    titleSize: number
+    descSize: number
+    textColor: string
+    descColor: string
+    textGap: number
+    includeLogo: boolean
+    /** public 下的 logo 图片路径 */
+    logo: string
+    logoSize: number
+  }
 }
 
 /** 每个质量档位的效果上限（spec §12.1） */
@@ -420,6 +570,8 @@ export interface TierSettings {
   shadowMapSize: number
   /** 粒子数量倍率 */
   particles: number
+  /** 程序化草叶数量倍率 */
+  grass: number
   /** basic = bloom + 调色，mid = + vignette + grain，full = 全开（含 DOF） */
   post: 'basic' | 'mid' | 'full'
 }
@@ -603,6 +755,27 @@ export const DEFAULT_PARTICLE_POOL: ParticlePool = {
   emitters: [],
 }
 
+/** 后处理面板项（场景与 ending 共用） */
+const postSchema: SchemaFor<PostConfig> = {
+  _label: '后处理 post',
+  enabled: bool(),
+  toneMapping: select('aces', 'agx', 'neutral', 'reinhard', 'linear'),
+  bloom: { _label: 'bloom', enabled: bool(), intensity: intensity(5), threshold: num(0, 2, 0.01), smoothing: num(0, 1, 0.01), radius: num(0, 1, 0.01) },
+  vignette: { _label: 'vignette', enabled: bool(), offset: num(0, 1, 0.01), darkness: num(0, 1, 0.01) },
+  chromaticAberration: { _label: 'chromaticAberration', enabled: bool(), offset: num(0, 0.02, 0.0001) },
+  dof: { _label: 'depthOfField', enabled: bool(), focusDistance: num(0, 100, 0.1), focalLength: num(0.1, 20, 0.1), bokehScale: num(0, 10, 0.1) },
+  noise: { _label: 'noise / grain', enabled: bool(), opacity: num(0, 0.5, 0.005) },
+  grade: {
+    _label: '调色 grade',
+    enabled: bool(),
+    hue: num(-Math.PI, Math.PI, 0.01),
+    saturation: num(-1, 1, 0.01),
+    contrast: num(-1, 1, 0.01),
+    brightness: num(-1, 1, 0.01),
+  },
+  ssao: { _label: 'SSAO（开销大）', enabled: bool(), intensity: num(0, 10, 0.1), radius: num(0.01, 2, 0.01) },
+}
+
 export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
   version: hidden,
   scene: hidden,
@@ -684,6 +857,31 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     },
   },
   bounds: { _label: '边界 bounds', min: vec(0.5), max: vec(0.5) },
+  sky: {
+    _label: '天空盒 sky（程序化）',
+    enabled: bool(),
+    topColor: color(),
+    midColor: color(),
+    horizonColor: color(),
+    bottomColor: color(),
+    midHeight: num(0.01, 1, 0.01),
+    horizonWidth: num(0.005, 0.5, 0.005),
+    sunColor: color(),
+    sunSize: num(0, 0.2, 0.001),
+    sunIntensity: intensity(20),
+    sunGlow: num(0, 3, 0.01),
+    sunGlowSpread: num(1, 256, 1, 'sunGlowSpread', '越大光晕越集中'),
+    moon: {
+      _label: '月亮 / 天体',
+      enabled: bool(),
+      color: color(),
+      azimuth: num(-180, 180, 1),
+      elevation: num(-10, 90, 0.5),
+      size: num(0.005, 0.5, 0.001),
+      softness: num(0, 1, 0.01),
+      intensity: num(0, 3, 0.01),
+    },
+  },
   environment: {
     _label: '环境光 environment',
     mode: select('procedural', 'hdri'),
@@ -691,9 +889,6 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     intensity: intensity(5),
     rotationY: num(-Math.PI, Math.PI, 0.01),
     background: bool('background（hdri）'),
-    skyColor: color(),
-    horizonColor: color(),
-    groundColor: color(),
     sunIntensity: intensity(20),
   },
   shadows: {
@@ -777,6 +972,43 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     causticsSpeed: num(0, 3, 0.01),
     opacity: num(0, 1, 0.01),
     blockDepth: num(0, 5, 0.05, 'blockDepth', '水深超过该值不可行走；0 = 不限制'),
+    walkable: bool('walkable', '水面可以行走（在浮岛之间走水）'),
+  },
+  pond: {
+    _label: '贴图池塘 pond（shader 水面）',
+    enabled: bool(),
+    material: { t: 'text', label: 'material（地形材质名）' },
+    maskColor: color('maskColor（贴图里的池塘色）'),
+    tolerance: num(0, 0.6, 0.005),
+    softness: num(0, 0.3, 0.005),
+    color: color(),
+    tint: num(0, 1, 0.01),
+    roughness: num(0, 1, 0.01),
+    normalScale: num(0.05, 5, 0.01),
+    normalStrength: num(0, 2, 0.01),
+    flowSpeed: num(0, 2, 0.01),
+    flowDirectionDeg: num(-180, 180, 1),
+    fresnelPower: num(0.5, 10, 0.1),
+    reflection: num(0, 3, 0.01),
+  },
+  grass: {
+    _label: '程序化草 grass',
+    enabled: bool(),
+    mask: { t: 'text', label: 'mask（密度图）' },
+    count: num(0, 200000, 1000, 'count（high 档）', '其它档位乘以 Global 档位表的 grass 倍率'),
+    radius: num(5, 80, 0.5),
+    fadeStart: num(0, 1, 0.01),
+    densityThreshold: num(0, 1, 0.01),
+    bladeHeight: range(0.02, 2, 0.01),
+    bladeWidth: num(0.005, 0.3, 0.001),
+    bend: num(0, 1, 0.01),
+    baseColor: color(),
+    tipColor: color(),
+    colorVariation: num(0, 1, 0.01),
+    normalUp: num(0, 1, 0.01),
+    windInfluence: num(0, 3, 0.01),
+    sss: num(0, 3, 0.01),
+    receiveShadow: bool(),
   },
   beacon: {
     _label: '引导发光粒子 beacon',
@@ -837,25 +1069,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
       },
     },
   },
-  post: {
-    _label: '后处理 post',
-    enabled: bool(),
-    toneMapping: select('aces', 'agx', 'neutral', 'reinhard', 'linear'),
-    bloom: { _label: 'bloom', enabled: bool(), intensity: intensity(5), threshold: num(0, 2, 0.01), smoothing: num(0, 1, 0.01), radius: num(0, 1, 0.01) },
-    vignette: { _label: 'vignette', enabled: bool(), offset: num(0, 1, 0.01), darkness: num(0, 1, 0.01) },
-    chromaticAberration: { _label: 'chromaticAberration', enabled: bool(), offset: num(0, 0.02, 0.0001) },
-    dof: { _label: 'depthOfField', enabled: bool(), focusDistance: num(0, 100, 0.1), focalLength: num(0.1, 20, 0.1), bokehScale: num(0, 10, 0.1) },
-    noise: { _label: 'noise / grain', enabled: bool(), opacity: num(0, 0.5, 0.005) },
-    grade: {
-      _label: '调色 grade',
-      enabled: bool(),
-      hue: num(-Math.PI, Math.PI, 0.01),
-      saturation: num(-1, 1, 0.01),
-      contrast: num(-1, 1, 0.01),
-      brightness: num(-1, 1, 0.01),
-    },
-    ssao: { _label: 'SSAO（开销大）', enabled: bool(), intensity: num(0, 10, 0.1), radius: num(0.01, 2, 0.01) },
-  },
+  post: postSchema,
   materials: { t: 'materials' },
   audio: {
     _label: '音频（占位）',
@@ -940,8 +1154,67 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     emissiveIntensity: intensity(5),
     roughness: num(0, 1, 0.01),
     metalness: num(0, 1, 0.01),
+    hoverEmissive: intensity(5),
   },
-  reveal: { _label: '入场', fadeDuration: seconds(), textDelay: seconds() },
+  reveal: {
+    _label: '入场',
+    fadeDuration: seconds(),
+    textDelay: seconds(),
+    boxScaleFrom: num(0.5, 1.5, 0.01),
+    boxDuration: seconds(),
+    specimenDuration: seconds(),
+    specimenStagger: seconds(),
+    specimenFrom: vec(0.05, 'specimenFrom（相对 slot）'),
+  },
+  environment: {
+    _label: '环境光（影棚）',
+    intensity: intensity(5),
+    rotationY: num(-Math.PI, Math.PI, 0.01),
+    topColor: color(),
+    bottomColor: color(),
+    keyIntensity: intensity(20),
+    keySize: num(0.5, 20, 0.1),
+  },
+  shadows: {
+    _label: '阴影（主光）',
+    enabled: bool(),
+    bias: num(-0.01, 0.01, 0.0001),
+    normalBias: num(0, 0.2, 0.001),
+    radius: num(0, 10, 0.1, 'radius（soft 档）'),
+    cameraSize: num(1, 30, 0.5),
+    cameraFar: num(5, 100, 1),
+  },
+  post: postSchema,
+  interaction: {
+    _label: '交互（旋转 / 缩放）',
+    yawLimitDeg: num(0, 90, 1),
+    pitchLimitDeg: num(0, 60, 1),
+    dragSensitivity: num(0.01, 1, 0.01),
+    damping: num(0, 1, 0.01),
+    zoomMin: num(0.3, 1, 0.01),
+    zoomMax: num(1, 3, 0.01),
+    zoomSpeed: num(0.0001, 0.005, 0.0001),
+    returnDelay: seconds(20),
+    idleSwayDeg: num(0, 10, 0.1),
+    idleSwaySpeed: num(0, 3, 0.01),
+  },
+  photo: {
+    _label: '照片导出',
+    scale: num(1, 4, 0.5),
+    margin: num(0, 400, 1),
+    background: color(),
+    borderWidth: num(0, 40, 1),
+    borderColor: color(),
+    includeText: bool(),
+    titleSize: num(10, 120, 1),
+    descSize: num(8, 60, 1),
+    textColor: color(),
+    descColor: color(),
+    textGap: num(0, 200, 1),
+    includeLogo: bool(),
+    logo: { t: 'text', label: 'logo（public 下路径）' },
+    logoSize: num(16, 400, 1),
+  },
 }
 
 const tierSchema = (label: string) => ({
@@ -954,6 +1227,7 @@ const tierSchema = (label: string) => ({
   shadows: { t: 'select', options: ['off', 'on', 'soft'] } as SelectLeaf<TierSettings['shadows']>,
   shadowMapSize: num(256, 4096, 256),
   particles: num(0, 1, 0.05),
+  grass: num(0, 1, 0.05),
   post: { t: 'select', options: ['basic', 'mid', 'full'] } as SelectLeaf<TierSettings['post']>,
 })
 
