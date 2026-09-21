@@ -2,7 +2,9 @@
   "version": 1,
   "scene": "garden",
   "camera": {
-    "fov": 24,
+    "mode": "first",
+    "eyeHeight": 2.3299999999999996,
+    "fov": 26,
     "near": 0.1,
     "far": 300,
     "followDistance": 6,
@@ -29,7 +31,7 @@
     "rotationY": 0
   },
   "character": {
-    "moveSpeed": 3.2,
+    "moveSpeed": 3.3000000000000003,
     "sprintMultiplier": 2.7,
     "turnSpeed": 10,
     "radius": 0.21999999999999997,
@@ -43,7 +45,8 @@
     "spawnYaw": 0,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
-    "groundSmoothing": 0.08
+    "groundSmoothing": 0.08,
+    "visible": true
   },
   "render": {
     "exposure": 1.1,
@@ -80,9 +83,9 @@
       -28
     ],
     "max": [
-      21,
       40,
-      30
+      60,
+      40
     ]
   },
   "sky": {
@@ -196,7 +199,12 @@
     "causticsSpeed": 0.6,
     "opacity": 0.85,
     "blockDepth": 0.6,
-    "walkable": false
+    "walkable": false,
+    "segments": 96,
+    "waveAmplitude": 0.04,
+    "waveLength": 3,
+    "waveSpeed": 0.55,
+    "waveSteepness": 0.35
   },
   "pond": {
     "enabled": true,
@@ -215,7 +223,7 @@
     "reflection": 0.36000000000000004
   },
   "grass": {
-    "enabled": true,
+    "enabled": false,
     "mask": "/models/env/garden.grass.png",
     "count": 178000,
     "radius": 13,

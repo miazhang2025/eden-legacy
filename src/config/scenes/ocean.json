@@ -2,7 +2,9 @@
   "version": 1,
   "scene": "ocean",
   "camera": {
-    "fov": 45,
+    "mode": "first",
+    "eyeHeight": 2.15,
+    "fov": 24,
     "near": 0.1,
     "far": 300,
     "followDistance": 6,
@@ -29,7 +31,7 @@
     "rotationY": 0
   },
   "character": {
-    "moveSpeed": 3.2,
+    "moveSpeed": 8.700000000000001,
     "sprintMultiplier": 1.8,
     "turnSpeed": 10,
     "radius": 0.35,
@@ -43,7 +45,8 @@
     "spawnYaw": 1.5708,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
-    "groundSmoothing": 0.08
+    "groundSmoothing": 0.08,
+    "visible": true
   },
   "render": {
     "exposure": 0.9,
@@ -59,16 +62,16 @@
   },
   "lights": {
     "ambient": {
-      "color": "#c7c3f0",
-      "intensity": 0.35
+      "color": "#747099",
+      "intensity": 0.76
     },
     "directional": {
-      "color": "#fff0f5",
-      "intensity": 1.5,
+      "color": "#e2cdd4",
+      "intensity": 2.07,
       "position": [
         30,
         45,
-        -35
+        35
       ]
     },
     "points": []
@@ -80,18 +83,18 @@
       -38
     ],
     "max": [
-      38,
-      40,
-      38
+      50,
+      50,
+      50
     ]
   },
   "sky": {
     "enabled": true,
     "topColor": "#93a6e8",
     "midColor": "#c9bdef",
-    "horizonColor": "#efcfe4",
+    "horizonColor": "#ebbae9",
     "bottomColor": "#7fd3dd",
-    "midHeight": 0.4,
+    "midHeight": 0.25,
     "horizonWidth": 0.06,
     "sunColor": "#fff4f0",
     "sunSize": 0,
@@ -111,7 +114,7 @@
   "environment": {
     "mode": "procedural",
     "hdri": "",
-    "intensity": 0.85,
+    "intensity": 0.87,
     "rotationY": 0,
     "background": false,
     "sunIntensity": 3
@@ -181,22 +184,27 @@
     "depthFalloff": 3,
     "normalScale": 0.22,
     "normalStrength": 0.22,
-    "flowSpeed": 0.08,
+    "flowSpeed": 0.37,
     "flowDirectionDeg": -60,
-    "fresnelPower": 5,
-    "roughness": 0.04,
+    "fresnelPower": 7.4,
+    "roughness": 0.42,
     "reflectionIntensity": 0.35,
     "reflectionResolution": 1024,
-    "reflectionLayers": "terrain",
+    "reflectionLayers": "terrain+vegetation",
     "refractionStrength": 0,
     "foamWidth": 0.35,
     "foamColor": "#f4fbff",
     "causticsIntensity": 0.5,
     "causticsScale": 0.35,
     "causticsSpeed": 0.6,
-    "opacity": 1,
-    "blockDepth": 0,
-    "walkable": true
+    "opacity": 0.77,
+    "blockDepth": 1.05,
+    "walkable": true,
+    "segments": 96,
+    "waveAmplitude": 0.12,
+    "waveLength": 5,
+    "waveSpeed": 0.8799999999999999,
+    "waveSteepness": 0.35
   },
   "pond": {
     "enabled": false,
@@ -770,10 +778,10 @@
       "intensity": 0.9,
       "threshold": 0.75,
       "smoothing": 0.3,
-      "radius": 0.65
+      "radius": 1
     },
     "vignette": {
-      "enabled": true,
+      "enabled": false,
       "offset": 0.3,
       "darkness": 0.55
     },
@@ -788,7 +796,7 @@
       "bokehScale": 2
     },
     "noise": {
-      "enabled": true,
+      "enabled": false,
       "opacity": 0.035
     },
     "grade": {
@@ -799,36 +807,12 @@
       "brightness": 0
     },
     "ssao": {
-      "enabled": false,
+      "enabled": true,
       "intensity": 1.5,
       "radius": 0.4
     }
   },
   "materials": {
-    "1": {
-      "color": "#d9c8ec"
-    },
-    "2": {
-      "color": "#d9c8ec"
-    },
-    "3": {
-      "color": "#d9c8ec"
-    },
-    "4": {
-      "color": "#d9c8ec"
-    },
-    "5": {
-      "color": "#d9c8ec"
-    },
-    "6": {
-      "color": "#d9c8ec"
-    },
-    "7": {
-      "color": "#d9c8ec"
-    },
-    "8": {
-      "color": "#d9c8ec"
-    },
     "9": {
       "role": "crystal"
     },
@@ -839,7 +823,8 @@
       "role": "crystal"
     },
     "12": {
-      "role": "crystal"
+      "role": "crystal",
+      "transparent": true
     },
     "13": {
       "role": "crystal"
@@ -851,7 +836,17 @@
       "role": "vegetation"
     },
     "16": {
-      "role": "crystal"
+      "role": "crystal",
+      "opacity": 1,
+      "alphaTest": 0.33,
+      "roughness": 0.15,
+      "metalness": 0.16,
+      "thickness": 1.74,
+      "attenuationColor": "#f28dc5"
+    },
+    "18": {
+      "role": "crystal",
+      "emissive": "#ffcce8"
     },
     "19": {
       "role": "crystal"

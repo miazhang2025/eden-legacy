@@ -2,6 +2,8 @@
   "version": 1,
   "scene": "cave",
   "camera": {
+    "mode": "third",
+    "eyeHeight": 1.56,
     "fov": 45,
     "near": 0.1,
     "far": 300,
@@ -43,7 +45,8 @@
     "spawnYaw": 0,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
-    "groundSmoothing": 0.08
+    "groundSmoothing": 0.08,
+    "visible": true
   },
   "render": {
     "exposure": 1,
@@ -196,7 +199,12 @@
     "causticsSpeed": 0.6,
     "opacity": 0.85,
     "blockDepth": 0.6,
-    "walkable": false
+    "walkable": false,
+    "segments": 96,
+    "waveAmplitude": 0.04,
+    "waveLength": 3,
+    "waveSpeed": 0.55,
+    "waveSteepness": 0.35
   },
   "pond": {
     "enabled": true,

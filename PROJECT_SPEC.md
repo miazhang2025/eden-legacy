@@ -297,6 +297,8 @@ src/materials/
 
 按档位实现，`water.quality` 控制：
 
+**已实现的水面动画**：水面网格按 `water.segments` 细分，vertex shader 里叠三层 Gerstner 波（`waveAmplitude` / `waveLength` / `waveSpeed` / `waveSteepness`），高度与横向位移一起做，并解析求出波浪法线，再与小尺度涟漪法线叠加。low 档细分自动减半。
+
 | 档 | 包含 |
 |---|---|
 | low | 法线贴图扰动 + 菲涅尔 + 反射用 envMap（无实时反射） |
@@ -751,7 +753,7 @@ dev 环境挂 studio → gizmo 拖拽 → 保存 state
 18. **工程**：npm；项目用 git 仓库管理，CI 用 GitHub Actions（至少跑 build + `check:bundle`）；质量档位检测使用 `detect-gpu`。
 19. **引导**：不做光柱，用发光粒子（§5.1）。
 20. **ocean 走水**（§15-B）：浮岛之间可以在水面上走。实现：`water.walkable = true` 时水面作为可站立的地面（地形与水面取高者），水面抬到浮岛底部（`water.level = 0.6`），bounds 扩到覆盖所有浮岛。浮岛整体下移 1.2（`env.position.y = 0.35`），岛底都没入水面 0.36–0.83，看不到水面与岛之间的缝。
-21. **角色 / 尺度**（§15-C/D）：暂保持现状（第三人称胶囊体、按最长边 60 单位归一化）。将来要换第一人称：加一个 `camera.mode: 'third' | 'first'` 与眼睛高度相机即可，移动 / 碰撞 / 采集判定不受影响；需要另定的是鼠标锁定下「点击资产收藏」的交互（准星或按键）。
+21. **角色 / 尺度**（§15-C/D）：尺度暂保持现状（按最长边 60 单位归一化）。**第一人称已实现**：`camera.mode: 'third' | 'first'`（first 时相机放在 `camera.eyeHeight`，角色自动隐藏）。两种视角共用同一套平滑：相机位置与视线目标都按 `camera.damping` 做阻尼插值，只有刚进场景 / 切换视角 / 被地形遮挡时才直接吸附，另有 `character.visible` 可在第三人称下单独隐藏角色。移动 / 碰撞 / 采集判定不受影响，第一人称下走近资产照样弹卡片、点击收藏。当前默认仍是第三人称，面板里可切换。尚未做鼠标锁定（现在靠拖拽转视角）；若将来要锁定鼠标，需要再定「点击资产收藏」的替代交互（准星或按键）。
 22. **KTX2**：已安装 KTX-Software 4.4.2（`~/tools/KTX`，可用环境变量 `KTX_BIN` 覆盖），`npm run models` 输出 ETC1S 贴图。garden 贴图显存约 320MB → 约 40MB。运行时 KTX2 / Basis 解码器自托管在 `public/basis/`。
 23. **garden 池塘**（§15-H）：用 shader 做水，不改模型。地形材质（`pond.material = '8'`）按「与池塘色的距离」生成遮罩，遮罩内叠流动波纹法线、低粗糙度反射、偏水色与菲涅尔天空色。参数在 config `pond` 段。池塘仍可行走（贴图池塘没有深度）。
 25. **garden 程序化草**：一个 draw call 的草叶网格，跟随相机、按世界格对齐（叶子钉在世界里不滑动），位置 / 高度 / 朝向 / 颜色全在 vertex shader 里由格子哈希算出，CPU 每帧只推相机位置。

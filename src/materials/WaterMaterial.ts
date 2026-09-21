@@ -33,6 +33,10 @@ export function createWaterUniforms() {
     uNormalStrength: { value: 0.3 },
     uFlowSpeed: { value: 0.1 },
     uFlowDir: { value: new Vector2(1, 0) },
+    uWaveAmp: { value: 0.1 },
+    uWaveLen: { value: 8 },
+    uWaveSpeed: { value: 0.5 },
+    uWaveSteep: { value: 0.35 },
     uFresnelPower: { value: 4 },
     uReflectionIntensity: { value: 0.8 },
     uReflectionMap: { value: null as Texture | null },
@@ -51,12 +55,60 @@ export function createWaterUniforms() {
 }
 export type WaterUniforms = ReturnType<typeof createWaterUniforms>
 
+// 三层 Gerstner 波：高度位移 + 横向位移（越陡浪尖越尖），并给出解析法线
+const waveChunk = /* glsl */ `
+  uniform float uTime;
+  uniform vec2 uFlowDir;
+  uniform float uWaveAmp;
+  uniform float uWaveLen;
+  uniform float uWaveSpeed;
+  uniform float uWaveSteep;
+
+  const vec3 EDEN_WAVE_AMP = vec3(1.0, 0.55, 0.3);
+  const vec3 EDEN_WAVE_LEN = vec3(1.0, 0.52, 0.27);
+  const vec3 EDEN_WAVE_ANG = vec3(0.0, 0.9, -0.7);
+
+  vec2 edenRot(vec2 v, float a) {
+    float c = cos(a);
+    float s = sin(a);
+    return vec2(c * v.x - s * v.y, s * v.x + c * v.y);
+  }
+
+  /** 返回世界空间位移；out 为该点的水面法线 */
+  vec3 edenWaves(vec2 p, out vec3 normal) {
+    vec3 offset = vec3(0.0);
+    vec2 slope = vec2(0.0);
+    vec2 base = length(uFlowDir) > 1e-4 ? normalize(uFlowDir) : vec2(1.0, 0.0);
+    for (int i = 0; i < 3; i++) {
+      float amp = uWaveAmp * EDEN_WAVE_AMP[i];
+      float len = max(uWaveLen * EDEN_WAVE_LEN[i], 0.05);
+      vec2 dir = edenRot(base, EDEN_WAVE_ANG[i]);
+      float k = 6.2831853 / len;
+      float phase = dot(dir, p) * k - uTime * uWaveSpeed * k;
+      offset.y += amp * sin(phase);
+      offset.xz += dir * (uWaveSteep * amp * cos(phase));
+      slope += dir * (amp * k * cos(phase));
+    }
+    normal = normalize(vec3(-slope.x, 1.0, -slope.y));
+    return offset;
+  }
+`
+
 const vertexShader = /* glsl */ `
+  ${waveChunk}
   uniform mat4 uReflectionMatrix;
   varying vec3 vEdenWaterWorld;
   varying vec4 vEdenReflCoord;
+  varying vec3 vEdenWaveNormal;
   void main() {
-    vEdenWaterWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+    vec3 world = (modelMatrix * vec4(position, 1.0)).xyz;
+    vec3 n;
+    vec3 offset = edenWaves(world.xz, n);
+    world += offset;
+    vEdenWaterWorld = world;
+    vEdenWaveNormal = n;
+    // 世界位移换回本地空间
+    csm_Position = position + inverse(mat3(modelMatrix)) * offset;
     // Reflector 的 textureMatrix 作用于本地坐标（水面与 Reflector 共用同一变换）
     vEdenReflCoord = uReflectionMatrix * vec4(position, 1.0);
   }
@@ -85,6 +137,7 @@ const fragmentShader = /* glsl */ `
   uniform float uMaxDepth;
   varying vec3 vEdenWaterWorld;
   varying vec4 vEdenReflCoord;
+  varying vec3 vEdenWaveNormal;
   ${noise}
 
   float edenWaves(vec2 p, vec2 flow) {
@@ -97,7 +150,9 @@ const fragmentShader = /* glsl */ `
     float e = 0.15;
     float dx = edenWaves(p + vec2(e, 0.0), flow) - edenWaves(p - vec2(e, 0.0), flow);
     float dz = edenWaves(p + vec2(0.0, e), flow) - edenWaves(p - vec2(0.0, e), flow);
-    vec3 nW = normalize(vec3(-dx * uNormalStrength, 1.0, -dz * uNormalStrength));
+    // 大尺度波浪法线 + 小尺度涟漪法线
+    vec3 ripple = vec3(-dx * uNormalStrength, 1.0, -dz * uNormalStrength);
+    vec3 nW = normalize(normalize(vEdenWaveNormal) + ripple - vec3(0.0, 1.0, 0.0));
     csm_FragNormal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
 
     // 水深：高度图 R = 深度 / uMaxDepth

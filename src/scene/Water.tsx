@@ -34,7 +34,9 @@ function WaterSurface() {
 
   const uniforms = useMemo(createWaterUniforms, [])
   const material = useMemo(() => createWaterMaterial(uniforms), [uniforms])
-  const geometry = useMemo(() => new PlaneGeometry(1, 1), [])
+  // 波浪需要足够的顶点；low 档减半
+  const segments = Math.max(1, Math.round(w.segments * (quality === 'low' ? 0.5 : 1)))
+  const geometry = useMemo(() => new PlaneGeometry(1, 1, segments, segments), [segments])
   useEffect(
     () => () => {
       material.dispose()
@@ -112,6 +114,10 @@ function WaterSurface() {
     u.uDepthMap.value = depthMap
     u.uDepthBounds.value.set(cx - c.size / 2, cz - c.size / 2, c.size, c.size)
     u.uMaxDepth.value = MAX_DEPTH
+    u.uWaveAmp.value = c.waveAmplitude
+    u.uWaveLen.value = c.waveLength
+    u.uWaveSpeed.value = c.waveSpeed
+    u.uWaveSteep.value = c.waveSteepness
     material.roughness = c.roughness
     // 环境反射也随 reflectionIntensity 缩放（没有海底的开放水面，全强度反射会把远处水面冲成天空色）
     material.envMapIntensity = c.reflectionIntensity

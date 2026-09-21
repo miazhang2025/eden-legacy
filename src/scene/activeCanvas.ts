@@ -27,3 +27,6 @@ export function captureActiveCanvas(): string | null {
   active.gl.render(active.scene, active.camera)
   return active.gl.domElement.toDataURL('image/png')
 }
+
+// DEV：暴露给自动化测试脚本
+if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__canvas = getActiveCanvas

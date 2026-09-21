@@ -40,6 +40,9 @@ export function CharacterController() {
   const anim = useRef<AnimName>('idle')
   const heading = useRef(0)
   const { radius, height, color } = useSceneCfg((c) => c.character)
+  // 第一人称下强制隐藏角色模型
+  const firstPerson = useSceneCfg((c) => c.camera.mode === 'first')
+  const visible = useSceneCfg((c) => c.character.visible) && !firstPerson
 
   useLayoutEffect(() => {
     const c = getSceneCfg().character
@@ -109,7 +112,7 @@ export function CharacterController() {
 
   const bodyLength = Math.max(0.01, height - radius * 2)
   return (
-    <group ref={group}>
+    <group ref={group} visible={visible}>
       <mesh position={[0, height / 2, 0]} castShadow>
         <capsuleGeometry args={[radius, bodyLength, 6, 12]} />
         <meshStandardMaterial color={color} roughness={0.6} />

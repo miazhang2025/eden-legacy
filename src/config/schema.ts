@@ -16,6 +16,10 @@ export interface SceneConfig {
   version: 1
   scene: SceneId
   camera: {
+    /** third = 第三人称跟随；first = 第一人称（自动隐藏角色） */
+    mode: 'third' | 'first'
+    /** 第一人称的眼睛高度（相对脚底） */
+    eyeHeight: number
     fov: number
     near: number
     far: number
@@ -50,6 +54,8 @@ export interface SceneConfig {
     radius: number
     height: number
     color: string
+    /** 是否显示角色模型（第一人称下强制隐藏） */
+    visible: boolean
     /** 只用 x/z，y 由地面射线决定 */
     spawn: Vec3
     spawnYaw: number
@@ -296,6 +302,12 @@ export interface WaterConfig {
   normalStrength: number
   flowSpeed: number
   flowDirectionDeg: number
+  /** 波浪：网格细分数与三层波的振幅 / 波长 / 速度 / 陡峭度（Gerstner 横向位移） */
+  segments: number
+  waveAmplitude: number
+  waveLength: number
+  waveSpeed: number
+  waveSteepness: number
   fresnelPower: number
   roughness: number
   reflectionIntensity: number
@@ -781,6 +793,8 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
   scene: hidden,
   camera: {
     _label: '相机',
+    mode: select('third', 'first'),
+    eyeHeight: num(0.2, 3, 0.01, 'eyeHeight（第一人称）'),
     fov: num(20, 90, 0.5),
     near: num(0.01, 5, 0.01),
     far: num(50, 2000, 10),
@@ -812,6 +826,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     radius: num(0.1, 1.5, 0.01),
     height: num(0.5, 4, 0.05),
     color: color(),
+    visible: bool('visible', '显示角色模型；第一人称下强制隐藏'),
     spawn: vec(0.5, 'spawn (x/z)'),
     spawnYaw: num(-Math.PI, Math.PI, 0.01),
     stepHeight: num(0, 2, 0.01),
@@ -959,6 +974,11 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     normalStrength: num(0, 2, 0.01),
     flowSpeed: num(0, 2, 0.01),
     flowDirectionDeg: num(-180, 180, 1),
+    segments: num(1, 256, 1, 'segments', '水面网格细分：波浪起伏需要足够的顶点，low 档自动减半'),
+    waveAmplitude: num(0, 3, 0.01),
+    waveLength: num(0.5, 80, 0.5),
+    waveSpeed: num(0, 3, 0.01),
+    waveSteepness: num(0, 1, 0.01, 'waveSteepness', '横向位移，越大浪越尖'),
     fresnelPower: num(0.5, 10, 0.1),
     roughness: num(0, 1, 0.01),
     reflectionIntensity: num(0, 2, 0.01),
