@@ -215,6 +215,35 @@ interface CollectableAssetDef {
 3. 植被/花卉这类重复物体尽量转 InstancedMesh（garden 的 61 物体里大部分是重复植被）。
 4. 模型自带的粒子发射点（ocean 里那些细丝状喷发）请导出为**空物体 / 命名点**（`emitter_*`），粒子由 §9.3 的粒子系统按 config 生成，不要用模型里烘死的几何。
 
+### 4.4 美术第二版接入（2026-09，已完成）
+
+美术把新的场景 glb、贴图、草模型、HDRI 放进 `public/`，已全部接入。约定如下：
+
+**目录分工**：`art/` 放源文件（不进部署包），`public/` 只放运行时真正要下载的东西。
+`art/env/*.glb`（新场景模型，旧版备份在 `art/env/_v1/`）、`art/textures/<scene>/*.jpg|png`（原始贴图）、
+`art/character/*.fbx`（角色动画，尚未接入）、`art/hdri/*.hdr`（原始 HDRI）、`art/grass/`（草模型，未采用）。
+`npm run models` / `npm run hdri` 负责把它们处理进 `public/`。dist 从 206MB 降到 28MB。
+
+**贴图按文件名自动接到网格**（`scripts/assign-textures.mjs`，被 `npm run models` 调用）：
+- 贴图命名 `SC<编号>[-<编号>]_<用途>.jpg|png`，例如 `SC08_land.jpg`、`SC30-41_archangel.jpg`（一张贴图覆盖 30–41 号）。
+- 网格名就是编号（`8`、`36.`），特例：`stem*` → 1 号；`水` 是花瓣上滴落的**水珠**（不是水面），按玻璃质感走 `droplet_crystal`。
+- **材质名 = 贴图文件名**，所以材质角色能按名字里的用途关键词自动推断（`land|rock|ground` → 静态，`poppy|coral|leaf` → 植被，`crystal|bubble|shell|droplet` → 晶体，见 `src/scene/materialOverrides.ts` 的 `defaultRole`）。美术以后换贴图不用改代码。
+- 一个编号有多张贴图时用脚本里的 `PICK` 指定（已确认 12/13 = bigpoppy、14 = daisy）；没有同号贴图的用 `OVERRIDES` 借用邻近编号。
+- **仍缺的贴图**：garden 的 SC12、SC13、SC48、SC49、SC50 五个编号（当前借用 14/47/46/45），补齐后删掉对应 `OVERRIDES` 即可。
+- ocean 的 21–23 号是海草，不是粒子发射点。
+
+**模型尺度**：新模型 `env.scale = 1`（旧版是缩放过的），position 按包围盒重新居中：garden/cave `[1.36, 1.37, 11.36]`、ocean `[-2.03, 0, 4.88]`。出生点、采集区（garden/cave 中心 `(-7, 3)` 半径 7，ocean `(7, -8)` 半径 5.5）与 12 个资产坐标随之重摆。
+
+**cave 仍无模型**：暂时借用 garden 的 glb + 碰撞体，靠 config 的光照/雾/色调区分。真模型到位后只改 `cave.json` 的 `env` 与摆位。
+
+**草模型不采用**：`art/grass/` 里 grassb 7626 面/簇、grassc 4309 面/簇，而单簇只有 8cm 高，铺满 garden 需要数千簇 → 千万级三角面。程序化草（`src/scene/Grass.tsx`）11 万片叶子合计仅 55 万面。结论是保留程序化草，草模型只可能用于近景点缀。
+
+**HDRI（`npm run hdri`，脚本 `scripts/process-hdri.mjs`）**：原图放 `art/hdri/`，脚本自己解码 / 降采样 / 重编码 Radiance RGBE（sharp 不支持 .hdr），输出 1024×512、每张 2MB 到 `public/hdri/`（原始三张共 45MB）。
+`EnvironmentConfig` 支持**打光与背景用两张不同的 HDRI**：`hdri` 负责 `scene.environment`，`hdriBackground` 只换天空（drei `<Environment background="only">`），`backgroundIntensity` 单独控制天空亮度而不影响打光。
+当前取值：garden 用 bluesky 打光 + pinksky 当背景（intensity 0.35 / background 0.7 / rotationY 1.57，这个朝向能看到云层和落日光）；ocean 用 qwantani dusk 同时打光与背景（0.5 / 0.7 / 1.57）；cave 仍是程序化天空。程序化天空在 HDRI 背景开启时自动隐藏，随时可在面板里切回。
+
+---
+
 ---
 
 ## 5. 场景通用架构（config-driven）
@@ -314,6 +343,29 @@ src/materials/
 
 - cave 的晶簇、ocean 的贝壳/晶体用：`transmission` + `thickness` + `ior` + `attenuationColor`，加一层假内部辉光（fresnel × emissive）。
 - transmission 是真贵的那个，只给**数量少、体积大**的主体晶体用；小碎晶用不透明 + 高 envMapIntensity 伪装。这条是硬规则。
+
+### 5.2c 地形细节贴图 detail（已实现）
+
+美术的地形贴图摊到几十米的地形上，走近了每个像素有半米大，糊成一片。`src/materials/detail.ts` 给**地形类材质**（材质名含 `land|landscape|ground|terrain`）打补丁，在近处叠一层平铺的细节贴图：
+
+- 颜色叠加用「中灰不变」的乘法（`diffuse *= mix(1, detail*2, strength)`），所以细节只加质感、不改地形原本的色彩分布。
+- 法线扰动只做加法（不替换原法线），保留地形本身的大形起伏。
+- 投影用世界 XZ 平面（地形基本水平），陡坡按法线 y 淡出，避免竖直面上的拉伸。
+- 距离淡出（默认 8m 起、35m 全无），远处回到原贴图，既省采样也避免整片地面出现平铺花纹。
+- 平铺重复用第二套「旋转 37° + 缩小 0.37×」的 uv 混合打散（`breakup`），代价是颜色和法线各多一次采样。
+- 池塘水面不叠细节：`detail` 必须在 `pond` **之前**注册（见 `envMaterials.ts` 注释），这样 pond 的代码在片元里排在前面，detail 才读得到 `edenPondMask`。两个补丁共享的片元全局变量放在 `src/materials/terrainGlobals.ts`，谁先编译谁负责声明。
+- 档位（`TierSettings.detail`）：low = 关闭，mid = 单层采样，high = 加打散。
+- 当前只有 garden 开启（`textures/detail/grass_detail_512.png` + 法线，strength 0.3 / normalStrength 0.5 / scale 0.6）。ocean、cave 的 `detail.map` 留空 = 关闭。
+
+### 5.2d 池塘水面动画（已实现）
+
+贴图池塘（§15-H）原本只有一层缓慢流动的噪声法线，看不出在动。现在是三层叠加：
+
+1. **主流动**：两层大尺度噪声反向推移（`flowSpeed` / `flowDirectionDeg`）。
+2. **细涟漪**：小尺度、更快，沿主流动的垂直方向穿过（`rippleScale` / `rippleSpeed` / `rippleStrength`）。
+3. **缓慢起伏**：整片水面的法线强度随时间与位置做正弦呼吸，模拟风掠过（`swell` / `swellSpeed`）。
+
+实测（同机位隔 2 秒两帧的像素差）：池塘区域平均变化 20.5，旁边草地只有 5.5（草的变化来自风动），水面动得清楚且不「沸腾」。
 
 ### 5.2b 已实现（M5）
 
@@ -697,7 +749,7 @@ dev 环境挂 studio → gizmo 拖拽 → 保存 state
 - 每场景 draw call 目标 < 150（植被走 InstancedMesh 后应远低于此）。
 - 每场景总纹理 < 120MB（KTX2 后）。
 - 场景切换时 dispose 上一场景资源，避免三场景叠加爆显存。
-- HDRI 用 1k/2k，不用 4k。
+- HDRI 用 1k/2k，不用 4k（`npm run hdri` 自动降到 1k，原图留在 `art/hdri/`，见 §4.4）。
 - 实时反射 pass 是第二份完整渲染，只走必要图层。
 - 每加一个效果，在面板里记录其开/关的帧时间差，写进 `docs/perf.md`。没有实测数据的效果不算完成。桌面数据由实现方记录，移动端数据由团队真机补测。
 - 档位与移动端的优先级：先按 `quality` 档位定基线，再叠加 `mobile` 段；单个效果自身的 quality（如 `water.quality`）不得高于全局档位。
@@ -707,7 +759,7 @@ dev 环境挂 studio → gizmo 拖拽 → 保存 state
 - 每个场景 draw call 目标 < 150，总纹理 < 120MB（KTX2 后）。
 - 每个场景入口做 loading（drei `<Loader>` 或自定义 2D 遮罩），loading 完成再 fade in。
 - 场景切换时卸载上一场景资源（`useGLTF.clear` 或 dispose），避免三场景叠加爆显存。
-- HDRI 用 1k/2k，不用 4k。
+- HDRI 用 1k/2k，不用 4k（`npm run hdri` 自动降到 1k，原图留在 `art/hdri/`，见 §4.4）。
 - 阴影只开主光，且用固定范围的 shadow camera。
 
 ---

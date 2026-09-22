@@ -10,7 +10,8 @@
     "typecheck": "tsc -b",
     "models": "node scripts/optimize-models.mjs",
     "bake:theatre": "node scripts/bake-theatre.ts",
-    "check:bundle": "node scripts/check-bundle.mjs"
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "hdri": "node scripts/process-hdri.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

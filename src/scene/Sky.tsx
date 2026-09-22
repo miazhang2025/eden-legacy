@@ -10,7 +10,7 @@ const RADIUS_FACTOR = 0.9
 /** 背景天空盒：跟随相机，最先绘制、不写深度、不受雾影响 */
 export function Sky() {
   const enabled = useSceneCfg((c) => c.sky.enabled)
-  const hdriBackground = useSceneCfg((c) => c.environment.mode === 'hdri' && c.environment.hdri !== '' && c.environment.background)
+  const hdriBackground = useSceneCfg((c) => c.environment.mode === 'hdri' && c.environment.background && (c.environment.hdri !== '' || c.environment.hdriBackground !== ''))
   const far = useSceneCfg((c) => c.camera.far)
   const material = useMemo(createSkyMaterial, [])
   const mesh = useRef<Mesh>(null)

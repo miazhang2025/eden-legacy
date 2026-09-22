@@ -54,6 +54,28 @@ export function CharacterController() {
     heading.current = c.spawnYaw
   }, [])
 
+  // DEV：把角色传送到某个 xz（自动贴地并重置「上一个合法位置」）。
+  // 直接改 rig.position 会被贴地判定当成掉出地形而拉回出生点，调参 / 截图时用这个。
+  useLayoutEffect(() => {
+    if (!import.meta.env.DEV) return
+    const teleport = (x: number, z: number, yaw?: number, pitch?: number) => {
+      const y = groundHeightFromSky(x, z)
+      if (y === null) return false
+      rig.position.set(x, y, z)
+      lastValid.copy(rig.position)
+      if (yaw !== undefined) {
+        rig.yaw = yaw
+        heading.current = yaw
+      }
+      if (pitch !== undefined) rig.pitch = pitch
+      return true
+    }
+    ;(window as unknown as Record<string, unknown>).__teleport = teleport
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__teleport
+    }
+  }, [])
+
   const playAnim = (name: AnimName) => {
     if (anim.current === name) return
     anim.current = name

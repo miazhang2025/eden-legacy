@@ -2,7 +2,7 @@
   "version": 1,
   "scene": "cave",
   "camera": {
-    "mode": "third",
+    "mode": "first",
     "eyeHeight": 1.56,
     "fov": 45,
     "near": 0.1,
@@ -10,7 +10,7 @@
     "followDistance": 6,
     "followHeight": 2.2,
     "lookAtOffset": 1.2,
-    "damping": 0.12,
+    "damping": 0.24999999999999997,
     "rotateSpeed": 0.005,
     "pitchMin": -0.2,
     "pitchMax": 0.9,
@@ -22,16 +22,16 @@
   "env": {
     "model": "/models/env/garden.glb",
     "collider": "/models/colliders/garden.glb",
-    "scale": 7.18,
+    "scale": 1,
     "position": [
-      21.46,
-      -10.91,
-      -14.59
+      1.36,
+      1.37,
+      11.36
     ],
     "rotationY": 0
   },
   "character": {
-    "moveSpeed": 3.2,
+    "moveSpeed": 2,
     "sprintMultiplier": 1.8,
     "turnSpeed": 10,
     "radius": 0.35,
@@ -40,7 +40,7 @@
     "spawn": [
       -1,
       0,
-      22
+      18
     ],
     "spawnYaw": 0,
     "stepHeight": 0.45,
@@ -78,14 +78,14 @@
   },
   "bounds": {
     "min": [
-      -19,
       -20,
-      -28
+      -20,
+      -27
     ],
     "max": [
-      21,
+      20,
       40,
-      30
+      27
     ]
   },
   "sky": {
@@ -117,6 +117,8 @@
     "intensity": 0.6,
     "rotationY": 0,
     "background": false,
+    "hdriBackground": "",
+    "backgroundIntensity": 1,
     "sunIntensity": 1.5
   },
   "shadows": {
@@ -208,10 +210,10 @@
   },
   "pond": {
     "enabled": true,
-    "material": "8",
-    "maskColor": "#1b0438",
-    "tolerance": 0.1,
-    "softness": 0.04,
+    "material": "SC08_land",
+    "maskColor": "#1f0339",
+    "tolerance": 0.12,
+    "softness": 0.05,
     "color": "#2b1f55",
     "tint": 0.5,
     "roughness": 0.04,
@@ -220,7 +222,27 @@
     "flowSpeed": 0.15,
     "flowDirectionDeg": 30,
     "fresnelPower": 3.5,
-    "reflection": 0.6
+    "reflection": 0.6,
+    "level": 1.31,
+    "levelTolerance": 0.35,
+    "darkCut": 0.06,
+    "rippleScale": 6,
+    "rippleSpeed": 0.6,
+    "rippleStrength": 0.5,
+    "swell": 0.35,
+    "swellSpeed": 0.25
+  },
+  "detail": {
+    "enabled": false,
+    "map": "",
+    "normalMap": "",
+    "scale": 0.6,
+    "strength": 0.45,
+    "normalStrength": 0.8,
+    "fadeStart": 8,
+    "fadeEnd": 35,
+    "slopeFade": 0.6,
+    "breakup": 0.5
   },
   "grass": {
     "enabled": false,
@@ -726,83 +748,7 @@
       "radius": 0.4
     }
   },
-  "materials": {
-    "7": {
-      "role": "vegetation"
-    },
-    "13": {
-      "role": "vegetation"
-    },
-    "14": {
-      "role": "vegetation"
-    },
-    "16": {
-      "role": "vegetation"
-    },
-    "17": {
-      "role": "vegetation"
-    },
-    "18": {
-      "role": "vegetation"
-    },
-    "19": {
-      "role": "vegetation"
-    },
-    "20": {
-      "role": "vegetation"
-    },
-    "22": {
-      "role": "vegetation"
-    },
-    "25": {
-      "role": "vegetation"
-    },
-    "28": {
-      "role": "vegetation"
-    },
-    "29": {
-      "role": "vegetation"
-    },
-    "30": {
-      "role": "vegetation"
-    },
-    "42": {
-      "role": "vegetation"
-    },
-    "43": {
-      "role": "vegetation"
-    },
-    "44": {
-      "role": "vegetation"
-    },
-    "45": {
-      "role": "vegetation"
-    },
-    "46": {
-      "role": "vegetation"
-    },
-    "47": {
-      "role": "vegetation"
-    },
-    "48": {
-      "role": "vegetation"
-    },
-    "49": {
-      "role": "vegetation"
-    },
-    "50": {
-      "role": "vegetation"
-    },
-    "51": {
-      "role": "vegetation"
-    },
-    "52": {
-      "role": "vegetation"
-    },
-    "stem": {
-      "role": "vegetation"
-    }
-  },
+  "materials": {},
   "audio": {
     "master": {
       "volume": 1,
@@ -830,9 +776,9 @@
   },
   "flow": {
     "zoneCenter": [
-      -14,
+      -7,
       0,
-      5
+      3
     ],
     "zoneRadius": 7,
     "proximity": 2.2,

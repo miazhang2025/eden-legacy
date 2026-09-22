@@ -95,6 +95,8 @@ export interface SceneConfig {
   water: WaterConfig
   /** 贴图池塘：地形贴图里画出来的水域，用 shader 按颜色遮罩做成水面（garden） */
   pond: PondConfig
+  /** 地形细节贴图：近处叠一层平铺草地细节，远处淡出 */
+  detail: DetailConfig
   /** 程序化草：跟随相机的草叶网格，一个 draw call */
   grass: GrassConfig
   /** 引导发光粒子的远近强度（spec §5.1） */
@@ -213,11 +215,16 @@ export interface SkyConfig {
 export interface EnvironmentConfig {
   /** procedural = 用天空盒渲染环境光（无需下载），hdri = 读 public/hdri 下的文件 */
   mode: 'procedural' | 'hdri'
+  /** 打光用的 HDRI（public/hdri 下，1k/2k；art/hdri 放原图，npm run hdri 降采样） */
   hdri: string
   intensity: number
   rotationY: number
   /** hdri 模式下是否同时作为背景（否则背景仍是程序化天空） */
   background: boolean
+  /** 背景另用一张 HDRI（留空则用 hdri 那张）；美术给的 pinksky 是纯背景图 */
+  hdriBackground: string
+  /** 背景 HDRI 的亮度（只影响看到的天空，不影响打光） */
+  backgroundIntensity: number
   /** 环境光里对应主光方向的亮斑强度 */
   sunIntensity: number
 }
@@ -335,6 +342,11 @@ export interface PondConfig {
   maskColor: string
   tolerance: number
   softness: number
+  /** 池塘所在高度（世界 y）与容差：只有落在这个高度带里的片元才可能是水 */
+  level: number
+  levelTolerance: number
+  /** 比这更暗的像素也算水（池塘深处在贴图里是纯黑） */
+  darkCut: number
   /** 水色与偏色强度 */
   color: string
   tint: number
@@ -343,9 +355,36 @@ export interface PondConfig {
   normalStrength: number
   flowSpeed: number
   flowDirectionDeg: number
+  /** 细涟漪层：尺度是主流动的倍数，速度更快，斜穿主流动方向 */
+  rippleScale: number
+  rippleSpeed: number
+  rippleStrength: number
+  /** 风掠过的缓慢呼吸：法线强度随时间起落 */
+  swell: number
+  swellSpeed: number
   fresnelPower: number
   /** 掠射角叠加天空（地平线色）的强度 */
   reflection: number
+}
+
+export interface DetailConfig {
+  enabled: boolean
+  /** public 下的细节贴图路径（颜色），留空则关闭 */
+  map: string
+  /** 细节法线贴图，可留空 */
+  normalMap: string
+  /** 平铺尺度：世界坐标 × scale 作为 uv，值越大花纹越密 */
+  scale: number
+  /** 颜色叠加强度（0 = 不影响颜色） */
+  strength: number
+  normalStrength: number
+  /** 距离淡出：start 之前全强度，end 之后完全消失 */
+  fadeStart: number
+  fadeEnd: number
+  /** 陡坡淡出强度（XZ 投影在竖直面上会被拉伸） */
+  slopeFade: number
+  /** 打散平铺重复的强度（0 = 关闭，省两次纹理采样） */
+  breakup: number
 }
 
 export interface GrassConfig {
@@ -584,6 +623,8 @@ export interface TierSettings {
   particles: number
   /** 程序化草叶数量倍率 */
   grass: number
+  /** 地形细节贴图：off = 关闭，basic = 单层采样，full = 加打散（多两次采样） */
+  detail: 'off' | 'basic' | 'full'
   /** basic = bloom + 调色，mid = + vignette + grain，full = 全开（含 DOF） */
   post: 'basic' | 'mid' | 'full'
 }
@@ -904,6 +945,8 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     intensity: intensity(5),
     rotationY: num(-Math.PI, Math.PI, 0.01),
     background: bool('background（hdri）'),
+    hdriBackground: { t: 'text', label: '背景 hdri（可留空）', hint: '留空 = 用打光那张当背景' },
+    backgroundIntensity: intensity(5),
     sunIntensity: intensity(20),
   },
   shadows: {
@@ -1001,6 +1044,9 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     maskColor: color('maskColor（贴图里的池塘色）'),
     tolerance: num(0, 0.6, 0.005),
     softness: num(0, 0.3, 0.005),
+    level: num(-20, 20, 0.01, 'level（池塘高度）'),
+    levelTolerance: num(0, 3, 0.01),
+    darkCut: num(0, 0.5, 0.005, 'darkCut', '亮度低于该值也算水（池塘深处贴图是纯黑）'),
     color: color(),
     tint: num(0, 1, 0.01),
     roughness: num(0, 1, 0.01),
@@ -1008,8 +1054,26 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     normalStrength: num(0, 2, 0.01),
     flowSpeed: num(0, 2, 0.01),
     flowDirectionDeg: num(-180, 180, 1),
+    rippleScale: num(1, 20, 0.1, 'rippleScale（细涟漪尺度倍数）'),
+    rippleSpeed: num(0, 3, 0.01),
+    rippleStrength: num(0, 2, 0.01),
+    swell: num(0, 1, 0.01, 'swell（风掠过的起伏）'),
+    swellSpeed: num(0, 2, 0.01),
     fresnelPower: num(0.5, 10, 0.1),
     reflection: num(0, 3, 0.01),
+  },
+  detail: {
+    _label: '地形细节贴图 detail',
+    enabled: bool(),
+    map: { t: 'text', label: 'map（颜色细节图）', hint: 'public 下的路径，留空关闭' },
+    normalMap: { t: 'text', label: 'normalMap（可留空）' },
+    scale: num(0.05, 4, 0.01, 'scale（平铺密度）'),
+    strength: num(0, 1.5, 0.01, 'strength（颜色叠加）'),
+    normalStrength: num(0, 3, 0.01),
+    fadeStart: num(0, 60, 0.5, 'fadeStart（开始淡出距离）'),
+    fadeEnd: num(1, 150, 0.5, 'fadeEnd（完全消失距离）'),
+    slopeFade: num(0, 1, 0.01, 'slopeFade（陡坡淡出）'),
+    breakup: num(0, 1, 0.01, 'breakup（打散平铺重复）', '0 = 关闭，可省两次纹理采样'),
   },
   grass: {
     _label: '程序化草 grass',
@@ -1248,6 +1312,7 @@ const tierSchema = (label: string) => ({
   shadowMapSize: num(256, 4096, 256),
   particles: num(0, 1, 0.05),
   grass: num(0, 1, 0.05),
+  detail: { t: 'select', options: ['off', 'basic', 'full'] } as SelectLeaf<TierSettings['detail']>,
   post: { t: 'select', options: ['basic', 'mid', 'full'] } as SelectLeaf<TierSettings['post']>,
 })
 

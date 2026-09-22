@@ -20,7 +20,7 @@ Mesh.prototype.raycast = acceleratedRaycast
  * - res：密度图分辨率
  */
 export const GRASS_RULES = {
-  garden: { terrain: ['8', '55'], blockers: ['54', '9', '13', '14', '53'], res: 256 },
+  garden: { terrain: ['8', '55'], blockers: ['9', '53', '54', '13', '14', '12'], res: 256 },
 }
 
 const smoothstep = (a, b, x) => {

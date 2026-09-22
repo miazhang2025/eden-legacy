@@ -47,13 +47,26 @@ export const isStandard = (m: Material): m is MeshStandardMaterial =>
 export const isPhysical = (m: Material): m is MeshPhysicalMaterial =>
   (m as MeshPhysicalMaterial).isMeshPhysicalMaterial === true
 
-/** 按材质名前缀推断默认角色（美术约定：veg_ / crystal_ / water_ / emitter_） */
+/** 植被类关键词（材质名来自贴图文件名，如 SC25_Coral、SC16_lupin） */
+const VEGETATION = /poppy|daisy|lupin|pineapple|tree|hydrangea|lotus|archangel|arrowhead|snakeplant|stem|bud|coral|anemone|grass|plant|flower|leaf|weed/i
+const CRYSTAL = /crystal|bubble|shell|pearl|droplet/i
+const STATIC = /land|landscape|rock|pepple|pebble|stone|ground/i
+
+/**
+ * 推断材质角色。优先前缀约定（veg_ / crystal_ / water_ / emitter_），
+ * 其次按材质名里的用途关键词（美术把贴图命名为 SC08_land、SC25_Coral 这种，能直接对上）。
+ * 认不出来的一律当静态，避免不该动的东西跟着风摆。
+ */
 export function defaultRole(name: string): MaterialRole {
   const n = name.toLowerCase()
   if (n.startsWith('veg_')) return 'vegetation'
   if (n.startsWith('crystal_')) return 'crystal'
   if (n.startsWith('water_')) return 'water'
   if (n.startsWith('emitter_')) return 'emitter'
+  if (n.includes('水') || /water/i.test(n)) return 'water'
+  if (STATIC.test(n)) return 'static'
+  if (CRYSTAL.test(n)) return 'crystal'
+  if (VEGETATION.test(n)) return 'vegetation'
   return 'static'
 }
 

@@ -17,6 +17,7 @@ import { MeshoptSimplifier } from 'meshoptimizer'
 import sharp from 'sharp'
 import { checkKTXSoftware, toktx } from '@gltf-transform/cli'
 import { bakeGrassMask } from './bake-grass-mask.mjs'
+import { assignTextures } from './assign-textures.mjs'
 
 // KTX-Software 的 bin 目录（默认装在 ~/tools/KTX，可用环境变量 KTX_BIN 覆盖）
 const KTX_BIN = process.env.KTX_BIN ?? join(process.env.USERPROFILE ?? process.env.HOME ?? '', 'tools', 'KTX', 'bin')
@@ -32,6 +33,7 @@ try {
 const SRC = 'art/env'
 const OUT_RENDER = 'public/models/env'
 const OUT_COLLIDER = 'public/models/colliders'
+const TEXTURES = 'art/textures'
 
 /**
  * 每个模型的碰撞体规则：
@@ -42,9 +44,10 @@ const OUT_COLLIDER = 'public/models/colliders'
  * 高模主要是花草等小物件，被 minExtent 整体剔除，因此总体减面远超 90%。
  */
 const COLLIDER_RULES = {
-  garden: { exclude: ['水'], minExtent: 0.12, maxTriangles: 20000 },
-  ocean: { exclude: [], minExtent: 0.08, maxTriangles: 20000 },
-  default: { exclude: [], minExtent: 0.1, maxTriangles: 20000 },
+  // include：明确列出可站立的地形 mesh（大花大树不进碰撞体，否则挡路）
+  garden: { include: ['8', '9', '55', '54', '53'], exclude: ['水'], minExtent: 0.12, maxTriangles: 20000 },
+  ocean: { include: ['1', '2', '3', '4', '5', '6', '7', '8'], exclude: [], minExtent: 0.08, maxTriangles: 20000 },
+  default: { include: null, exclude: [], minExtent: 0.1, maxTriangles: 20000 },
 }
 
 const countTriangles = (doc) =>
@@ -62,6 +65,12 @@ const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)}MB`
 
 async function buildRender(src, name) {
   const doc = await io.read(src)
+  // 美术给的场景 glb 只有几何：按名字接贴图、建材质（材质名带用途，运行时据此判断角色）
+  const tex = await assignTextures(doc, name, TEXTURES)
+  if (tex.assigned) {
+    console.log(`  贴图     → ${tex.assigned} 个 mesh / ${tex.materials} 个材质 / ${tex.textures} 张贴图`)
+    if (tex.missing.length) console.warn(`  ⚠ 没找到贴图的 mesh：${tex.missing.join(', ')}`)
+  }
   await doc.transform(
     dedup(),
     instance({ min: 2 }),
@@ -97,8 +106,11 @@ async function buildCollider(src, name) {
   const dropped = []
   nodes.forEach((n, i) => {
     const meshName = n.getMesh().getName() || n.getName()
-    const excluded = rules.exclude.includes(meshName) || rules.exclude.includes(n.getName())
-    if (excluded || extents[i] / sceneExtent < rules.minExtent) {
+    const excluded =
+      rules.exclude.includes(meshName) ||
+      rules.exclude.includes(n.getName()) ||
+      (rules.include ? !rules.include.includes(meshName) : extents[i] / sceneExtent < rules.minExtent)
+    if (excluded) {
       dropped.push(meshName)
       n.setMesh(null)
     } else {
@@ -143,7 +155,10 @@ for (const f of files) {
   console.log(`  collider → ${col.out}  ${mb(statSync(col.out).size)}  ${Math.round(col.triangles)} 三角面`)
   console.log(`    保留 ${col.kept.length} 个 mesh：${col.kept.join(', ')}`)
   console.log(`    排除 ${col.dropped.length} 个（小物件/水面）`)
-  const grass = await bakeGrassMask(await io.read(src), name, OUT_RENDER)
+  // 草地密度图要读贴图颜色，所以也得先接好贴图
+  const textured = await io.read(src)
+  await assignTextures(textured, name, TEXTURES)
+  const grass = await bakeGrassMask(textured, name, OUT_RENDER)
   if (grass) console.log(`  grass    → ${grass.png}  草地覆盖 ${(grass.coverage * 100).toFixed(0)}%`)
 }
 

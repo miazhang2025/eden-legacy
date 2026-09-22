@@ -3,8 +3,8 @@
   "scene": "garden",
   "camera": {
     "mode": "first",
-    "eyeHeight": 2.3299999999999996,
-    "fov": 26,
+    "eyeHeight": 1.0499999999999996,
+    "fov": 33,
     "near": 0.1,
     "far": 300,
     "followDistance": 6,
@@ -22,11 +22,11 @@
   "env": {
     "model": "/models/env/garden.glb",
     "collider": "/models/colliders/garden.glb",
-    "scale": 7.18,
+    "scale": 1,
     "position": [
-      21.46,
-      -10.91,
-      -14.59
+      1.36,
+      1.37,
+      11.36
     ],
     "rotationY": 0
   },
@@ -40,7 +40,7 @@
     "spawn": [
       -1,
       0,
-      22
+      18
     ],
     "spawnYaw": 0,
     "stepHeight": 0.45,
@@ -66,8 +66,8 @@
       "intensity": 0.32999999999999996
     },
     "directional": {
-      "color": "#c59b98",
-      "intensity": 2.93,
+      "color": "#ffddd6",
+      "intensity": 1.52,
       "position": [
         20,
         20,
@@ -78,13 +78,13 @@
   },
   "bounds": {
     "min": [
-      -19,
       -20,
-      -28
+      -20,
+      -27
     ],
     "max": [
       40,
-      60,
+      50,
       40
     ]
   },
@@ -112,12 +112,14 @@
     }
   },
   "environment": {
-    "mode": "procedural",
-    "hdri": "",
-    "intensity": 1.1,
-    "rotationY": 0,
+    "mode": "hdri",
+    "hdri": "hdri/qwantani_dusk_2_puresky.hdr",
+    "intensity": 0.54,
+    "rotationY": -0.20000000000000004,
     "background": false,
-    "sunIntensity": 2.5
+    "hdriBackground": "",
+    "backgroundIntensity": 0.15999999999999995,
+    "sunIntensity": 0
   },
   "shadows": {
     "enabled": true,
@@ -208,19 +210,39 @@
   },
   "pond": {
     "enabled": true,
-    "material": "8",
-    "maskColor": "#210a3f",
-    "tolerance": 0.1,
-    "softness": 0.06,
-    "color": "#3f2667",
-    "tint": 0.29,
-    "roughness": 0.51,
+    "material": "SC08_land",
+    "maskColor": "#1f0339",
+    "tolerance": 0.12,
+    "softness": 0.05,
+    "color": "#453361",
+    "tint": 0.24,
+    "roughness": 0.48000000000000004,
     "normalScale": 1.34,
     "normalStrength": 0.7000000000000001,
     "flowSpeed": 0.15,
     "flowDirectionDeg": -20,
     "fresnelPower": 4.3,
-    "reflection": 0.36000000000000004
+    "reflection": 0.36000000000000004,
+    "level": 1.3,
+    "levelTolerance": 0.48999999999999994,
+    "darkCut": 0.004999999999999997,
+    "rippleScale": 6,
+    "rippleSpeed": 0.6,
+    "rippleStrength": 0.5,
+    "swell": 0.35,
+    "swellSpeed": 0.25
+  },
+  "detail": {
+    "enabled": true,
+    "map": "textures/detail/grass_detail_512.png",
+    "normalMap": "textures/detail/grass_detail_normal_512.png",
+    "scale": 0.6,
+    "strength": 0.3,
+    "normalStrength": 0.5,
+    "fadeStart": 8,
+    "fadeEnd": 35,
+    "slopeFade": 0.6,
+    "breakup": 0.5
   },
   "grass": {
     "enabled": false,
@@ -293,13 +315,13 @@
         "easing": "linear"
       },
       "turbulence": {
-        "intensity": 0.8,
+        "intensity": 1.74,
         "frequency": 0.15,
         "speed": 0.25
       },
       "size": [
         0.025,
-        0.06
+        0.009999999999999998
       ],
       "colorStart": "#fff2b0",
       "colorEnd": "#ffe08a",
@@ -609,9 +631,9 @@
       "radius": 0.5800000000000001
     },
     "vignette": {
-      "enabled": false,
+      "enabled": true,
       "offset": 0.3,
-      "darkness": 0.4100000000000001
+      "darkness": 0.2800000000000001
     },
     "chromaticAberration": {
       "enabled": false,
@@ -619,19 +641,19 @@
     },
     "dof": {
       "enabled": false,
-      "focusDistance": 25,
+      "focusDistance": 0,
       "focalLength": 6.8,
       "bokehScale": 2
     },
     "noise": {
       "enabled": false,
-      "opacity": 0.135
+      "opacity": 0.49
     },
     "grade": {
       "enabled": true,
       "hue": 5.204170427930421e-18,
       "saturation": 0.15000000000000002,
-      "contrast": 0.11,
+      "contrast": 0.019999999999999997,
       "brightness": -0.04
     },
     "ssao": {
@@ -640,89 +662,7 @@
       "radius": 0.4
     }
   },
-  "materials": {
-    "7": {
-      "role": "vegetation"
-    },
-    "9": {
-      "metalness": 0.66
-    },
-    "13": {
-      "role": "vegetation"
-    },
-    "14": {
-      "role": "vegetation"
-    },
-    "15": {
-      "role": "vegetation"
-    },
-    "16": {
-      "role": "vegetation"
-    },
-    "17": {
-      "role": "vegetation"
-    },
-    "18": {
-      "role": "vegetation"
-    },
-    "19": {
-      "role": "vegetation"
-    },
-    "20": {
-      "role": "vegetation"
-    },
-    "22": {
-      "roughness": 1
-    },
-    "25": {
-      "role": "vegetation"
-    },
-    "28": {
-      "role": "vegetation"
-    },
-    "29": {
-      "role": "vegetation"
-    },
-    "30": {
-      "role": "vegetation"
-    },
-    "42": {
-      "role": "vegetation"
-    },
-    "43": {
-      "role": "vegetation"
-    },
-    "44": {
-      "role": "vegetation"
-    },
-    "45": {
-      "role": "vegetation"
-    },
-    "46": {
-      "role": "vegetation"
-    },
-    "47": {
-      "role": "vegetation"
-    },
-    "48": {
-      "role": "vegetation"
-    },
-    "49": {
-      "role": "vegetation"
-    },
-    "50": {
-      "role": "vegetation"
-    },
-    "51": {
-      "role": "vegetation"
-    },
-    "52": {
-      "role": "vegetation"
-    },
-    "stem": {
-      "role": "vegetation"
-    }
-  },
+  "materials": {},
   "audio": {
     "master": {
       "volume": 1,
@@ -750,9 +690,9 @@
   },
   "flow": {
     "zoneCenter": [
-      -14,
+      -7,
       0,
-      5
+      3
     ],
     "zoneRadius": 7,
     "proximity": 2.2,

@@ -30,3 +30,6 @@ export function captureActiveCanvas(): string | null {
 
 // DEV：暴露给自动化测试脚本
 if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__canvas = getActiveCanvas
+
+// DEV：暴露 three 给自动化测试脚本
+if (import.meta.env.DEV) import('three').then((t) => ((window as unknown as Record<string, unknown>).__three = t))

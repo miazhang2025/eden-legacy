@@ -7,6 +7,7 @@ import { createCrystalMaterial } from '../materials/CrystalMaterial'
 import { shared } from '../materials/uniforms'
 import { bakeVegetationAttributes, createVegetationMaterial, vegetationVertexShader } from '../materials/VegetationMaterial'
 import { patchCaustics } from '../materials/caustics'
+import { isTerrainName, patchDetail } from '../materials/detail'
 import { patchPond } from '../materials/pond'
 import { useSceneCfg } from '../state/useConfigStore'
 import { useTier } from '../state/useQualityStore'
@@ -147,6 +148,9 @@ export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
         // 静态：水下地形投射焦散（uniform 控制开关，未开水面时不生效）
         for (const s of c.sources) {
           patchCaustics(s)
+          // 细节贴图：只给地形类材质叠（草地细节贴到石头上不对）
+          // 必须在 pond 之前注册，否则 detail 的代码会排在 pond 之前，读不到水面遮罩
+          if (isTerrainName(c.name)) patchDetail(s)
           // 贴图池塘：只给画有池塘的那张地形材质打补丁（开关由 uniform 控制）
           if (c.name === pondMaterial) patchPond(s)
         }

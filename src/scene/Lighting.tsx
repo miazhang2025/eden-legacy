@@ -17,15 +17,31 @@ function SceneEnvironment() {
   const sunColor = useSceneCfg((c) => c.lights.directional.color)
   const rotation: [number, number, number] = [0, env.rotationY, 0]
 
-  if (env.mode === 'hdri' && env.hdri) {
+  if (env.mode === 'hdri' && (env.hdri || env.hdriBackground)) {
+    // 背景与打光可以是两张不同的 HDRI（美术给的 pinksky 是纯背景、bluesky 是打光）：
+    // 第二个 Environment 用 background="only"，只换天空不动 scene.environment。
+    const bg = env.background ? env.hdriBackground || env.hdri : ''
     return (
-      <Environment
-        files={url(env.hdri)}
-        background={env.background}
-        environmentIntensity={env.intensity}
-        environmentRotation={rotation}
-        backgroundRotation={rotation}
-      />
+      <>
+        {env.hdri && (
+          <Environment
+            files={url(env.hdri)}
+            background={env.background && !env.hdriBackground}
+            environmentIntensity={env.intensity}
+            environmentRotation={rotation}
+            backgroundRotation={rotation}
+            backgroundIntensity={env.backgroundIntensity}
+          />
+        )}
+        {bg && bg !== env.hdri && (
+          <Environment
+            files={url(bg)}
+            background="only"
+            backgroundRotation={rotation}
+            backgroundIntensity={env.backgroundIntensity}
+          />
+        )}
+      </>
     )
   }
   // 程序化：用天空盒渲染一次环境贴图；天空 / 主光变化时重新渲染（frames=1，平时零开销）
