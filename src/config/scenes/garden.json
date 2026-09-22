@@ -3,7 +3,7 @@
   "scene": "garden",
   "camera": {
     "mode": "first",
-    "eyeHeight": 1.0499999999999996,
+    "eyeHeight": 1.1699999999999995,
     "fov": 33,
     "near": 0.1,
     "far": 300,
@@ -31,7 +31,7 @@
     "rotationY": 0
   },
   "character": {
-    "moveSpeed": 3.3000000000000003,
+    "moveSpeed": 2,
     "sprintMultiplier": 2.7,
     "turnSpeed": 10,
     "radius": 0.21999999999999997,
@@ -56,9 +56,9 @@
   "fog": {
     "type": "exp2",
     "color": "#cdbfdf",
-    "density": 0.012,
-    "near": 10,
-    "far": 80
+    "density": 0.017,
+    "near": 15,
+    "far": 93
   },
   "lights": {
     "ambient": {
@@ -132,18 +132,18 @@
   "wind": {
     "enabled": true,
     "directionDeg": -98,
-    "strength": 0.08999999999999998,
-    "speed": 1.2,
-    "scale": 0.03,
+    "strength": 0.04999999999999998,
+    "speed": 0.14999999999999994,
+    "scale": 0.019999999999999997,
     "gustStrength": 0.24,
-    "gustFrequency": 0.25,
+    "gustFrequency": 0.15000000000000002,
     "gustScale": 0.04,
-    "flutterStrength": 0.03,
-    "flutterFrequency": 9,
-    "headSway": 0.05,
+    "flutterStrength": 0.049999999999999996,
+    "flutterFrequency": 4.9,
+    "headSway": 0.1,
     "stiffnessSource": "localY",
-    "stiffnessPower": 2.95,
-    "confirmGustStrength": 2.5,
+    "stiffnessPower": 4,
+    "confirmGustStrength": 1.15,
     "confirmGustDuration": 1.5
   },
   "sss": {
@@ -213,23 +213,23 @@
     "material": "SC08_land",
     "maskColor": "#1f0339",
     "tolerance": 0.12,
-    "softness": 0.05,
+    "softness": 0.185,
     "color": "#453361",
     "tint": 0.24,
-    "roughness": 0.48000000000000004,
+    "roughness": 0.32000000000000006,
     "normalScale": 1.34,
     "normalStrength": 0.7000000000000001,
     "flowSpeed": 0.15,
     "flowDirectionDeg": -20,
-    "fresnelPower": 4.3,
+    "fresnelPower": 2.9,
     "reflection": 0.36000000000000004,
     "level": 1.3,
     "levelTolerance": 0.48999999999999994,
     "darkCut": 0.004999999999999997,
-    "rippleScale": 6,
+    "rippleScale": 4.9,
     "rippleSpeed": 0.6,
     "rippleStrength": 0.5,
-    "swell": 0.35,
+    "swell": 0.27999999999999997,
     "swellSpeed": 0.25
   },
   "detail": {
@@ -363,7 +363,7 @@
     },
     {
       "name": "beaconZone",
-      "enabled": true,
+      "enabled": false,
       "role": "beaconZone",
       "maxParticles": 260,
       "emitterShape": "sphere",
@@ -449,7 +449,7 @@
     },
     {
       "name": "beaconAsset",
-      "enabled": true,
+      "enabled": false,
       "role": "beaconAsset",
       "maxParticles": 240,
       "emitterShape": "sphere",
@@ -657,12 +657,31 @@
       "brightness": -0.04
     },
     "ssao": {
-      "enabled": true,
+      "enabled": false,
       "intensity": 1.5,
       "radius": 0.4
     }
   },
-  "materials": {},
+  "materials": {
+    "SC01_stem": {
+      "role": "static"
+    },
+    "SC26_tree": {
+      "role": "static"
+    },
+    "SC25_tree": {
+      "role": "static"
+    },
+    "SC24_tree": {
+      "role": "static"
+    },
+    "SC23_tree": {
+      "role": "static"
+    },
+    "SC21-22_tree": {
+      "role": "static"
+    }
+  },
   "audio": {
     "master": {
       "volume": 1,
