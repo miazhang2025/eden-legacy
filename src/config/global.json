@@ -20,6 +20,7 @@
         "shadowMapSize": 512,
         "particles": 0.4,
         "grass": 0.2,
+        "scatter": 0.3,
         "detail": "off",
         "post": "basic"
       },
@@ -33,6 +34,7 @@
         "shadowMapSize": 1024,
         "particles": 0.7,
         "grass": 0.5,
+        "scatter": 0.6,
         "detail": "basic",
         "post": "mid"
       },
@@ -46,6 +48,7 @@
         "shadowMapSize": 2048,
         "particles": 1,
         "grass": 1,
+        "scatter": 1,
         "detail": "full",
         "post": "full"
       }

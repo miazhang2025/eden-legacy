@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Color, DoubleSide, MathUtils, MeshStandardMaterial, type Group } from 'three'
 import type { CollectableAssetDef } from '../data/assets'
-import { assetTransform, useAssetTransform } from '../state/useAssetOverrides'
+import { assetTransform, useAssetTransform } from '../state/assetPlacement'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
 import { nowSec, useFlowStore } from '../state/useFlowStore'
 import { groundHeightFromSky } from './collision'
@@ -12,7 +12,7 @@ import { dampFactor } from './rig'
 export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
   const group = useRef<Group>(null)
   const emissive = useRef(0)
-  /** 资产贴地：worldPosition 的 x/z 为世界坐标，y 为相对地面的偏移；x/z 变化时重新求地面高度 */
+  /** 资产贴地：config assets[].position 的 x/z 为世界坐标，y 为相对地面的偏移；x/z 变化时重新求地面高度 */
   const ground = useRef<{ x: number; z: number; y: number } | null>(null)
   const roughness = useSceneCfg((c) => c.placeholder.assetRoughness)
   const metalness = useSceneCfg((c) => c.placeholder.assetMetalness)
@@ -54,9 +54,7 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     let floating = false
 
     switch (phase) {
-      case 'IDLE':
-        break
-      case 'PROMPTED':
+      case 'EXPLORING':
       case 'INSPECTING': {
         floating = true
         const breathe = 1 - f.breatheDepth * (0.5 + 0.5 * Math.sin(t * f.breatheSpeed + phaseOffset))
@@ -98,7 +96,7 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     // 拖拽转视角时不算点击
     if (e.delta > getSceneCfg().flow.clickDragThreshold) return
     e.stopPropagation()
-    // 只有 proximity 内（正在 INSPECTING 这个资产）才生效，由 store 判定
+    // 只有 proximity 内（正在 INSPECTING 这个资产）且四个都看过才生效，由 store 判定
     useFlowStore.getState().confirm(def.id)
   }
 

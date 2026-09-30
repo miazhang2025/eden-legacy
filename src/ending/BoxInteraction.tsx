@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { MathUtils, Vector3, type Group } from 'three'
+import { MathUtils, PerspectiveCamera, Vector3, type Group } from 'three'
 import { dampFactor } from '../scene/rig'
 import { useConfigStore } from '../state/useConfigStore'
 import { useEndingUi } from './useEndingUi'
@@ -75,7 +75,7 @@ export function BoxInteraction({ children }: { children: ReactNode }) {
 
   useFrame((clock, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
-    const { interaction: c, camera: camCfg } = useConfigStore.getState().endingEffective
+    const { interaction: c, camera: camCfg, frame } = useConfigStore.getState().endingEffective
     const s = state.current
     const now = performance.now() / 1000
     // 松手一段时间后缓慢回正（缩放不回正）
@@ -95,7 +95,17 @@ export function BoxInteraction({ children }: { children: ReactNode }) {
     }
     // 缩放 = 沿视线方向调整相机距离
     lookAt.set(...camCfg.lookAt)
-    camPos.set(...camCfg.position).sub(lookAt).multiplyScalar(s.zoom).add(lookAt)
+    camPos.set(...camCfg.position).sub(lookAt)
+    if (camCfg.autoFrame && camera instanceof PerspectiveCamera) {
+      // 画框（含边框）按画布宽高比装进视野，横竖屏都不会被裁
+      const tan = Math.tan((camera.fov * DEG) / 2)
+      const pad = 1 + camCfg.framePadding
+      const halfW = (frame.size[0] / 2 + frame.border) * pad
+      const halfH = (frame.size[1] / 2 + frame.border) * pad
+      const dist = Math.max(halfH / tan, halfW / (tan * camera.aspect)) + frame.size[2] / 2
+      camPos.setLength(dist)
+    }
+    camPos.multiplyScalar(s.zoom).add(lookAt)
     camera.position.copy(camPos)
     camera.lookAt(lookAt)
   })

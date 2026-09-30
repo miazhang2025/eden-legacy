@@ -10,11 +10,11 @@ import { useEnvMaterials } from './envMaterials'
 /** 自托管 Draco 解码器（public/draco），不走外部 CDN */
 export const DRACO_PATH = `${import.meta.env.BASE_URL}draco/`
 
-const url = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
+export const url = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 
 /** KTX2 / Basis 贴图解码器（自托管 public/basis，全局只建一个，需要渲染器来判断 GPU 支持的压缩格式） */
 let ktx2: KTX2Loader | null = null
-function useKTX2Extension() {
+export function useKTX2Extension() {
   const gl = useThree((s) => s.gl)
   ktx2 ??= new KTX2Loader().setTranscoderPath(`${import.meta.env.BASE_URL}basis/`).detectSupport(gl)
   // drei 的 GLTFLoader 类型来自 three-stdlib，只声明用到的方法
@@ -23,8 +23,20 @@ function useKTX2Extension() {
   }
 }
 
+/**
+ * 给 useLoader 直接加载 .ktx2 贴图用：构造时返回上面那个全局实例
+ * （每个实例都会单独加载转码器、开一组 worker）。用之前先调用 useKTX2Extension() 完成初始化。
+ */
+export class SharedKTX2Loader extends KTX2Loader {
+  constructor() {
+    super()
+    if (!ktx2) throw new Error('KTX2Loader 还没初始化：先调用 useKTX2Extension()')
+    return ktx2 as SharedKTX2Loader
+  }
+}
+
 /** 场景切换时释放 GPU 资源并清出 useGLTF 缓存，避免三个场景叠加爆显存（spec §12.3） */
-function useDisposeOnUnmount(path: string, root: Object3D) {
+export function useDisposeOnUnmount(path: string, root: Object3D) {
   useEffect(
     () => () => {
       root.traverse((o) => {

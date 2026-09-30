@@ -1,16 +1,40 @@
 // 唯一文案出口。界面里不出现硬编码字符串，所有文字按 key 从这里取。
 
 const COPY: Record<string, string> = {
+  // ---------- 项目 ----------
+  'app.name': '伊甸遗存录',
+  'app.brand': '伊甸遗存录 · EDEN LEGACY',
+
   // ---------- Landing ----------
-  'landing.title': '生态标本盒',
-  'landing.subtitle': '穿过地层、潮汐与花园，为这个世界留下三件标本',
-  'landing.button.enter': '进入',
+  'landing.eyebrow': 'EDEN LEGACY',
+  'landing.lede.1': '很久以后，伊甸只剩下三处仍在呼吸的遗境。地层深处的晶簇、潮汐之下的回声、花园里最后一季花期，都在缓慢地褪色。',
+  'landing.lede.2': '你是最后一位记录者。穿过这三处遗境，从每一处带走一件生命的痕迹，把它们安放进同一只标本匣——那将是伊甸留给未来的全部记忆。',
+  'landing.journey': '三处遗境 · 三件标本',
+  'landing.button.enter': '开始记录',
+  'landing.chapter.cave.num': '壹',
+  'landing.chapter.cave.name': '地层遗境',
+  'landing.chapter.cave.place': '水晶洞穴',
+  'landing.chapter.cave.desc': '无光的岩缝里，晶簇与菌光替大地记住了时间。',
+  'landing.chapter.cave.finds': '矿石 · 菌菇',
+  'landing.chapter.ocean.num': '贰',
+  'landing.chapter.ocean.name': '潮汐圣殿',
+  'landing.chapter.ocean.place': '海洋',
+  'landing.chapter.ocean.desc': '潮水一遍遍退去，贝壳与游鱼守着圣殿的回声。',
+  'landing.chapter.ocean.finds': '贝壳 · 游鱼',
+  'landing.chapter.garden.num': '叁',
+  'landing.chapter.garden.name': '万物花园',
+  'landing.chapter.garden.place': '花园',
+  'landing.chapter.garden.desc': '最后一季花期里，花与蝶仍在追逐落日的余温。',
+  'landing.chapter.garden.finds': '花卉 · 蝴蝶',
 
   // ---------- 场景提示语 ----------
   'scene.cave.prompt': '请选择一种你希望保存的地下生命痕迹',
   'scene.ocean.prompt': '请选择一种你希望保存的海洋生命',
   'scene.garden.prompt': '请选择一种你希望保存的花园生命',
   'card.button.collect': '收集',
+  'card.button.locked': '先去看看其他 {n} 件',
+  'scene.progress': '已发现 {found} / {total}',
+  'scene.progress.done': '都找到了，选择一件带走吧',
 
   // ---------- 竖屏提示 ----------
   'orientation.hint': '请将设备横向放置',
@@ -67,6 +91,9 @@ const COPY: Record<string, string> = {
   // ---------- Ending ----------
   'ending.button.export': '导出照片',
   'ending.button.restart': '重新开始',
+  'ending.photo.title': '标本照片',
+  'ending.photo.save': '保存照片',
+  'ending.photo.close': '关闭',
 }
 
 /** 按 key 取文案。缺失的 key 在开发环境下报警告并原样返回 key，方便发现遗漏。 */

@@ -1,0 +1,54 @@
+{
+  "sheetsById": {
+    "layout": {
+      "staticOverrides": {
+        "byObject": {
+          "asset:ocean_shell_01": {
+            "position": {
+              "x": 10.613,
+              "y": 0.434,
+              "z": -1.708
+            }
+          },
+          "asset:ocean_shell_02": {
+            "position": {
+              "x": 5.505,
+              "y": 0,
+              "z": 8.072
+            }
+          },
+          "asset:ocean_fish_01": {
+            "position": {
+              "x": -0.732,
+              "y": 0,
+              "z": 3.839
+            }
+          },
+          "asset:ocean_fish_02": {
+            "position": {
+              "x": -14.508,
+              "y": 0,
+              "z": 7.154
+            }
+          },
+          "spawn": {
+            "position": {
+              "x": 18.735,
+              "y": 0,
+              "z": -2.704
+            },
+            "rotation": {
+              "x": 0,
+              "y": -16.955,
+              "z": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitionVersion": "0.4.0",
+  "revisionHistory": [
+    "A-AqhQolu4tWlX_6"
+  ]
+}

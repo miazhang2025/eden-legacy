@@ -23,9 +23,9 @@ import { CollectPrompt } from '../ui/CollectPrompt'
 import { useTransition } from '../ui/Transition'
 import { AssetFlow } from './AssetFlow'
 import { CharacterController } from './CharacterController'
-import { CollectZone } from './CollectZone'
 import { ColliderModel, EnvModel } from './EnvModel'
 import { FollowCamera } from './FollowCamera'
+import { BoundaryField, GeneratedTerrain, Scatter } from './GeneratedTerrain'
 
 /** Suspense 内的内容全部就绪后才挂载，此时 fade in */
 function RevealWhenReady() {
@@ -56,14 +56,24 @@ function Atmosphere() {
   )
 }
 
-/** 环境模型 + 碰撞体；env.model 为空时回落到色块地面 */
+/**
+ * 环境模型 + 碰撞体；env.model 为空时回落到色块地面。
+ * 生成地形开启时：原模型照常加载（被替换的地形材质隐藏），碰撞体换成生成地形的，并加载可玩区软边界。
+ */
 function Terrain() {
   const env = useSceneCfg((c) => c.env)
+  const terrain = useSceneCfg((c) => c.terrain)
   if (!env.model) return <PlaceholderGround />
+  const generated = terrain.enabled && terrain.model !== ''
+  const collider = generated ? terrain.collider : env.collider
   return (
     <>
       <EnvModel path={env.model} />
-      {env.collider && <ColliderModel path={env.collider} />}
+      {generated && <GeneratedTerrain path={terrain.model} />}
+      {generated && terrain.scatter.enabled && terrain.scatter.model && <Scatter path={terrain.scatter.model} />}
+      {generated && terrain.boundary.enabled && terrain.boundary.map && <BoundaryField map={terrain.boundary.map} />}
+      {/* key：切换碰撞体时重新挂载，旧碰撞体先注销 */}
+      {collider && <ColliderModel key={collider} path={collider} />}
     </>
   )
 }
@@ -129,7 +139,6 @@ export function SceneShell({ sceneId }: { sceneId: SceneId }) {
           <Grass />
           <Water />
           <Particles />
-          <CollectZone />
           <CharacterController />
           {/* DEV 调试：自由飞行相机替代跟随相机 */}
           {freeFly ? <OrbitControls makeDefault /> : <FollowCamera />}

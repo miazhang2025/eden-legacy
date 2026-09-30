@@ -1,9 +1,11 @@
 import { useFrame } from '@react-three/fiber'
 import { Color, Vector2, Vector3 } from 'three'
+import { waterOn } from '../config/schema'
 import { getSceneCfg } from '../state/useConfigStore'
 import { getTier } from '../state/useQualityStore'
 import { updateDetailUniforms } from './detail'
 import { updatePondUniforms } from './pond'
+import { updatePeakUniforms, updateTerrainUniforms } from './terrain'
 
 // 场景级共享 uniform 注册表（spec §5.2）：所有自定义材质引用同一批 uniform 对象，
 // 由 <SharedUniformDriver /> 一个 useFrame 统一推送，不让每个材质各跑一个。
@@ -114,8 +116,9 @@ export function SharedUniformDriver() {
 
     // 焦散：只在 high 档水面开启时投射
     const water = cfg.water
-    const causticsOn = water.enabled && tier.water === 'high' && water.quality === 'high' && water.causticsIntensity > 0
-    shared.uWaterLevel.value = water.enabled ? water.level : -1e4
+    const waterActive = waterOn(cfg)
+    const causticsOn = waterActive && tier.water === 'high' && water.quality === 'high' && water.causticsIntensity > 0
+    shared.uWaterLevel.value = waterActive ? water.level : -1e4
     shared.uCausticsEnabled.value = causticsOn ? 1 : 0
     shared.uCausticsIntensity.value = water.causticsIntensity
     shared.uCausticsScale.value = water.causticsScale
@@ -123,6 +126,8 @@ export function SharedUniformDriver() {
 
     updatePondUniforms(cfg)
     updateDetailUniforms(cfg, tier)
+    updateTerrainUniforms(cfg)
+    updatePeakUniforms(cfg)
   })
   return null
 }

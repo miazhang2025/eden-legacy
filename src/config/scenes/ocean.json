@@ -38,11 +38,11 @@
     "height": 1.7,
     "color": "#e0f0ff",
     "spawn": [
-      13,
+      18.735,
       0,
-      -8
+      -2.704
     ],
-    "spawnYaw": 1.5708,
+    "spawnYaw": 1.8946,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
     "groundSmoothing": 0.08,
@@ -54,11 +54,11 @@
   },
   "background": "#b3d7df",
   "fog": {
-    "type": "exp2",
-    "color": "#e6d8f0",
-    "density": 0.0005,
-    "near": 10,
-    "far": 80
+    "type": "linear",
+    "color": "#ebbed7",
+    "density": 0.0175,
+    "near": 6.5,
+    "far": 500
   },
   "lights": {
     "ambient": {
@@ -91,11 +91,11 @@
   "sky": {
     "enabled": true,
     "topColor": "#aeb9df",
-    "midColor": "#cfc4f2",
-    "horizonColor": "#d1e4e8",
-    "bottomColor": "#7fd3dd",
-    "midHeight": 0.27,
-    "horizonWidth": 0.005,
+    "midColor": "#ae9fcc",
+    "horizonColor": "#ffd1f4",
+    "bottomColor": "#95fbf3",
+    "midHeight": 0.22999999999999998,
+    "horizonWidth": 0.045,
     "sunColor": "#fffcf9",
     "sunSize": 0,
     "sunIntensity": 0,
@@ -114,11 +114,11 @@
   "environment": {
     "mode": "hdri",
     "hdri": "hdri/bluesky_actuallighting.hdr",
-    "intensity": 0.49,
-    "rotationY": 1.78,
+    "intensity": 0.6,
+    "rotationY": -0.75,
     "background": false,
-    "hdriBackground": "hdri/pinksky_bg.hdr",
-    "backgroundIntensity": 2.7199999999999998,
+    "hdriBackground": "hdri/ocean_bg.hdr",
+    "backgroundIntensity": 0.7099999999999997,
     "sunIntensity": 2.17
   },
   "shadows": {
@@ -181,6 +181,7 @@
       0
     ],
     "size": 400,
+    "mesh": "",
     "shallowColor": "#43cfd0",
     "deepColor": "#0f86ad",
     "depthFalloff": 3,
@@ -207,6 +208,56 @@
     "waveLength": 5,
     "waveSpeed": 0.7499999999999999,
     "waveSteepness": 0.35
+  },
+  "terrain": {
+    "enabled": false,
+    "model": "",
+    "collider": "",
+    "replaces": "",
+    "ownsWater": false,
+    "material": "textured",
+    "near": {
+      "albedo": "",
+      "normal": "",
+      "orm": "",
+      "tileSize": 1,
+      "tint": "#ffffff",
+      "normalStrength": 1,
+      "aoStrength": 0.8,
+      "roughness": 1
+    },
+    "far": {
+      "albedo": "",
+      "normal": "",
+      "orm": "",
+      "tileSize": 1,
+      "tint": "#ffffff",
+      "normalStrength": 1,
+      "aoStrength": 0.8,
+      "roughness": 1
+    },
+    "breakup": 0.5,
+    "macroStrength": 0.25,
+    "macroScale": 18,
+    "bedColor": "#2b2440",
+    "bedTint": 0.5,
+    "peaks": {
+      "topColor": "#9d8fb6",
+      "baseColor": "#e6d8f0",
+      "shade": 0.5
+    },
+    "scatter": {
+      "enabled": false,
+      "model": "",
+      "density": 1
+    },
+    "boundary": {
+      "enabled": false,
+      "map": "",
+      "inset": 0.6,
+      "softWidth": 1.5,
+      "pushBack": 2
+    }
   },
   "pond": {
     "enabled": false,
@@ -829,7 +880,7 @@
       "brightness": 0
     },
     "ssao": {
-      "enabled": true,
+      "enabled": false,
       "intensity": 1.5,
       "radius": 0.4
     }
@@ -888,13 +939,71 @@
     "assetRoughness": 0.45,
     "assetMetalness": 0.1
   },
+  "assets": [
+    {
+      "id": "ocean_shell_01",
+      "position": [
+        10.613,
+        0,
+        -1.708
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    },
+    {
+      "id": "ocean_shell_02",
+      "position": [
+        5.505,
+        0,
+        8.072
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    },
+    {
+      "id": "ocean_fish_01",
+      "position": [
+        -0.732,
+        0,
+        3.839
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    },
+    {
+      "id": "ocean_fish_02",
+      "position": [
+        -14.508,
+        0,
+        7.154
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    }
+  ],
   "flow": {
     "zoneCenter": [
       5,
       0,
       0
     ],
-    "zoneRadius": 6.9,
+    "zoneRadius": 1.8,
     "proximity": 2.2,
     "othersFadeOut": true,
     "selectGlowDuration": 1.1500000000000001,

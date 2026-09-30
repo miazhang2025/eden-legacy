@@ -38,11 +38,11 @@
     "height": 1.7,
     "color": "#e8e0ff",
     "spawn": [
-      -1,
+      1.805,
       0,
-      18
+      21.429
     ],
-    "spawnYaw": 0,
+    "spawnYaw": 0.1364,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
     "groundSmoothing": 0.08,
@@ -181,6 +181,7 @@
       0
     ],
     "size": 80,
+    "mesh": "",
     "shallowColor": "#5a8f86",
     "deepColor": "#1c3b3f",
     "depthFalloff": 1.2,
@@ -207,6 +208,56 @@
     "waveLength": 3,
     "waveSpeed": 0.55,
     "waveSteepness": 0.35
+  },
+  "terrain": {
+    "enabled": false,
+    "model": "",
+    "collider": "",
+    "replaces": "",
+    "ownsWater": false,
+    "material": "textured",
+    "near": {
+      "albedo": "",
+      "normal": "",
+      "orm": "",
+      "tileSize": 1,
+      "tint": "#ffffff",
+      "normalStrength": 1,
+      "aoStrength": 0.8,
+      "roughness": 1
+    },
+    "far": {
+      "albedo": "",
+      "normal": "",
+      "orm": "",
+      "tileSize": 1,
+      "tint": "#ffffff",
+      "normalStrength": 1,
+      "aoStrength": 0.8,
+      "roughness": 1
+    },
+    "breakup": 0.5,
+    "macroStrength": 0.25,
+    "macroScale": 18,
+    "bedColor": "#2b2440",
+    "bedTint": 0.5,
+    "peaks": {
+      "topColor": "#9d8fb6",
+      "baseColor": "#2a1f4d",
+      "shade": 0.5
+    },
+    "scatter": {
+      "enabled": false,
+      "model": "",
+      "density": 1
+    },
+    "boundary": {
+      "enabled": false,
+      "map": "",
+      "inset": 0.6,
+      "softWidth": 1.5,
+      "pushBack": 2
+    }
   },
   "pond": {
     "enabled": true,
@@ -774,13 +825,71 @@
     "assetRoughness": 0.45,
     "assetMetalness": 0.1
   },
+  "assets": [
+    {
+      "id": "cave_ore_01",
+      "position": [
+        -4.021,
+        0,
+        10.407
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    },
+    {
+      "id": "cave_ore_02",
+      "position": [
+        2.411,
+        0,
+        12.585
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    },
+    {
+      "id": "cave_mushroom_01",
+      "position": [
+        4.916,
+        0,
+        6.188
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    },
+    {
+      "id": "cave_mushroom_02",
+      "position": [
+        0.64,
+        0,
+        1.449
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    }
+  ],
   "flow": {
     "zoneCenter": [
-      -7,
+      2.444,
       0,
-      3
+      -3.582
     ],
-    "zoneRadius": 7,
+    "zoneRadius": 1.8,
     "proximity": 2.2,
     "othersFadeOut": true,
     "selectGlowDuration": 0.8,

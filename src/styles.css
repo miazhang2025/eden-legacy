@@ -87,26 +87,179 @@ body,
 .landing__content {
   position: relative;
   height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(32px, 7vw, 120px);
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 6dvh max(clamp(24px, 7vw, 96px), env(safe-area-inset-right)) 6dvh
+    max(clamp(24px, 7vw, 96px), env(safe-area-inset-left));
+}
+.landing__intro > *,
+.landing__journey-title,
+.landing__chapter {
+  opacity: 0;
+  animation: landing-rise 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.landing__eyebrow {
+  margin: 0 0 18px;
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.5em;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.landing__eyebrow::after {
+  content: '';
+  width: 64px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
+}
+.landing__intro {
+  container-type: inline-size;
+}
+/* 标题永远一行：字号跟左栏宽度走（5 个字 × 1.18em ≈ 5.9em，16cqi 约占满 95%） */
+.landing__title {
+  margin: 0 0 clamp(16px, 4dvh, 36px);
+  font-family: var(--font-display);
+  font-size: min(88px, 16cqi);
+  white-space: nowrap;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.18em;
+  animation-delay: 0.15s;
+}
+.landing__lede {
+  margin: 0 0 12px;
+  max-width: 34em;
+  color: var(--fg-dim);
+  font-size: clamp(13px, 1.25vw, 16px);
+  line-height: 2;
+  letter-spacing: 0.06em;
+  text-wrap: pretty;
+}
+.landing__lede:nth-of-type(2) { animation-delay: 0.35s; }
+.landing__lede:nth-of-type(3) { animation-delay: 0.5s; }
+.landing__enter {
+  margin-top: clamp(12px, 3dvh, 28px);
+  animation-delay: 0.7s;
+}
+
+/* 三处遗境：沿一条竖线排开，按游玩顺序 */
+.landing__journey-title {
+  margin: 0 0 clamp(12px, 3dvh, 28px);
+  color: var(--fg-dim);
+  font-size: 12px;
+  letter-spacing: 0.4em;
+  animation-delay: 0.6s;
+}
+.landing__chapters {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  gap: clamp(12px, 3.2dvh, 32px);
+}
+.landing__chapters::before {
+  content: '';
+  position: absolute;
+  left: 21px;
+  top: 22px;
+  bottom: 22px;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(233, 217, 176, 0.35) 15%, rgba(233, 217, 176, 0.35) 85%, transparent);
+}
+.landing__chapter {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr;
   gap: 20px;
-  padding: 24px;
-  text-align: center;
+  align-items: start;
 }
-.landing__title {
-  margin: 0;
+.landing__chapter:nth-child(1) { animation-delay: 0.8s; }
+.landing__chapter:nth-child(2) { animation-delay: 0.95s; }
+.landing__chapter:nth-child(3) { animation-delay: 1.1s; }
+.landing__chapter-num {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(233, 217, 176, 0.45);
+  border-radius: 50%;
+  background: #120e0b;
+  color: var(--accent);
   font-family: var(--font-display);
-  font-size: clamp(32px, 6vw, 72px);
-  font-weight: 400;
-  letter-spacing: 0.25em;
+  font-size: 18px;
 }
-.landing__subtitle {
-  margin: 0 0 16px;
+.landing__chapter-body {
+  padding-top: 2px;
+}
+.landing__chapter-name {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: clamp(17px, 1.7vw, 22px);
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.landing__chapter-name small {
   color: var(--fg-dim);
-  font-size: clamp(14px, 1.6vw, 18px);
-  letter-spacing: 0.15em;
+  font-family: var(--font);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+}
+.landing__chapter-desc {
+  margin: 0 0 6px;
+  color: var(--fg-dim);
+  font-size: 13px;
+  line-height: 1.8;
+  letter-spacing: 0.05em;
+}
+.landing__chapter-finds {
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  opacity: 0.75;
+}
+/* 每处遗境一点点自己的色温 */
+.landing__chapter--cave .landing__chapter-num { box-shadow: 0 0 18px rgba(126, 249, 255, 0.12); }
+.landing__chapter--ocean .landing__chapter-num { box-shadow: 0 0 18px rgba(107, 216, 255, 0.12); }
+.landing__chapter--garden .landing__chapter-num { box-shadow: 0 0 18px rgba(255, 138, 200, 0.12); }
+
+@keyframes landing-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing__intro > *,
+  .landing__journey-title,
+  .landing__chapter {
+    animation-duration: 0.01s;
+    animation-delay: 0s;
+  }
+}
+/* 横屏手机：高度很紧，收掉第二段与遗境描述 */
+@media (max-height: 520px) {
+  .landing__content { padding-top: 4dvh; padding-bottom: 4dvh; }
+  .landing__eyebrow { margin-bottom: 10px; }
+  .landing__lede { line-height: 1.8; font-size: 12px; }
+  .landing__lede:nth-of-type(3) { display: none; }
+  .landing__chapter-desc { display: none; }
+  .landing__chapter { gap: 14px; grid-template-columns: 36px 1fr; }
+  .landing__chapter-num { width: 36px; height: 36px; font-size: 15px; }
+  .landing__chapters::before { left: 17px; }
+}
+/* 竖屏 / 窄屏：上下排列 */
+@media (max-aspect-ratio: 1/1) {
+  .landing__content { grid-template-columns: 1fr; align-content: center; overflow-y: auto; }
 }
 
 /* ---------- 场景 UI ---------- */
@@ -124,6 +277,12 @@ body,
   opacity: 0;
   pointer-events: none;
   transition: opacity 1s ease, transform 1s ease;
+}
+.collect-prompt__progress {
+  margin-top: 8px;
+  font-size: 0.7em;
+  letter-spacing: 0.3em;
+  opacity: 0.75;
 }
 .collect-prompt.is-visible {
   opacity: 1;
@@ -321,4 +480,146 @@ body,
   color: var(--fg-dim);
   font-size: 13px;
   line-height: 1.7;
+}
+
+/* ---------- Ending：横屏布局（竖版标本盒居中，文字与按钮分列两侧） ---------- */
+@media (min-aspect-ratio: 1/1) {
+  .ending {
+    display: block;
+  }
+  .ending__stage {
+    position: absolute;
+    inset: 0;
+  }
+  .ending__text {
+    position: absolute;
+    left: max(6vw, env(safe-area-inset-left));
+    top: 50%;
+    transform: translateY(-50%);
+    max-width: 26vw;
+    padding: 0;
+    text-align: left;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .ending__name {
+    margin-bottom: 16px;
+  }
+  .ending__desc {
+    line-height: 1.9;
+  }
+  .ending__actions {
+    position: absolute;
+    right: max(6vw, env(safe-area-inset-right));
+    top: 50%;
+    transform: translateY(-50%);
+    flex-direction: column;
+    padding: 0;
+    z-index: 1;
+  }
+}
+
+/* ---------- Ending：快门 ---------- */
+.shutter {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+.shutter__flash {
+  position: absolute;
+  inset: 0;
+  background: #fffaf0;
+  opacity: 0;
+  animation: shutter-flash 0.9s ease-out forwards;
+}
+/* 取景框四角：从外向内收拢，闪光时消失 */
+.shutter__frame {
+  position: absolute;
+  inset: 8dvh 50% 8dvh 50%;
+  width: min(62dvh, 80vw);
+  translate: -50% 0;
+  animation: shutter-frame 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.shutter__frame i {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 0 solid var(--fg);
+}
+.shutter__frame i:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px; }
+.shutter__frame i:nth-child(2) { right: 0; top: 0; border-width: 2px 2px 0 0; }
+.shutter__frame i:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 2px 2px; }
+.shutter__frame i:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0; }
+@keyframes shutter-frame {
+  0% { opacity: 0; scale: 1.15; }
+  30% { opacity: 1; }
+  70% { opacity: 1; scale: 1; }
+  100% { opacity: 0; scale: 1; }
+}
+/* 最亮点在 ~0.42s，与 Ending.tsx 的 SHUTTER_MS 对应 */
+@keyframes shutter-flash {
+  0%, 40% { opacity: 0; }
+  47% { opacity: 0.92; }
+  100% { opacity: 0; }
+}
+
+/* ---------- Ending：照片卡片 ---------- */
+.photo-card {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 4dvh 16px;
+  background: rgba(6, 5, 4, 0.72);
+  backdrop-filter: blur(6px);
+  animation: photo-card-in 0.4s ease forwards;
+}
+.photo-card__paper {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  max-height: 100%;
+  animation: photo-drop 0.9s cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
+}
+.photo-card__image {
+  display: block;
+  min-height: 0;
+  max-width: min(86vw, 520px);
+  max-height: calc(92dvh - 100px);
+  object-fit: contain;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(244, 239, 230, 0.08);
+  rotate: -1.5deg;
+  /* 相纸显影：从过曝发白、偏暖、略糊慢慢变清晰 */
+  animation: photo-develop 2.2s ease-out both;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.photo-card__actions {
+  display: flex;
+  gap: 16px;
+  animation: photo-card-in 0.6s ease 0.8s both;
+}
+@keyframes photo-card-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes photo-drop {
+  from { opacity: 0; transform: translateY(-40px) scale(1.06) rotate(4deg); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes photo-develop {
+  0% { filter: brightness(2.2) sepia(0.6) contrast(0.5) blur(3px); }
+  60% { filter: brightness(1.15) sepia(0.2) contrast(0.9) blur(0.5px); }
+  100% { filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shutter__frame,
+  .photo-card__paper,
+  .photo-card__image {
+    animation-duration: 0.01s;
+  }
 }

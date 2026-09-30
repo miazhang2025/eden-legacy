@@ -1,8 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Box3, Color, DoubleSide, Matrix4, Mesh, MeshStandardMaterial, Vector3, type Group } from 'three'
-import type { SlotConfig } from '../config/schema'
-import type { CollectableAssetDef } from '../data/assets'
+import type { Placement } from './composition'
 import { useEndingCfg } from '../state/useConfigStore'
 import { PlaceholderModel } from '../scene/PlaceholderModel'
 import { useEndingUi } from './useEndingUi'
@@ -30,18 +29,14 @@ function localBounds(root: Group, out: Box3) {
   return out
 }
 
-export function SpecimenSlot({
-  index,
-  slot,
-  asset,
-}: {
-  index: number
-  slot: SlotConfig
-  asset: CollectableAssetDef | undefined
-}) {
-  const inner = useRef<Group>(null)
+// 层级：outer（落位点 + 入场 / 漂浮动画）→ fit（自动缩放 + 居中）→ turn（构图旋转）→ 模型
+// fit 在 turn 外面，所以测出的是「转过之后」的包围盒，缩放能让旋转后的外形刚好装进 region
+export function SpecimenSlot({ index, placement }: { index: number; placement: Placement }) {
+  const { asset, position, rotation, region, scale } = placement
+  const fit = useRef<Group>(null)
   const outer = useRef<Group>(null)
   const reveal = useEndingCfg((c) => c.reveal)
+  const { floatAmplitude, floatSpeed } = useEndingCfg((c) => c.composition)
   const { emissiveIntensity, roughness, metalness, hoverEmissive } = useEndingCfg((c) => c.specimen)
   const hovered = useEndingUi((s) => !!asset && s.hoveredId === asset.id)
 
@@ -68,14 +63,16 @@ export function SpecimenSlot({
   }, [asset])
 
   // 入场：标本盒放到一半时开始，三件依次错开落位并淡入
-  useFrame(() => {
+  // 落位后轻微漂浮，三件相位错开
+  useFrame((state) => {
     const g = outer.current
     if (!g || !material) return
     const p = segment(reveal.boxDuration * 0.5 + index * reveal.specimenStagger, reveal.specimenDuration)
+    const bob = Math.sin(state.clock.elapsedTime * floatSpeed * Math.PI * 2 + index * 2.1) * floatAmplitude * p
     g.position.set(
-      slot.position[0] + reveal.specimenFrom[0] * (1 - p),
-      slot.position[1] + reveal.specimenFrom[1] * (1 - p),
-      slot.position[2] + reveal.specimenFrom[2] * (1 - p),
+      position[0] + reveal.specimenFrom[0] * (1 - p),
+      position[1] + reveal.specimenFrom[1] * (1 - p) + bob,
+      position[2] + reveal.specimenFrom[2] * (1 - p),
     )
     material.opacity = p
     material.transparent = p < 1
@@ -85,20 +82,19 @@ export function SpecimenSlot({
   // 悬停时自发光增强，提示哪一个是当前标本
   if (material) material.emissiveIntensity = hovered ? hoverEmissive : emissiveIntensity
 
-  // autoFit：按包围盒最长边缩放到 fitSize，并把包围盒中心对齐 slot 原点
+  // 自动适配：等比缩放到刚好装进 region（取三轴里最紧的一个），再把包围盒中心对齐落位点
   useLayoutEffect(() => {
-    const g = inner.current
+    const g = fit.current
     if (!g || !asset) return
     g.scale.setScalar(1)
     g.position.set(0, 0, 0)
     localBounds(g, box)
     box.getSize(size)
     box.getCenter(center)
-    const longest = Math.max(size.x, size.y, size.z) || 1
-    const s = slot.autoFit ? slot.fitSize / longest : (asset.specimenScale ?? 1)
+    const s = Math.min(region[0] / (size.x || 1), region[1] / (size.y || 1), region[2] / (size.z || 1)) * scale
     g.scale.setScalar(s)
-    if (slot.autoFit) g.position.copy(center).multiplyScalar(-s)
-  }, [asset, slot.autoFit, slot.fitSize, slot.position, slot.rotation, slot.scale])
+    g.position.copy(center).multiplyScalar(-s)
+  }, [asset, region, scale, rotation])
 
   if (!asset || !material) return null
   const ui = useEndingUi.getState
@@ -106,9 +102,7 @@ export function SpecimenSlot({
   return (
     <group
       ref={outer}
-      position={slot.position}
-      rotation={slot.rotation}
-      scale={slot.scale}
+      position={position}
       onPointerOver={(e) => {
         e.stopPropagation()
         if (e.nativeEvent.pointerType === 'mouse' && !ui().dragging) ui().hover(asset.id, ...at(e))
@@ -126,8 +120,10 @@ export function SpecimenSlot({
         ui().hover(ui().hoveredId === asset.id ? null : asset.id, ...at(e))
       }}
     >
-      <group ref={inner}>
-        <PlaceholderModel category={asset.category} material={material} />
+      <group ref={fit}>
+        <group rotation={rotation}>
+          <PlaceholderModel category={asset.category} material={material} />
+        </group>
       </group>
     </group>
   )

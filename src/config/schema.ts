@@ -93,6 +93,8 @@ export interface SceneConfig {
   sss: SSSConfig
   crystal: CrystalConfig
   water: WaterConfig
+  /** 生成地形（npm run terrain）：替换美术地形 + 无边界远景裙边 + 可玩区软边界 */
+  terrain: TerrainConfig
   /** 贴图池塘：地形贴图里画出来的水域，用 shader 按颜色遮罩做成水面（garden） */
   pond: PondConfig
   /** 地形细节贴图：近处叠一层平铺草地细节，远处淡出 */
@@ -122,8 +124,12 @@ export interface SceneConfig {
     assetRoughness: number
     assetMetalness: number
   }
+  /** 本场景 4 个候选资产的摆位（id 对应 data/assets.ts；顺序 = 摆位快捷键 1–4） */
+  assets: AssetPlacement[]
   flow: {
+    /** 已弃用：原采集区中心（采集区已取消） */
     zoneCenter: Vec3
+    /** 已弃用：原采集区半径 */
     zoneRadius: number
     proximity: number
     othersFadeOut: boolean
@@ -151,6 +157,14 @@ export interface SceneConfig {
     /** 点击判定：拖拽超过该像素数不算点击 */
     clickDragThreshold: number
   }
+}
+
+export interface AssetPlacement {
+  id: string
+  /** x/z 为世界坐标，y 为相对地面的偏移（运行时用射线贴地） */
+  position: Vec3
+  rotation: Vec3
+  scale: number
 }
 
 export type MaterialSide = 'front' | 'back' | 'double'
@@ -301,6 +315,8 @@ export interface WaterConfig {
   /** 水面平面中心（x/z）与边长 */
   center: Vec3
   size: number
+  /** 网格水面（npm run terrain 生成的池塘形状，套 env 变换）；空 = 用 center / size 的方形平面 */
+  mesh: string
   shallowColor: string
   deepColor: string
   /** 深度到达该值时完全变为 deepColor */
@@ -333,6 +349,66 @@ export interface WaterConfig {
   /** 水面可以行走（ocean：在浮岛之间「走水」） */
   walkable: boolean
 }
+
+/** 地面平铺贴图一套（npm run ground 从 Megascans 贴图压成 KTX2） */
+export interface GroundLayer {
+  albedo: string
+  normal: string
+  /** R = AO，G = 粗糙度 */
+  orm: string
+  /** 一张贴图覆盖的世界尺寸（米）；Megascans 扫描是 1×1m */
+  tileSize: number
+  /** 颜色乘数（白 = 原色） */
+  tint: string
+  normalStrength: number
+  aoStrength: number
+  roughness: number
+}
+
+export interface TerrainConfig {
+  /** 用生成地形替换美术地形；关掉 = 换回原始素材（原模型、原碰撞体、贴图池塘） */
+  enabled: boolean
+  /** 生成地形（npm run terrain 输出），空 = 没有生成地形 */
+  model: string
+  collider: string
+  /** 开启时隐藏的原始地形材质名，逗号分隔 */
+  replaces: string
+  /** 水面跟着生成地形走：关掉生成地形时 water 也一起关（换回贴图池塘） */
+  ownsWater: boolean
+  /** textured = 原地形范围用 near 贴图、外面用 far 贴图；painted = 原地形范围用原来的手绘贴图 */
+  material: 'textured' | 'painted'
+  /** 原地形范围（中心）的贴图 */
+  near: GroundLayer
+  /** 远景裙边的贴图 */
+  far: GroundLayer
+  /** 第二套旋转 uv 的混合量（打散平铺重复，只作用于颜色） */
+  breakup: number
+  /** 大尺度明暗斑驳：强度与尺度（米），远处看不出平铺周期 */
+  macroStrength: number
+  macroScale: number
+  /** 池底着色 */
+  bedColor: string
+  bedTint: number
+  /** 远景尖峰（不吃雾）：山脚色（接近雾色）→ 峰顶色，shade = 主光明暗强度 */
+  peaks: { topColor: string; baseColor: string; shade: number }
+  /** 散布花草（npm run scatter）：每种植物一个实例化 draw call；density × 档位 scatter 倍率 = 实际数量比例 */
+  scatter: { enabled: boolean; model: string; density: number }
+  /** 可玩区软边界：靠近边缘时往外走的分量逐渐被削掉，贴着边滑动，不撞空气墙 */
+  boundary: {
+    enabled: boolean
+    /** 可玩区距离场（npm run terrain 输出，旁边有同名 .json） */
+    map: string
+    /** 离原地形边缘多远（米）停下 */
+    inset: number
+    /** 从 inset + softWidth 开始减速 */
+    softWidth: number
+    /** 已经在边界外时往回推的速度（米/秒） */
+    pushBack: number
+  }
+}
+
+/** 水面是否生效：生成地形接管水面时，关掉生成地形也关掉水面 */
+export const waterOn = (c: SceneConfig) => c.water.enabled && !(c.terrain.ownsWater && !c.terrain.enabled)
 
 export interface PondConfig {
   enabled: boolean
@@ -511,19 +587,34 @@ export interface PointLightConfig {
   position: Vec3
 }
 
-export interface SlotConfig {
-  position: Vec3
+/**
+ * 标本构图里的一个角色（主体 / 前景点缀 / 远景点缀）。
+ * anchor 与 region 都按画框内框的宽 / 高 / 深归一：anchor 是中心点（-0.5–0.5），region 是可占据的范围（0–1）。
+ * 模型会在套用 rotation 之后按包围盒等比缩放到刚好装进 region，并把包围盒中心对齐 anchor。
+ */
+export interface CompositionRole {
+  anchor: Vec3
+  region: Vec3
   rotation: Vec3
+  /** 在自动适配结果上再乘的倍率 */
   scale: number
-  /** 开启时按资产包围盒最长边缩放到 fitSize */
-  autoFit: boolean
-  fitSize: number
 }
+
+export type HeroChoice = 'auto' | SceneId
+export type MirrorMode = 'auto' | 'off' | 'on'
 
 export interface EndingConfig {
   version: 1
   scene: 'ending'
-  camera: { fov: number; position: Vec3; lookAt: Vec3 }
+  camera: {
+    fov: number
+    position: Vec3
+    lookAt: Vec3
+    /** 开启时沿 position→lookAt 方向自动调整距离，让整个画框刚好装进画布 */
+    autoFrame: boolean
+    /** autoFrame 时画框四周留白（占画框尺寸的比例） */
+    framePadding: number
+  }
   background: string
   lights: {
     ambient: { color: string; intensity: number }
@@ -540,7 +631,25 @@ export interface EndingConfig {
     border: number
     planeDepth: number
   }
-  slots: { slotA: SlotConfig; slotB: SlotConfig; slotC: SlotConfig }
+  /**
+   * 三件标本的构图：一件主体 + 两件点缀，全部按画框尺寸自动算位置 / 大小。
+   * hero = auto 时按类别优先级挑主体（见 data/specimenBoxes.ts HERO_RANK），组合补丁可指定。
+   */
+  composition: {
+    hero: HeroChoice
+    heroRole: CompositionRole
+    /** 前景点缀：更靠近镜头、略大 */
+    accentNear: CompositionRole
+    /** 远景点缀：更靠后、更小 */
+    accentFar: CompositionRole
+    /** 左右镜像：auto = 按组合 id 决定，让 8 种组合不完全一样 */
+    mirror: MirrorMode
+    /** 按组合 id 给每件的旋转加的随机扰动（度） */
+    jitterDeg: number
+    /** 静止时的轻微漂浮 */
+    floatAmplitude: number
+    floatSpeed: number
+  }
   /** 标本（占位几何体）的材质 */
   specimen: { emissiveIntensity: number; roughness: number; metalness: number; hoverEmissive: number }
   /** 入场：画布淡入 + 标本盒放大 + 三件标本依次落位（自己写，不用 Theatre 时间轴，见 ADR-003） */
@@ -553,7 +662,7 @@ export interface EndingConfig {
     /** 每件标本的入场时长与相互错开的间隔 */
     specimenDuration: number
     specimenStagger: number
-    /** 标本入场时的起始偏移（相对各自 slot） */
+    /** 标本入场时的起始偏移（相对各自落位点） */
     specimenFrom: Vec3
   }
   /** 影棚环境光：上下两色的渐变球 + 一块柔光板，渲染一次作为环境贴图 */
@@ -605,6 +714,13 @@ export interface EndingConfig {
     /** public 下的 logo 图片路径 */
     logo: string
     logoSize: number
+    /** 在底边框正中压一行项目名 */
+    includeBrand: boolean
+    brandSize: number
+    /** 只截取画框所在区域（而不是整个画布） */
+    crop: boolean
+    /** 裁切时画框外留白（占画框屏幕尺寸的比例） */
+    cropPadding: number
   }
 }
 
@@ -623,6 +739,8 @@ export interface TierSettings {
   particles: number
   /** 程序化草叶数量倍率 */
   grass: number
+  /** 散布花草（生成地形上的实例化植物）数量倍率 */
+  scatter: number
   /** 地形细节贴图：off = 关闭，basic = 单层采样，full = 加打散（多两次采样） */
   detail: 'off' | 'basic' | 'full'
   /** basic = bloom + 调色，mid = + vignette + grain，full = 全开（含 DOF） */
@@ -679,6 +797,8 @@ export interface ArrayLeaf<U = unknown> extends LeafBase {
   item: SchemaFor<U>
   itemLabel: (item: U, index: number) => string
   create: (existing: U[]) => U
+  /** 固定条目：面板里不显示「添加 / 删除」 */
+  fixed?: boolean
 }
 /** 材质：运行时遍历场景收集 material name 动态生成 */
 export interface MaterialsLeaf { t: 'materials' }
@@ -828,6 +948,17 @@ const postSchema: SchemaFor<PostConfig> = {
   },
   ssao: { _label: 'SSAO（开销大）', enabled: bool(), intensity: num(0, 10, 0.1), radius: num(0.01, 2, 0.01) },
 }
+
+const groundLayer = {
+  albedo: { t: 'text' },
+  normal: { t: 'text' },
+  orm: { t: 'text', label: 'orm（R=AO G=粗糙度）' },
+  tileSize: num(0.1, 10, 0.05, 'tileSize（一张贴图多少米）'),
+  tint: color(),
+  normalStrength: num(0, 3, 0.01),
+  aoStrength: num(0, 1, 0.01),
+  roughness: num(0, 2, 0.01, 'roughness（粗糙度倍率）'),
+} as const
 
 export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
   version: hidden,
@@ -1010,6 +1141,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     level: num(-20, 20, 0.01),
     center: vec(0.5, 'center (x/z)'),
     size: num(1, 1000, 1),
+    mesh: { t: 'text', label: 'mesh（网格水面）', hint: 'npm run terrain 生成的池塘水面；空 = 用 center / size 的方形平面' },
     shallowColor: color(),
     deepColor: color(),
     depthFalloff: num(0.01, 20, 0.01),
@@ -1036,6 +1168,37 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     opacity: num(0, 1, 0.01),
     blockDepth: num(0, 5, 0.05, 'blockDepth', '水深超过该值不可行走；0 = 不限制'),
     walkable: bool('walkable', '水面可以行走（在浮岛之间走水）'),
+  },
+  terrain: {
+    _label: '生成地形 terrain',
+    enabled: bool('enabled', '关掉 = 换回原始地形素材（原碰撞体、贴图池塘）'),
+    model: { t: 'text' },
+    collider: { t: 'text' },
+    replaces: { t: 'text', label: 'replaces（隐藏的原地形材质）', hint: '逗号分隔' },
+    ownsWater: bool('ownsWater', '关掉生成地形时同时关掉 water 水面'),
+    material: select('textured', 'painted'),
+    near: { _label: 'near（中心贴图）', ...groundLayer },
+    far: { _label: 'far（远景贴图）', ...groundLayer },
+    breakup: num(0, 1, 0.01, 'breakup（打散平铺）'),
+    macroStrength: num(0, 1, 0.01, 'macroStrength（大尺度斑驳）'),
+    macroScale: num(1, 100, 0.5, 'macroScale（斑驳尺度 m）'),
+    bedColor: color('bedColor（池底）'),
+    bedTint: num(0, 1, 0.01),
+    peaks: { _label: '远景尖峰 peaks', topColor: color(), baseColor: color('baseColor（山脚，接近雾色）'), shade: num(0, 1, 0.01) },
+    scatter: {
+      _label: '散布花草 scatter',
+      enabled: bool(),
+      model: { t: 'text' },
+      density: num(0, 1, 0.01, 'density（数量比例）', '再乘以 Global 档位表的 scatter 倍率'),
+    },
+    boundary: {
+      _label: '软边界 boundary',
+      enabled: bool(),
+      map: { t: 'text', label: 'map（距离场）' },
+      inset: num(-2, 5, 0.05, 'inset（离边缘多远停下）'),
+      softWidth: num(0.1, 6, 0.05, 'softWidth（减速带宽度）'),
+      pushBack: num(0, 10, 0.1, 'pushBack（出界回推 m/s）'),
+    },
   },
   pond: {
     _label: '贴图池塘 pond（shader 水面）',
@@ -1172,15 +1335,28 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     _label: '占位',
     groundColor: color(),
     groundSize: num(10, 200, 1),
-    zoneColor: color(),
-    zoneOpacity: num(0, 1, 0.01, 'zoneOpacity', '采集区地面圈，0 = 隐藏'),
+    zoneColor: color('zoneColor（已弃用）'),
+    zoneOpacity: num(0, 1, 0.01, 'zoneOpacity', '已弃用（原采集区地面圈）'),
     assetRoughness: num(0, 1, 0.01),
     assetMetalness: num(0, 1, 0.01),
   },
+  assets: {
+    t: 'array',
+    label: '资产摆位 assets',
+    fixed: true,
+    itemLabel: (a, i) => `${i + 1} · ${a.id}`,
+    create: () => ({ id: '', position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 }),
+    item: {
+      id: { t: 'hidden' },
+      position: vec(0.1, 'position（x/z 世界，y 离地）'),
+      rotation: vec(0.01),
+      scale: num(0.1, 5, 0.01),
+    },
+  },
   flow: {
     _label: '采集流程',
-    zoneCenter: vec(0.5, 'zoneCenter (x/z)'),
-    zoneRadius: num(1, 40, 0.1),
+    zoneCenter: vec(0.5, 'zoneCenter（已弃用）'),
+    zoneRadius: num(0.5, 40, 0.1, 'zoneRadius', '已弃用（原采集区半径）'),
     proximity: num(0.5, 10, 0.1),
     othersFadeOut: bool('othersFadeOut', '确认后其余三个资产是否同步淡出'),
     selectGlowDuration: seconds(),
@@ -1201,18 +1377,24 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
   },
 }
 
-const slotSchema = {
-  position: vec(0.05),
+const roleSchema = {
+  anchor: vec(0.01, 'anchor（归一）'),
+  region: vec(0.01, 'region（归一）'),
   rotation: vec(0.01),
-  scale: num(0.1, 5, 0.01),
-  autoFit: bool('autoFit', '开启时按包围盒最长边缩放到 fitSize，关闭时用资产的 specimenScale'),
-  fitSize: num(0.1, 5, 0.01),
+  scale: num(0.1, 3, 0.01),
 }
 
 export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
   version: hidden,
   scene: hidden,
-  camera: { _label: '相机', fov: num(10, 90, 0.5), position: vec(0.1), lookAt: vec(0.1) },
+  camera: {
+    _label: '相机',
+    fov: num(10, 90, 0.5),
+    position: vec(0.1),
+    lookAt: vec(0.1),
+    autoFrame: bool('autoFrame', '按画框大小自动调整相机距离'),
+    framePadding: num(0, 1, 0.01),
+  },
   background: color('背景色'),
   lights: lightsSchema,
   frame: {
@@ -1227,11 +1409,16 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     border: num(0, 2, 0.01),
     planeDepth: num(-5, 5, 0.01),
   },
-  slots: {
-    _label: '标本 slot',
-    slotA: { _label: 'slotA（洞穴）', ...slotSchema },
-    slotB: { _label: 'slotB（海洋）', ...slotSchema },
-    slotC: { _label: 'slotC（花园）', ...slotSchema },
+  composition: {
+    _label: '标本构图',
+    hero: select<HeroChoice>('auto', 'cave', 'ocean', 'garden'),
+    heroRole: { _label: '主体', ...roleSchema },
+    accentNear: { _label: '前景点缀', ...roleSchema },
+    accentFar: { _label: '远景点缀', ...roleSchema },
+    mirror: select<MirrorMode>('auto', 'off', 'on'),
+    jitterDeg: num(0, 30, 0.5),
+    floatAmplitude: num(0, 0.3, 0.005),
+    floatSpeed: num(0, 3, 0.01),
   },
   specimen: {
     _label: '标本材质',
@@ -1248,7 +1435,7 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     boxDuration: seconds(),
     specimenDuration: seconds(),
     specimenStagger: seconds(),
-    specimenFrom: vec(0.05, 'specimenFrom（相对 slot）'),
+    specimenFrom: vec(0.05, 'specimenFrom（相对落位点）'),
   },
   environment: {
     _label: '环境光（影棚）',
@@ -1298,6 +1485,10 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     includeLogo: bool(),
     logo: { t: 'text', label: 'logo（public 下路径）' },
     logoSize: num(16, 400, 1),
+    includeBrand: bool('includeBrand', '底边框压一行项目名'),
+    brandSize: num(8, 48, 1),
+    crop: bool('crop', '只截取画框区域'),
+    cropPadding: num(0, 1, 0.01),
   },
 }
 
@@ -1312,6 +1503,7 @@ const tierSchema = (label: string) => ({
   shadowMapSize: num(256, 4096, 256),
   particles: num(0, 1, 0.05),
   grass: num(0, 1, 0.05),
+  scatter: num(0, 1, 0.05),
   detail: { t: 'select', options: ['off', 'basic', 'full'] } as SelectLeaf<TierSettings['detail']>,
   post: { t: 'select', options: ['basic', 'mid', 'full'] } as SelectLeaf<TierSettings['post']>,
 })

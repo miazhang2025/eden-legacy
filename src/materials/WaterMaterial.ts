@@ -51,6 +51,8 @@ export function createWaterUniforms() {
     /** 高度图覆盖范围：xy = 最小 x/z，zw = 边长 */
     uDepthBounds: { value: new Vector4(0, 0, 1, 1) },
     uMaxDepth: { value: MAX_DEPTH },
+    /** 1 = 水深来自网格顶点属性 _depth（生成的池塘水面），0 = 来自高度图 */
+    uUseVertexDepth: { value: 0 },
   }
 }
 export type WaterUniforms = ReturnType<typeof createWaterUniforms>
@@ -97,10 +99,13 @@ const waveChunk = /* glsl */ `
 const vertexShader = /* glsl */ `
   ${waveChunk}
   uniform mat4 uReflectionMatrix;
+  attribute float _depth;
   varying vec3 vEdenWaterWorld;
   varying vec4 vEdenReflCoord;
   varying vec3 vEdenWaveNormal;
+  varying float vEdenDepth;
   void main() {
+    vEdenDepth = _depth;
     vec3 world = (modelMatrix * vec4(position, 1.0)).xyz;
     vec3 n;
     vec3 offset = edenWaves(world.xz, n);
@@ -109,7 +114,7 @@ const vertexShader = /* glsl */ `
     vEdenWaveNormal = n;
     // 世界位移换回本地空间
     csm_Position = position + inverse(mat3(modelMatrix)) * offset;
-    // Reflector 的 textureMatrix 作用于本地坐标（水面与 Reflector 共用同一变换）
+    // uReflectionMatrix 已在 CPU 端乘好「本网格本地 → Reflector 本地」（见 Water.tsx）
     vEdenReflCoord = uReflectionMatrix * vec4(position, 1.0);
   }
 `
@@ -135,9 +140,11 @@ const fragmentShader = /* glsl */ `
   uniform sampler2D uDepthMap;
   uniform vec4 uDepthBounds;
   uniform float uMaxDepth;
+  uniform float uUseVertexDepth;
   varying vec3 vEdenWaterWorld;
   varying vec4 vEdenReflCoord;
   varying vec3 vEdenWaveNormal;
+  varying float vEdenDepth;
   ${noise}
 
   float edenWaves(vec2 p, vec2 flow) {
@@ -158,7 +165,9 @@ const fragmentShader = /* glsl */ `
     // 水深：高度图 R = 深度 / uMaxDepth
     vec2 duv = (vEdenWaterWorld.xz - uDepthBounds.xy) / uDepthBounds.zw;
     float depth = uMaxDepth;
-    if (all(greaterThanEqual(duv, vec2(0.0))) && all(lessThanEqual(duv, vec2(1.0)))) {
+    if (uUseVertexDepth > 0.5) {
+      depth = vEdenDepth;
+    } else if (all(greaterThanEqual(duv, vec2(0.0))) && all(lessThanEqual(duv, vec2(1.0)))) {
       depth = texture2D(uDepthMap, duv).r * uMaxDepth;
     }
     float t = uUseDepthColor > 0.5 ? smoothstep(0.0, uDepthFalloff, depth) : 1.0;
@@ -187,7 +196,7 @@ export function createWaterMaterial(uniforms: WaterUniforms): EdenCSM {
     vertexShader,
     fragmentShader,
     uniforms: { uTime: shared.uTime, ...uniforms },
-    cacheKey: 'eden-water-v1',
+    cacheKey: 'eden-water-v2',
   })
   m.__edenRole = 'water'
   return m

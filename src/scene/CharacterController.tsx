@@ -1,9 +1,10 @@
 import { useLayoutEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { MathUtils, Vector3, type Group } from 'three'
-import type { SceneConfig } from '../config/schema'
+import { waterOn, type SceneConfig } from '../config/schema'
 import { getMove } from '../input/useInput'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
+import { boundaryDistance, constrainMove, pushInside } from './boundary'
 import { groundHeight, groundHeightFromSky, isBlocked } from './collision'
 import { dampFactor, forwardFromYaw, rightFromYaw, rig } from './rig'
 
@@ -21,7 +22,7 @@ const lastValid = new Vector3()
  *  - 前方膝盖高度的短射线命中碰撞体 → 阻挡（墙、岩石）
  *  - 目标点向下射线在 [当前+stepHeight, 当前-maxDrop] 内未命中 → 阻挡（陡坡过高 / 悬崖边 / 地形外）
  */
-function tryMove(dx: number, dz: number, c: SceneConfig['character'], w: SceneConfig['water']): number | null {
+function tryMove(dx: number, dz: number, c: SceneConfig['character'], w: SceneConfig['water'] | null): number | null {
   const len = Math.hypot(dx, dz)
   if (len < 1e-6) return null
   const p = rig.position
@@ -30,7 +31,7 @@ function tryMove(dx: number, dz: number, c: SceneConfig['character'], w: SceneCo
   if (isBlocked(probe, stepDir, len + c.radius)) return null
   const g = groundHeight(p.x + dx, p.z + dz, p.y + c.stepHeight, c.stepHeight + c.maxDrop)
   // 水深超过 blockDepth 的区域不可进入（浅水 / 汀步可以走）
-  if (g !== null && w.enabled && w.blockDepth > 0 && w.level - g > w.blockDepth) return null
+  if (g !== null && w && w.blockDepth > 0 && w.level - g > w.blockDepth) return null
   return g
 }
 
@@ -71,8 +72,16 @@ export function CharacterController() {
       return true
     }
     ;(window as unknown as Record<string, unknown>).__teleport = teleport
+    // 读当前位置 / 到可玩区边缘的距离（调软边界用）
+    ;(window as unknown as Record<string, unknown>).__where = () => ({
+      x: rig.position.x,
+      y: rig.position.y,
+      z: rig.position.z,
+      edge: boundaryDistance(rig.position.x, rig.position.z),
+    })
     return () => {
       delete (window as unknown as Record<string, unknown>).__teleport
+      delete (window as unknown as Record<string, unknown>).__where
     }
   }, [])
 
@@ -95,22 +104,30 @@ export function CharacterController() {
     if (moving) {
       const speed = c.moveSpeed * (move.sprint ? c.sprintMultiplier : 1) * Math.min(1, dir.length())
       dir.normalize().multiplyScalar(speed * dt)
+      // 朝向按玩家输入算（软边界削掉外向分量后可能接近 0，不能拿来算朝向）
+      const target = Math.atan2(-dir.x, -dir.z)
+      constrainMove(rig.position, dir)
 
       // 先试整步，不行再沿单轴滑动（贴墙走）
-      if (tryMove(dir.x, dir.z, c, cfg.water) !== null) {
+      const water = waterOn(cfg) ? cfg.water : null
+      if (dir.lengthSq() < 1e-10) {
+        // 正对着边界走：原地不动
+      } else if (tryMove(dir.x, dir.z, c, water) !== null) {
         rig.position.x += dir.x
         rig.position.z += dir.z
-      } else if (tryMove(dir.x, 0, c, cfg.water) !== null) {
+      } else if (tryMove(dir.x, 0, c, water) !== null) {
         rig.position.x += dir.x
-      } else if (tryMove(0, dir.z, c, cfg.water) !== null) {
+      } else if (tryMove(0, dir.z, c, water) !== null) {
         rig.position.z += dir.z
       }
 
-      const target = Math.atan2(-dir.x, -dir.z)
       const delta = MathUtils.euclideanModulo(target - heading.current + Math.PI, Math.PI * 2) - Math.PI
       heading.current += delta * Math.min(1, c.turnSpeed * dt)
     }
     playAnim(moving ? 'walk' : 'idle')
+
+    // 软边界外（出生点 / 传送 / 冲刺冲出去）缓慢推回
+    pushInside(rig.position, dt)
 
     // bounds clamp（碰撞体之外的最后一道保险）
     const { min, max } = cfg.bounds

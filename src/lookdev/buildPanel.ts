@@ -149,11 +149,13 @@ function buildArray(parent: Container, leaf: ArrayLeaf, key: string, path: Path,
     const itemPath = [...path, i]
     const sub = addFolder(f, leaf.itemLabel(item, i), foldKeyOf(ctx, itemPath), true)
     buildNode(sub, leaf.item, itemPath, ctx)
+    if (leaf.fixed) return
     sub.addButton({ title: '删除' }).on('click', () => {
       ctx.update((d) => getAt(d, path).splice(i, 1))
       ctx.rebuild()
     })
   })
+  if (leaf.fixed) return
   f.addButton({ title: '+ 添加' }).on('click', () => {
     ctx.update((d) => {
       const arr = getAt(d, path)

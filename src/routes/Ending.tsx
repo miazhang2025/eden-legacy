@@ -6,6 +6,7 @@ import { copy } from '../data/copy'
 import { resolveBox } from '../data/specimenBoxes'
 import { exportPhoto } from '../ending/ExportPhoto'
 import { BoxInteraction } from '../ending/BoxInteraction'
+import { PhotoCard, ShutterFlash } from '../ending/PhotoCard'
 import { EndingStage } from '../ending/EndingStage'
 import { startReveal } from '../ending/reveal'
 import { PostFX } from '../scene/PostFX'
@@ -19,6 +20,9 @@ import { useDebugStore } from '../state/useDebugStore'
 import { useRunStore } from '../state/useRunStore'
 import { useRevealOnMount, useTransition } from '../ui/Transition'
 import { EndingGuard } from './SceneGuard'
+
+/** 快门闪光到最亮的时刻（与 styles.css 里 .shutter 动画对应） */
+const SHUTTER_MS = 420
 
 function EndingInner() {
   useRevealOnMount()
@@ -43,6 +47,7 @@ function EndingInner() {
   const post = useEndingCfg((c) => c.post)
   const [gl, setGl] = useState<RootState['gl'] | null>(null)
   const exporting = useEndingUi((s) => s.exporting)
+  const photoOpen = useEndingUi((s) => !!s.photo)
   const [shown, setShown] = useState(false)
   const [textShown, setTextShown] = useState(false)
 
@@ -59,6 +64,17 @@ function EndingInner() {
       AudioBus.stopAmbience()
     }
   }, [reveal.textDelay])
+
+  // 拍照：快门动画与截图同时开始，照片卡片等闪光最亮之后再出现
+  const takePhoto = async () => {
+    useEndingUi.setState((s) => ({ shutter: s.shutter + 1 }))
+    const started = performance.now()
+    const photo = await exportPhoto(box, useConfigStore.getState().endingEffective.photo)
+    if (!photo) return
+    const wait = SHUTTER_MS - (performance.now() - started)
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+    useEndingUi.getState().showPhoto(photo)
+  }
 
   const restart = () => {
     // 回到 Landing 还是直接进洞穴：待定（spec §15-F），暂回 Landing
@@ -88,7 +104,7 @@ function EndingInner() {
           <color attach="background" args={[background]} />
           <EndingStage />
           <BoxInteraction>
-            <SpecimenBox selections={selections} />
+            <SpecimenBox selections={selections} seed={box.id} />
           </BoxInteraction>
           <RegisterCanvas />
           <PostFX post={post} />
@@ -102,8 +118,8 @@ function EndingInner() {
       <footer className={`ending__actions ${textShown ? 'is-visible' : ''}`}>
         <button
           className="btn"
-          disabled={!gl || exporting}
-          onClick={() => void exportPhoto(box, useConfigStore.getState().endingEffective.photo)}
+          disabled={!gl || exporting || photoOpen}
+          onClick={() => void takePhoto()}
         >
           {copy('ending.button.export')}
         </button>
@@ -112,6 +128,8 @@ function EndingInner() {
         </button>
       </footer>
       <SpecimenTooltip />
+      <ShutterFlash />
+      <PhotoCard />
       {TheatreSaveButton && (
         <Suspense fallback={null}>
           <TheatreSaveButton id="ending" />

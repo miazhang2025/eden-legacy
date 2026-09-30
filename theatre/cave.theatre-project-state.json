@@ -1,0 +1,61 @@
+{
+  "sheetsById": {
+    "layout": {
+      "staticOverrides": {
+        "byObject": {
+          "asset:cave_ore_01": {
+            "position": {
+              "x": -4.021,
+              "y": 1.552,
+              "z": 10.407
+            }
+          },
+          "asset:cave_ore_02": {
+            "position": {
+              "x": 2.411,
+              "y": 0.915,
+              "z": 12.585
+            }
+          },
+          "asset:cave_mushroom_01": {
+            "position": {
+              "x": 4.916,
+              "y": 0.984,
+              "z": 6.188
+            }
+          },
+          "asset:cave_mushroom_02": {
+            "position": {
+              "x": 0.64,
+              "y": 0.926,
+              "z": 1.449
+            }
+          },
+          "spawn": {
+            "position": {
+              "x": 1.805,
+              "y": 1.08,
+              "z": 21.429
+            },
+            "rotation": {
+              "x": 0,
+              "y": -12.43,
+              "z": 0
+            }
+          },
+          "zone": {
+            "position": {
+              "x": 2.444,
+              "y": 1.337,
+              "z": -3.582
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitionVersion": "0.4.0",
+  "revisionHistory": [
+    "sJ4Hwxgl07t1yMgY"
+  ]
+}

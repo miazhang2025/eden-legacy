@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Box3, Mesh, MeshDepthMaterial, RGBADepthPacking, Vector3, type Material, type MeshStandardMaterial, type Object3D } from 'three'
 import { create } from 'zustand'
 import CustomShaderMaterial from 'three-custom-shader-material/vanilla'
-import type { MaterialOverride, MaterialRole, SceneConfig, SceneId, TierSettings } from '../config/schema'
+import { waterOn, type MaterialOverride, type MaterialRole, type SceneConfig, type SceneId, type TierSettings } from '../config/schema'
 import { createCrystalMaterial } from '../materials/CrystalMaterial'
 import { shared } from '../materials/uniforms'
 import { bakeVegetationAttributes, createVegetationMaterial, vegetationVertexShader } from '../materials/VegetationMaterial'
@@ -86,13 +86,26 @@ function roleBase(e: MaterialEntry, cfg: SceneConfig, tier: TierSettings): Parti
  * 2. 按角色转换：vegetation → 风动 + SSS；crystal → 透射；emitter → 隐藏并登记发射点；water → 水面平面开启时隐藏
  * 3. 登记到材质注册表（look dev 面板用）
  * 4. 应用 config.materials 覆盖（叠加在角色基础值之上）
+ *
+ * options（给同一场景里的第二个模型用，如散布花草）：
+ *   register = false：不登记材质注册表 / 发射点（否则会顶掉主环境模型的）；config.materials 覆盖照样生效（按材质名）
+ *   castShadow：按 mesh 决定是否投阴影（默认全部投）
  */
-export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
+export function useEnvMaterials(
+  sceneId: SceneId,
+  root: Object3D,
+  options: { register?: boolean; castShadow?: (mesh: Mesh) => boolean } = {},
+) {
+  const register = options.register ?? true
+  const castShadowRef = useRef(options.castShadow)
+  castShadowRef.current = options.castShadow
   const collected = useMemo(() => collect(root), [root])
   const overrides = useSceneCfg((c) => c.materials)
   const cfg = useSceneCfg((c) => c)
   const tier = useTier()
-  const waterEnabled = cfg.water.enabled
+  const waterEnabled = waterOn(cfg)
+  // 生成地形开启时隐藏被替换的原始地形（素材本身不动，关掉 terrain.enabled 即换回）
+  const replaced = cfg.terrain.enabled && cfg.terrain.model ? cfg.terrain.replaces : ''
 
   // 角色表的字符串 key：只有角色变化时才重建材质
   const roles = useMemo(() => {
@@ -112,6 +125,7 @@ export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
     /** 每个 mesh 要挂的材质 / 深度材质 / 图层 / 可见性 */
     const assign: Array<{ mesh: Mesh; material: Material; depth?: Material; layer: number; visible: boolean }> = []
     const created: Material[] = []
+    const hidden = new Set(replaced.split(',').map((s) => s.trim()).filter(Boolean))
 
     for (const c of collected) {
       const role = roles[c.name]
@@ -154,7 +168,8 @@ export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
           // 贴图池塘：只给画有池塘的那张地形材质打补丁（开关由 uniform 控制）
           if (c.name === pondMaterial) patchPond(s)
         }
-        c.meshes.forEach((mesh, i) => assign.push({ mesh, material: c.originals[i], layer: 0, visible: true }))
+        const visible = !hidden.has(c.name)
+        c.meshes.forEach((mesh, i) => assign.push({ mesh, material: c.originals[i], layer: 0, visible }))
       }
 
       entries[c.name] = {
@@ -172,7 +187,7 @@ export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
     return { entries, emitters, assign, created }
     // rolesKey 代表 roles 的内容
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collected, rolesKey, stiffness, thickness, waterEnabled, pondMaterial])
+  }, [collected, rolesKey, stiffness, thickness, waterEnabled, pondMaterial, replaced])
   const entries = plan.entries
 
   useLayoutEffect(() => {
@@ -182,11 +197,13 @@ export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
       a.mesh.customDepthMaterial = a.depth
       a.mesh.layers.set(a.layer)
       a.mesh.visible = a.visible
-      a.mesh.castShadow = true
+      a.mesh.castShadow = castShadowRef.current?.(a.mesh) ?? true
       a.mesh.receiveShadow = true
     }
-    useModelEmitters.setState({ positions: plan.emitters })
-    useMaterialRegistry.setState({ scene: sceneId, entries: plan.entries })
+    if (register) {
+      useModelEmitters.setState({ positions: plan.emitters })
+      useMaterialRegistry.setState({ scene: sceneId, entries: plan.entries })
+    }
     return () => {
       for (const o of originals) {
         o.mesh.material = o.material
@@ -195,10 +212,11 @@ export function useEnvMaterials(sceneId: SceneId, root: Object3D) {
         o.mesh.visible = true
       }
       for (const m of plan.created) m.dispose()
+      if (!register) return
       if (useMaterialRegistry.getState().entries === plan.entries) useMaterialRegistry.setState({ scene: null, entries: {} })
       useModelEmitters.setState({ positions: [] })
     }
-  }, [plan, sceneId])
+  }, [plan, sceneId, register])
 
   // 数值：原值 ← 角色基础值 ← 面板覆盖
   useEffect(() => {

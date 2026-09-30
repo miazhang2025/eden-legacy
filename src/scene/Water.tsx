@@ -1,58 +1,134 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { PlaneGeometry, type Matrix4, type Mesh } from 'three'
+import { useGLTF } from '@react-three/drei'
+import { Matrix4, Mesh, PlaneGeometry, Vector3, type BufferGeometry } from 'three'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
+import { waterOn } from '../config/schema'
 import { isTouchMode } from '../input/useInput'
 import { MAX_DEPTH, bakeDepthMap, createWaterMaterial, createWaterUniforms } from '../materials/WaterMaterial'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
 import { capQuality, useTier } from '../state/useQualityStore'
 import { hasCollider, setWalkPlane } from './collision'
+import { url, useEnvTransform } from './EnvModel'
 import { LAYER_VEGETATION } from './envMaterials'
 
 const DEG = Math.PI / 180
+const reflMatrix = new Matrix4()
+const inverse = new Matrix4()
+const local = new Vector3()
 
-// 水面平面（spec §5.2C）。三个场景都可以有，由各自 config 的 water.enabled 控制。
+// 水面（spec §5.2C）。三个场景都可以有，由各自 config 的 water.enabled 控制（生成地形接管水面时见 waterOn）。
+// 两种形态：
+//   - 方形平面（water.mesh 为空）：center / size / level 摆放，水深来自碰撞体烘的高度图（ocean）
+//   - 网格水面（water.mesh）：npm run terrain 生成的池塘形状，高度跟着原池面走（可以有多级），
+//     套 env 变换，水深来自顶点属性 _depth（garden）
 export function Water() {
-  const enabled = useSceneCfg((c) => c.water.enabled)
+  const enabled = useSceneCfg(waterOn)
   const walkable = useSceneCfg((c) => c.water.walkable)
   const level = useSceneCfg((c) => c.water.level)
+  const meshPath = useSceneCfg((c) => c.water.mesh)
   // 走水：水面作为可站立的地面（spec §15-B 决定：ocean 浮岛之间可以走水）
   useEffect(() => {
     setWalkPlane(enabled && walkable ? level : null)
     return () => setWalkPlane(null)
   }, [enabled, walkable, level])
   if (!enabled) return null
-  return <WaterSurface />
+  return meshPath ? <MeshWater path={meshPath} /> : <PlaneWater />
 }
 
-function WaterSurface() {
+function PlaneWater() {
+  const w = useSceneCfg((c) => c.water)
+  const tier = useTier()
+  const quality = capQuality(w.quality, tier.water)
+  // 波浪需要足够的顶点；low 档减半
+  const segments = Math.max(1, Math.round(w.segments * (quality === 'low' ? 0.5 : 1)))
+  const geometry = useMemo(() => new PlaneGeometry(1, 1, segments, segments), [segments])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  const { mesh, material } = useWaterSurface(false)
+  const [cx, , cz] = w.center
+  return (
+    <mesh
+      ref={mesh}
+      geometry={geometry}
+      material={material}
+      position={[cx, w.level, cz]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      scale={[w.size, w.size, 1]}
+      receiveShadow
+      renderOrder={1}
+    />
+  )
+}
+
+function MeshWater({ path }: { path: string }) {
+  const { scene } = useGLTF(url(path))
+  const geometry = useMemo(() => {
+    let g: BufferGeometry | null = null
+    scene.traverse((o) => {
+      if (o instanceof Mesh && !g) g = o.geometry as BufferGeometry
+    })
+    return g as BufferGeometry | null
+  }, [scene])
+  const t = useEnvTransform()
+  // 多级水面：实时反射平面跟着离相机最近的那片水走（反射相机会裁掉平面以下的东西，
+  // 平面放在高处时，低处水面的岸全被裁掉，只剩天空）。水面顶点稀疏取样，每帧找最近的一个。
+  const samples = useMemo(() => {
+    if (!geometry) return new Float32Array(0)
+    const p = geometry.getAttribute('position')
+    const step = Math.max(1, Math.floor(p.count / 800))
+    const out: number[] = []
+    for (let i = 0; i < p.count; i += step) out.push(p.getX(i), p.getY(i), p.getZ(i))
+    return new Float32Array(out)
+  }, [geometry])
+  const { mesh, material } = useWaterSurface(true, (camera) => {
+    const m = mesh.current
+    if (!m || !samples.length) return null
+    // 相机转到水面网格本地坐标里比较，结果再转回世界高度
+    local.copy(camera).applyMatrix4(inverse.copy(m.matrixWorld).invert())
+    let best = Infinity
+    let y = 0
+    for (let i = 0; i < samples.length; i += 3) {
+      const d = (samples[i] - local.x) ** 2 + (samples[i + 2] - local.z) ** 2
+      if (d < best) {
+        best = d
+        y = samples[i + 1]
+      }
+    }
+    return local.set(samples[0], y, samples[2]).applyMatrix4(m.matrixWorld).y
+  })
+  if (!geometry) return null
+  return (
+    <group {...t}>
+      <mesh ref={mesh} geometry={geometry} material={material} receiveShadow renderOrder={1} />
+    </group>
+  )
+}
+
+/**
+ * 水面材质 + 实时反射 + 每帧同步 config（两种形态共用）。
+ * reflectionLevel：给定相机位置返回反射平面的世界高度（多级水面用），null / 不传 = water.level。
+ */
+function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector3) => number | null) {
   const w = useSceneCfg((c) => c.water)
   const tier = useTier()
   const quality = capQuality(w.quality, tier.water)
   const scene = useThree((s) => s.scene)
   const mesh = useRef<Mesh>(null)
+  const planeY = useRef(NaN)
 
   const uniforms = useMemo(createWaterUniforms, [])
   const material = useMemo(() => createWaterMaterial(uniforms), [uniforms])
-  // 波浪需要足够的顶点；low 档减半
-  const segments = Math.max(1, Math.round(w.segments * (quality === 'low' ? 0.5 : 1)))
-  const geometry = useMemo(() => new PlaneGeometry(1, 1, segments, segments), [segments])
-  useEffect(
-    () => () => {
-      material.dispose()
-      geometry.dispose()
-    },
-    [material, geometry],
-  )
+  useEffect(() => () => material.dispose(), [material])
 
-  // 水深图：碰撞体就绪后按水面范围烘一次；范围 / 高度变化时重烘
+  // 水深图（只有方形平面用）：碰撞体就绪后按水面范围烘一次；范围 / 高度变化时重烘
   const [colliderReady, setColliderReady] = useState(hasCollider)
   const [cx, , cz] = w.center
   const depthMap = useMemo(
-    () => (colliderReady ? bakeDepthMap(w.level, cx, cz, w.size) : null),
-    [colliderReady, w.level, cx, cz, w.size],
+    () => (!vertexDepth && colliderReady ? bakeDepthMap(w.level, cx, cz, w.size) : null),
+    [vertexDepth, colliderReady, w.level, cx, cz, w.size],
   )
   useEffect(() => () => depthMap?.dispose(), [depthMap])
+  const hasDepth = vertexDepth || depthMap !== null
 
   // 实时反射（mid 及以上）：分辨率是最大的性能旋钮，移动端减半
   const resolution = Math.round(w.reflectionResolution * (isTouchMode() ? 0.5 : 1))
@@ -65,6 +141,8 @@ function WaterSurface() {
       multisample: 0,
     })
     r.visible = false
+    // 反射平面：水位高度的水平面（网格水面有多级时，其它级的反射会略有偏差）
+    r.rotation.set(-Math.PI / 2, 0, 0)
     return r
   }, [quality, resolution])
   useEffect(
@@ -93,7 +171,7 @@ function WaterSurface() {
     material.needsUpdate = true
   }, [material, quality, w.refractionStrength])
 
-  useFrame((state) => {
+  useFrame((state, dt) => {
     if (!colliderReady && hasCollider()) setColliderReady(true)
     const c = getSceneCfg().water
     const u = uniforms
@@ -109,8 +187,9 @@ function WaterSurface() {
     u.uFoamWidth.value = c.foamWidth
     u.uFoamColor.value.set(c.foamColor)
     u.uOpacity.value = c.opacity
-    u.uUseDepthColor.value = quality !== 'low' && depthMap ? 1 : 0
-    u.uUseFoam.value = quality === 'high' && depthMap ? 1 : 0
+    u.uUseVertexDepth.value = vertexDepth ? 1 : 0
+    u.uUseDepthColor.value = quality !== 'low' && hasDepth ? 1 : 0
+    u.uUseFoam.value = quality === 'high' && hasDepth ? 1 : 0
     u.uDepthMap.value = depthMap
     u.uDepthBounds.value.set(cx - c.size / 2, cz - c.size / 2, c.size, c.size)
     u.uMaxDepth.value = MAX_DEPTH
@@ -124,34 +203,28 @@ function WaterSurface() {
 
     const m = mesh.current
     if (reflector && m) {
-      // Reflector 与水面共用同一变换；渲染反射时把水面自己藏起来
-      reflector.position.copy(m.position)
-      reflector.rotation.copy(m.rotation)
-      reflector.scale.copy(m.scale)
+      // 反射平面高度：多级水面时平滑地跟到最近那片水（瞬间跳变会让反射闪一下）
+      const target = reflectionLevel?.(state.camera.position) ?? c.level
+      const y = Number.isFinite(planeY.current) ? planeY.current + (target - planeY.current) * Math.min(1, dt * 3) : target
+      planeY.current = y
+      reflector.position.set(0, y, 0)
       reflector.updateMatrixWorld()
+      // 渲染反射时把水面自己藏起来
       m.visible = false
       reflector.onBeforeRender(state.gl, scene, state.camera, undefined as never, undefined as never, undefined as never)
       reflector.visible = false
       m.visible = true
       u.uReflectionMap.value = reflector.getRenderTarget().texture
-      const reflUniforms = (reflector.material as unknown as { uniforms: { textureMatrix: { value: Matrix4 } } }).uniforms
-      u.uReflectionMatrix.value = reflUniforms.textureMatrix.value
+      // textureMatrix 作用于 Reflector 本地坐标；水面网格本地 → 世界 → Reflector 本地
+      const texMatrix = (reflector.material as unknown as { uniforms: { textureMatrix: { value: Matrix4 } } }).uniforms
+        .textureMatrix.value
+      reflMatrix.copy(reflector.matrixWorld).invert().multiply(m.matrixWorld)
+      u.uReflectionMatrix.value.multiplyMatrices(texMatrix, reflMatrix)
       u.uUseReflection.value = 1
     } else {
       u.uUseReflection.value = 0
     }
   })
 
-  return (
-    <mesh
-      ref={mesh}
-      geometry={geometry}
-      material={material}
-      position={[cx, w.level, cz]}
-      rotation={[-Math.PI / 2, 0, 0]}
-      scale={[w.size, w.size, 1]}
-      receiveShadow
-      renderOrder={1}
-    />
-  )
+  return { mesh, material }
 }

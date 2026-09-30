@@ -1,5 +1,7 @@
+import { Box3, Vector3, type Object3D } from 'three'
 import type { EndingConfig } from '../config/schema'
 import { AudioBus } from '../audio/AudioBus'
+import { copy } from '../data/copy'
 import type { BoxResult } from '../data/specimenBoxes'
 import { getActiveCanvas } from '../scene/activeCanvas'
 import { useEndingUi } from './useEndingUi'
@@ -7,9 +9,18 @@ import { useEndingUi } from './useEndingUi'
 // 照片导出（spec §8.4）：
 //   1. 临时隐藏提示框
 //   2. 以 photo.scale 倍像素比渲染一帧并立刻读取（同一个任务内完成，浏览器不会把放大的画布绘制到屏幕上）
-//   3. 新建 2D canvas，按 config 绘制底色 / 边框 / 标题与描述 / logo，再把 3D 帧放进去
-//   4. toBlob('image/png') → 下载 specimen-<boxId>-<时间戳>.png
-//   5. 恢复
+//   3. photo.crop 时只保留画框在屏幕上的投影区域
+//   4. 新建 2D canvas，按 config 绘制底色 / 边框 / 标题与描述 / logo，再把 3D 帧放进去
+//   5. toBlob('image/png') → 交给照片卡片展示（useEndingUi.photo），由卡片上的「保存」按钮下载
+//   6. 恢复
+
+/** 照片裁切的参照物（标本盒画框），由 SpecimenBox 注册 */
+export const photoSubject: { current: Object3D | null } = { current: null }
+
+export interface Photo {
+  url: string
+  filename: string
+}
 
 const FONT_DISPLAY = "'Songti SC', 'STSong', 'Noto Serif SC', 'SimSun', serif"
 const FONT_BODY = "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif"
@@ -31,12 +42,15 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   })
 }
 
+/** 不能出现在行首的标点：超宽时也挂在上一行末尾 */
+const NO_LINE_START = new Set('，。、；：？！）」』》”’…—,.;:?!)')
+
 /** 按字符换行（中文没有空格分词） */
 function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = []
   let line = ''
   for (const ch of text) {
-    if (ctx.measureText(line + ch).width > maxWidth && line) {
+    if (ctx.measureText(line + ch).width > maxWidth && line && !NO_LINE_START.has(ch)) {
       lines.push(line)
       line = ch
     } else line += ch
@@ -45,8 +59,41 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
   return lines
 }
 
-/** 以倍率渲染当前 3D 画布，返回一张独立的 canvas */
-function captureScaled(scale: number): HTMLCanvasElement | null {
+const bounds = new Box3()
+const corner = new Vector3()
+
+/** photoSubject 在画布上的投影矩形（0–1，左上为原点），外扩 padding（占自身尺寸的比例） */
+function subjectRect(padding: number): { x: number; y: number; w: number; h: number } | null {
+  const active = getActiveCanvas()
+  const subject = photoSubject.current
+  if (!active || !subject) return null
+  bounds.setFromObject(subject)
+  if (bounds.isEmpty()) return null
+  let x0 = Infinity
+  let y0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  for (let i = 0; i < 8; i++) {
+    corner
+      .set(i & 1 ? bounds.max.x : bounds.min.x, i & 2 ? bounds.max.y : bounds.min.y, i & 4 ? bounds.max.z : bounds.min.z)
+      .project(active.camera)
+    x0 = Math.min(x0, corner.x)
+    x1 = Math.max(x1, corner.x)
+    y0 = Math.min(y0, corner.y)
+    y1 = Math.max(y1, corner.y)
+  }
+  const px = ((x1 - x0) / 2) * padding
+  const py = ((y1 - y0) / 2) * padding
+  const left = Math.max(0, (x0 + 1) / 2 - px)
+  const right = Math.min(1, (x1 + 1) / 2 + px)
+  const top = Math.max(0, (1 - y1) / 2 - py)
+  const bottom = Math.min(1, (1 - y0) / 2 + py)
+  if (right <= left || bottom <= top) return null
+  return { x: left, y: top, w: right - left, h: bottom - top }
+}
+
+/** 以倍率渲染当前 3D 画布，返回一张独立的 canvas；crop 时只保留画框区域 */
+function captureScaled(scale: number, crop: boolean, cropPadding: number): HTMLCanvasElement | null {
   const active = getActiveCanvas()
   if (!active) return null
   const { gl, scene, camera } = active
@@ -55,9 +102,12 @@ function captureScaled(scale: number): HTMLCanvasElement | null {
   try {
     gl.setPixelRatio(prev * scale)
     gl.render(scene, camera)
-    shot.width = gl.domElement.width
-    shot.height = gl.domElement.height
-    shot.getContext('2d')!.drawImage(gl.domElement, 0, 0)
+    const W = gl.domElement.width
+    const H = gl.domElement.height
+    const r = (crop && subjectRect(cropPadding)) || { x: 0, y: 0, w: 1, h: 1 }
+    shot.width = Math.round(r.w * W)
+    shot.height = Math.round(r.h * H)
+    shot.getContext('2d')!.drawImage(gl.domElement, -Math.round(r.x * W), -Math.round(r.y * H))
   } finally {
     gl.setPixelRatio(prev)
     gl.render(scene, camera)
@@ -65,14 +115,15 @@ function captureScaled(scale: number): HTMLCanvasElement | null {
   return shot
 }
 
-export async function exportPhoto(box: BoxResult, photo: EndingConfig['photo']): Promise<string | null> {
+export async function exportPhoto(box: BoxResult, photo: EndingConfig['photo']): Promise<Photo | null> {
   AudioBus.playSfx('photoExport')
   useEndingUi.setState({ exporting: true, hoveredId: null })
   try {
-    const shot = captureScaled(photo.scale)
+    const shot = captureScaled(photo.scale, photo.crop, photo.cropPadding)
     if (!shot) return null
     // 版面按「屏幕 1 倍像素 × scale × 设备像素比」统一放大
-    const k = shot.width / (getActiveCanvas()!.gl.domElement.clientWidth || shot.width)
+    const dom = getActiveCanvas()!.gl.domElement
+    const k = (dom.width / (dom.clientWidth || dom.width)) * photo.scale
     const margin = photo.margin * k
     const gap = photo.textGap * k
     const titlePx = photo.titleSize * k
@@ -98,6 +149,23 @@ export async function exportPhoto(box: BoxResult, photo: EndingConfig['photo']):
       ctx.strokeStyle = photo.borderColor
       ctx.lineWidth = bw
       ctx.strokeRect(margin / 2, margin / 2, out.width - margin, out.height - margin)
+    }
+
+    // 项目名压在底边框正中，底色挖出一段让它「断开」边框
+    if (photo.includeBrand) {
+      const brandPx = photo.brandSize * k
+      ctx.font = `${brandPx}px ${FONT_BODY}`
+      ctx.letterSpacing = `${brandPx * 0.4}px`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const text = copy('app.brand')
+      const w = ctx.measureText(text).width + brandPx * 2
+      const y = out.height - margin / 2
+      ctx.fillStyle = photo.background
+      ctx.fillRect(out.width / 2 - w / 2, y - brandPx, w, brandPx * 2)
+      ctx.fillStyle = photo.borderColor
+      ctx.fillText(text, out.width / 2, y)
+      ctx.letterSpacing = '0px'
     }
 
     if (photo.includeText) {
@@ -127,15 +195,16 @@ export async function exportPhoto(box: BoxResult, photo: EndingConfig['photo']):
 
     const blob = await new Promise<Blob | null>((r) => out.toBlob(r, 'image/png'))
     if (!blob) return null
-    const filename = `specimen-${box.id}-${timestamp()}.png`
-    const href = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = href
-    a.download = filename
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(href), 1000)
-    return filename
+    return { url: URL.createObjectURL(blob), filename: `specimen-${box.id}-${timestamp()}.png` }
   } finally {
     useEndingUi.setState({ exporting: false })
   }
+}
+
+/** 下载照片 */
+export function savePhoto(photo: Photo) {
+  const a = document.createElement('a')
+  a.href = photo.url
+  a.download = photo.filename
+  a.click()
 }

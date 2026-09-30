@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { InstancedBufferAttribute, InstancedBufferGeometry, MathUtils, PlaneGeometry, type Mesh } from 'three'
 import type { ParticlePool as PoolConfig, SceneConfig, Vec3 } from '../../config/schema'
 import { assetsForScene } from '../../data/assets'
-import { assetTransform } from '../../state/useAssetOverrides'
+import { assetTransform } from '../../state/assetPlacement'
 import { getSceneCfg, useConfigStore, useSceneCfg } from '../../state/useConfigStore'
 import { useFlowStore } from '../../state/useFlowStore'
 import { useTier } from '../../state/useQualityStore'
@@ -109,19 +109,22 @@ function pushParams(u: ParticleUniforms, p: PoolConfig) {
   u.uBurst.value = p.role === 'burst' ? 1 : 0
 }
 
-/** 引导发光粒子的目标强度（spec §5.1）：远处亮、走近变弱；进入采集区后区域光团减弱、资产光团点亮 */
-function beaconTarget(pool: PoolConfig, cfg: SceneConfig, pos: Vec3): number {
+/**
+ * 引导发光粒子的目标强度（spec §5.1）：远处亮、走近变弱。
+ * beaconZone 原用于标记采集区，采集区已取消，不再点亮；
+ * beaconAsset 在探索阶段点亮尚未看过的资产，四个都看过后全部点亮供选择，确认后熄灭（burst 接手）。
+ */
+function beaconTarget(pool: PoolConfig, cfg: SceneConfig, pos: Vec3, assetId?: string): number {
   const b = cfg.beacon
-  const phase = useFlowStore.getState().phase
+  const flow = useFlowStore.getState()
   const d = Math.hypot(pos[0] - rig.position.x, pos[2] - rig.position.z)
   const k = MathUtils.smoothstep(d, b.falloffNear, b.falloffFar)
   if (pool.role === 'beaconZone') {
-    if (phase === 'IDLE') return MathUtils.lerp(b.zoneNearIntensity, b.zoneFarIntensity, k)
-    if (phase === 'PROMPTED' || phase === 'INSPECTING') return b.zoneInsideIntensity
     return 0
   }
-  // beaconAsset：进入采集区后才点亮，确认后熄灭（burst 接手）
-  if (phase !== 'PROMPTED' && phase !== 'INSPECTING') return 0
+  if (flow.phase !== 'EXPLORING' && flow.phase !== 'INSPECTING') return 0
+  const allFound = flow.total > 0 && flow.discovered.length >= flow.total
+  if (!allFound && assetId && flow.discovered.includes(assetId)) return 0
   return MathUtils.lerp(b.assetNearIntensity, b.assetFarIntensity, k)
 }
 
@@ -172,11 +175,12 @@ function Pool({ index }: { index: number }) {
       u.uEmitterDelay.value[i] = e.delay
       u.uEmitterGround.value[i] = p.followCamera ? -1e4 : ground(e.position[0], e.position[2])
       let target = 1
-      if (p.role === 'beaconZone' || p.role === 'beaconAsset') target = beaconTarget(p, c, e.position)
+      if (p.role === 'beaconZone') target = beaconTarget(p, c, e.position)
+      if (p.role === 'beaconAsset') target = beaconTarget(p, c, e.position, assetsForScene(c.scene)[i]?.id)
       if (p.role === 'burst') {
         // 只在被确认的那个资产位置爆发
         const confirmed = assetsForScene(c.scene).findIndex((a) => a.id === flow.assetId)
-        target = flow.phase !== 'IDLE' && i === confirmed ? 1 : 0
+        target = flow.phase !== 'EXPLORING' && flow.phase !== 'INSPECTING' && i === confirmed ? 1 : 0
       }
       current.current[i] = MathUtils.lerp(current.current[i], target, dampFactor(0.4, dt))
       if (p.role === 'burst') current.current[i] = target

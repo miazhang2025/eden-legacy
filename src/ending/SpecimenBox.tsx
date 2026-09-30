@@ -1,9 +1,10 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { MathUtils, type Group } from 'three'
-import { getAsset } from '../data/assets'
 import { useEndingCfg } from '../state/useConfigStore'
 import type { SceneId } from '../config/schema'
+import { composeSpecimens } from './composition'
+import { photoSubject } from './ExportPhoto'
 import { segment } from './reveal'
 import { SpecimenSlot } from './SpecimenSlot'
 
@@ -47,12 +48,18 @@ function FramePlane() {
   )
 }
 
-// selections（来自 useRunStore）是决定标本盒形态的唯一输入；slot 映射固定：A=cave, B=ocean, C=garden
-export function SpecimenBox({ selections }: { selections: Record<SceneId, string | null> }) {
+// selections（来自 useRunStore）是决定标本盒形态的唯一输入；构图（谁做主体、摆在哪）由 composition 自动算出，
+// seed（组合 id）决定镜像与旋转扰动，同一组合每次结果一致
+export function SpecimenBox({ selections, seed }: { selections: Record<SceneId, string | null>; seed: string }) {
   const mode = useEndingCfg((c) => c.frame.mode)
-  const slots = useEndingCfg((c) => c.slots)
+  const frameSize = useEndingCfg((c) => c.frame.size)
+  const composition = useEndingCfg((c) => c.composition)
   const reveal = useEndingCfg((c) => c.reveal)
   const group = useRef<Group>(null)
+  const placements = useMemo(
+    () => composeSpecimens(selections, composition, frameSize, seed),
+    [selections, composition, frameSize, seed],
+  )
 
   // 入场：整体从 boxScaleFrom 放到 1
   useFrame(() => {
@@ -62,10 +69,11 @@ export function SpecimenBox({ selections }: { selections: Record<SceneId, string
 
   return (
     <group ref={group}>
-      {mode === '3d' ? <Frame3D /> : <FramePlane />}
-      <SpecimenSlot index={0} slot={slots.slotA} asset={getAsset(selections.cave)} />
-      <SpecimenSlot index={1} slot={slots.slotB} asset={getAsset(selections.ocean)} />
-      <SpecimenSlot index={2} slot={slots.slotC} asset={getAsset(selections.garden)} />
+      {/* 照片裁切以画框为准 */}
+      <group ref={(g) => void (photoSubject.current = g)}>{mode === '3d' ? <Frame3D /> : <FramePlane />}</group>
+      {placements.map((p, i) => (
+        <SpecimenSlot key={p.scene} index={i} placement={p} />
+      ))}
     </group>
   )
 }

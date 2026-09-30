@@ -1,4 +1,4 @@
-# 生态标本盒 · Web 体验项目 Spec
+# 伊甸遗存录（Eden Legacy）· Web 体验项目 Spec
 
 > 本文件是给实现方（Claude Code / 工程师）的唯一真源文档。  
 > 实现时如果发现文档与代码冲突，以本文件为准；如果本文件有缺口，先在「待确认问题」区追加问题，不要自行发明产品逻辑。
@@ -7,7 +7,7 @@
 
 ## 0. 一句话描述
 
-一个五页的网页体验：玩家从 2D landing 进入三个 3D 场景，在每个场景中用第三人称角色控制器行走探索，每个场景从 4 个候选生态资产中采集 1 个；三次选择被持久化，最终在 2D 的 ending 页面组合成一个巴洛克风格的 3D「生态标本盒」，可交互并导出照片。
+《伊甸遗存录》是一个五页的网页体验：玩家从 2D landing 进入三个 3D 场景，在每个场景中用第三人称角色控制器行走探索，每个场景从 4 个候选生态资产中采集 1 个；三次选择被持久化，最终在 2D 的 ending 页面组合成一个巴洛克风格的 3D「生态标本盒」，可交互并导出照片。
 
 同时必须交付一个独立的 **Tech Art Look Dev 面板**，能实时调节场景里尽可能多的参数（光照 / 材质 / 相机 / 粒子 / 后处理 / 雾 / 水面），并导出 config 文件直接替换场景的设定数值。
 
@@ -666,13 +666,14 @@ Tweakpane 面板负责调数值，**摆位置交给 Theatre.js**（`@theatre/stu
 - `@theatre/studio` 与 `@theatre/r3f` 装为 `devDependencies`，挂载点用 `import.meta.env.DEV` 包住，并确保生产构建里被 tree-shake 掉（构建后检查 bundle 里不含 `theatre` 字样，提供 `npm run check:bundle` 脚本，CI 中调用）。
 - `@theatre/core` 同样**不进生产**。生产代码只读自己的 config，不播放 Theatre 的 state。
 
+**资产摆位不走 Theatre**：12 个候选资产的位置 / 旋转 / 缩放在 `config/scenes/<scene>.json` 的 `assets` 段，由 look dev 面板「资产摆位 assets」调节并随 Export JSON 导出。面板打开时可走位摆放：走到位置按 `1`–`4` 把对应资产放到角色前方 1.5m，`5` 把出生点设为当前位置与朝向。
+
 **用它摆什么**：
 
 | 对象 | 落到哪 |
 |---|---|
-| 12 个候选资产的 `worldPosition` / `worldRotation` / `scale` | `data/assets.ts` |
 | ending 三个 slot 的 transform | `config/scenes/ending.json` |
-| 采集区 `zoneCenter` / `zoneRadius` | `config/scenes/*.json` 的 `flow` 段 |
+| ~~采集区 `zoneCenter` / `zoneRadius`~~（已取消：资产散落，四个都看过才能收集）| `config/scenes/*.json` 的 `flow` 段 |
 | beacon 与各粒子发射点的 `position` | `config/scenes/*.json` 的 `particles[].emitters[]` |
 | 灯光位置（点光/主光）| `config/scenes/*.json` 的 `lights` 段 |
 
@@ -690,10 +691,10 @@ dev 环境挂 studio → gizmo 拖拽 → 保存 state
 
 **已实现的用法（M3）**：
 1. `npm run dev`，访问 `http://localhost:5173/?theatre=1#/<scene>`（`?theatre=1` 放在 `#` 之前）；只有 DEV + 这个参数才加载 studio。
-2. 左侧大纲里是本场景所有可摆放对象（资产 `asset:<id>`、`zone`、`spawn`、`light:directional`、`light:point:<name>`；ending 页为 `slot:slotA/B/C`）。点 **Editor** 打开带 gizmo 的编辑视图。代理物体只在编辑视图可见，拖动时游戏画面实时跟随。
+2. 左侧大纲里是本场景所有可摆放对象（`zone`（已弃用）、`spawn`、`light:directional`、`light:point:<name>`；ending 页为 `slot:slotA/B/C`）。点左上角**相机图标**打开带 gizmo 的编辑视图。代理物体只在编辑视图可见，拖动时游戏画面实时跟随。
 3. 右下角「保存摆位」→ 写入 `theatre/<scene>.theatre-project-state.json`（经 dev server 中间件）。
-4. `npm run bake:theatre`（或 `-- <scene>` 只烘一个）→ 写回 `src/data/assets.ts` 与 `src/config/scenes/*.json`。只写被拖动过的对象和分量。
-- 约定：`zone` 的缩放 x = 采集区半径；`spawn` 的旋转 y = 出生朝向；资产在 Theatre 里是绝对高度，烘焙时换算为「相对地面的偏移」（`worldPosition[1]`），只水平拖动时保持贴地。
+4. `npm run bake:theatre`（或 `-- <scene>` 只烘一个）→ 写回 `src/config/scenes/*.json`。只写被拖动过的对象和分量。
+- 约定：`zone` 已弃用；`spawn` 的旋转 y = 出生朝向。
 - `npm run build && npm run check:bundle` 校验生产包不含 Theatre / Tweakpane。
 - Theatre 的 state 文件进版本库（方便下次接着拖），但它是**中间产物**，真源是烘出来的 config。两者不一致时以 config 为准。
 - 目录：`theatre/`（state 文件）+ `scripts/bake-theatre.ts`（烘焙脚本）。

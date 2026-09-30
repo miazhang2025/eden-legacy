@@ -4,7 +4,7 @@
 // 做法：每个可摆放的对象在 Theatre 里对应一个「只在编辑器视图可见」的代理物体。
 // 拖动代理 → onValuesChange → 实时写回运行时 config / 资产覆盖，场景立即跟随。
 // 「保存摆位」把 Theatre state 写到 theatre/<scene>.theatre-project-state.json，
-// 再用 `npm run bake:theatre` 单向烘回 assets.ts 与 config/scenes/*.json。
+// 再用 `npm run bake:theatre` 单向烘回 config/scenes/*.json。
 
 import { useEffect, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -13,9 +13,8 @@ import studioModule from '@theatre/studio'
 import extensionModule from '@theatre/r3f/dist/extension'
 import { SheetProvider, editable as e } from '@theatre/r3f'
 import type { ConfigId, SceneId, Vec3 } from '../config/schema'
-import { assetsForScene, type CollectableAssetDef } from '../data/assets'
+import type { RoleName } from '../ending/composition'
 import { groundHeightFromSky, hasCollider } from '../scene/collision'
-import { assetTransform, useAssetOverrides } from '../state/useAssetOverrides'
 import { useConfigStore } from '../state/useConfigStore'
 
 // @theatre/studio 与 r3f extension 是 CJS 包，经 Vite 预构建后 default 可能多包一层
@@ -62,43 +61,6 @@ function useOnValues(obj: ISheetObject | null, cb: (v: Transform) => void) {
 }
 
 const PROXY_COLOR = '#ff4fd8'
-
-function AssetProxy({ def }: { def: CollectableAssetDef }) {
-  // 代理的 y 是绝对世界高度（= 地面 + 偏移），回写时再换算回相对地面的偏移
-  const [init] = useState(() => {
-    const t = assetTransform(def)
-    const g = groundHeightFromSky(t.position[0], t.position[2]) ?? 0
-    return { ...t, offsetY: t.position[1], position: [t.position[0], g + t.position[1], t.position[2]] as Vec3 }
-  })
-  const [obj, setObj] = useState<ISheetObject | null>(null)
-  useOnValues(obj, (v) => {
-    // 与 bake-theatre 同一语义：y 没被拖过时保持原来的离地偏移（水平拖动后仍贴地）；
-    // y 被拖过时，偏移 = 绝对高度 - 新位置的地面高度
-    const [x, y, z] = v3(v.position)
-    const yDragged = Math.abs(v.position.y - init.position[1]) > 1e-6
-    const offsetY = yDragged ? +(y - (groundHeightFromSky(x, z) ?? 0)).toFixed(3) : init.offsetY
-    useAssetOverrides.getState().set(def.id, {
-      position: [x, offsetY, z],
-      rotation: v3(v.rotation),
-      scale: +v.scale.x.toFixed(3),
-    })
-  })
-  return (
-    <e.group
-      theatreKey={`asset:${def.id}`}
-      visible="editor"
-      objRef={setObj}
-      position={init.position}
-      rotation={init.rotation}
-      scale={init.scale}
-    >
-      <mesh>
-        <octahedronGeometry args={[0.6, 0]} />
-        <meshBasicMaterial color={PROXY_COLOR} wireframe />
-      </mesh>
-    </e.group>
-  )
-}
 
 function ZoneProxy() {
   const [init] = useState(() => {
@@ -164,7 +126,7 @@ function LightProxy({ theatreKey, position, onMove }: { theatreKey: string; posi
   )
 }
 
-/** 探索场景的摆位编辑：12 个资产（本场景 4 个）、采集区、出生点、灯光 */
+/** 探索场景的摆位编辑：zone（已弃用）、出生点、灯光。资产摆位改在 look dev 面板（config assets 段） */
 export function TheatreSceneEditor({ sceneId }: { sceneId: SceneId }) {
   // 代理的初始高度依赖地面射线，等碰撞体注册后再挂载
   const [ready, setReady] = useState(hasCollider)
@@ -179,13 +141,9 @@ function SceneProxies({ sceneId }: { sceneId: SceneId }) {
   const lights = useConfigStore((s) => s.configs[sceneId].lights)
   const update = useConfigStore((s) => s.update)
 
-  useEffect(() => () => useAssetOverrides.getState().clear(), [])
 
   return (
     <SheetProvider sheet={sheet}>
-      {assetsForScene(sceneId).map((a) => (
-        <AssetProxy key={a.id} def={a} />
-      ))}
       <ZoneProxy />
       <SpawnProxy />
       <LightProxy
@@ -205,41 +163,48 @@ function SceneProxies({ sceneId }: { sceneId: SceneId }) {
   )
 }
 
-function SlotProxy({ slot }: { slot: 'slotA' | 'slotB' | 'slotC' }) {
-  const [init] = useState(() => useConfigStore.getState().configs.ending.slots[slot])
+/** 构图角色的摆位代理：Theatre 里的位置 = anchor × 画框尺寸（不含镜像 / 扰动），线框盒 = region */
+function RoleProxy({ role }: { role: RoleName }) {
+  const [init] = useState(() => {
+    const { composition, frame } = useConfigStore.getState().configs.ending
+    return { r: composition[role], size: frame.size }
+  })
+  const [w, h, d] = init.size
   const [obj, setObj] = useState<ISheetObject | null>(null)
   useOnValues(obj, (v) => {
     useConfigStore.getState().update('ending', (c) => {
-      c.slots[slot].position = v3(v.position)
-      c.slots[slot].rotation = v3(v.rotation, 4)
-      c.slots[slot].scale = +v.scale.x.toFixed(3)
+      const [fw, fh, fd] = c.frame.size
+      const r = c.composition[role]
+      r.anchor = v3({ x: v.position.x / fw, y: v.position.y / fh, z: v.position.z / fd }, 4)
+      r.rotation = v3(v.rotation, 4)
+      r.scale = +v.scale.x.toFixed(3)
     })
   })
   return (
     <e.group
-      theatreKey={`slot:${slot}`}
+      theatreKey={`role:${role}`}
       visible="editor"
       objRef={setObj}
-      position={init.position}
-      rotation={init.rotation}
-      scale={init.scale}
+      position={[init.r.anchor[0] * w, init.r.anchor[1] * h, init.r.anchor[2] * d]}
+      rotation={init.r.rotation}
+      scale={init.r.scale}
     >
       <mesh>
-        <boxGeometry args={[init.fitSize, init.fitSize, init.fitSize]} />
+        <boxGeometry args={[init.r.region[0] * w, init.r.region[1] * h, init.r.region[2] * d]} />
         <meshBasicMaterial color={PROXY_COLOR} wireframe />
       </mesh>
     </e.group>
   )
 }
 
-/** Ending 的摆位编辑：三个 slot */
+/** Ending 的摆位编辑：主体 + 两件点缀 */
 export function TheatreEndingEditor() {
   const sheet = useSheet('ending')
   return (
     <SheetProvider sheet={sheet}>
-      <SlotProxy slot="slotA" />
-      <SlotProxy slot="slotB" />
-      <SlotProxy slot="slotC" />
+      <RoleProxy role="heroRole" />
+      <RoleProxy role="accentNear" />
+      <RoleProxy role="accentFar" />
     </SheetProvider>
   )
 }

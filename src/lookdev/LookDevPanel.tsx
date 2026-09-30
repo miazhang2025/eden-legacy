@@ -8,6 +8,8 @@ import { ENDING_SCHEMA, GLOBAL_SCHEMA, SCENE_SCHEMA, type QualityTier, type Scen
 import { ALL_COMBOS } from '../data/specimenBoxes'
 import { captureActiveCanvas, getActiveCanvas } from '../scene/activeCanvas'
 import { debugSkipScene } from '../scene/AssetFlow'
+import { groundHeightFromSky } from '../scene/collision'
+import { forwardFromYaw, rig } from '../scene/rig'
 import { useMaterialRegistry } from '../scene/materialOverrides'
 import { useConfigStore } from '../state/useConfigStore'
 import { useDebugStore } from '../state/useDebugStore'
@@ -28,6 +30,38 @@ const readOpen = () => {
 }
 
 const isScene = (id: StoreId): id is SceneId => id !== 'ending' && id !== 'global'
+
+/** 摆位快捷键把资产放到角色前方多远（米），避免放下后立刻进入 proximity */
+const DROP_AHEAD = 1.5
+const round = (n: number, d = 3) => +n.toFixed(d)
+
+/**
+ * 走位摆放（面板打开时生效）：在游戏里走到想要的位置，按 1–4 把 assets[0–3] 放到角色前方，
+ * 5 把出生点设为当前位置与朝向。直接写 config，面板实时刷新，随 Export JSON 导出。
+ */
+function dropAtPlayer(id: SceneId, n: number): string | null {
+  const store = useConfigStore.getState()
+  if (store.scene !== id) return null
+  const cfg = store.configs[id]
+  if (n <= 4) {
+    const a = cfg.assets[n - 1]
+    if (!a) return null
+    const fwd = forwardFromYaw(rig.yaw)
+    const x = round(rig.position.x + fwd.x * DROP_AHEAD)
+    const z = round(rig.position.z + fwd.z * DROP_AHEAD)
+    if (groundHeightFromSky(x, z) === null) return null
+    store.update(id, (d) => void (d.assets[n - 1].position = [x, a.position[1], z]))
+    return `${a.id} → (${x}, ${z})`
+  }
+  const x = round(rig.position.x)
+  const z = round(rig.position.z)
+  const yaw = round(Math.atan2(Math.sin(rig.yaw), Math.cos(rig.yaw)), 4)
+  store.update(id, (d) => {
+    d.character.spawn = [x, 0, z]
+    d.character.spawnYaw = yaw
+  })
+  return `spawn → (${x}, ${z}) yaw ${yaw}`
+}
 
 /** 顶部工具区：文件操作、性能、调试 */
 function buildTools(pane: Pane, ctx: BuildContext, stopFns: Array<() => void>) {
@@ -159,6 +193,20 @@ function buildTools(pane: Pane, ctx: BuildContext, stopFns: Array<() => void>) {
       .addBinding(d, 'freeFly', { label: 'free-fly 相机' })
       .on('change', (ev) => useDebugStore.setState({ freeFly: ev.value }))
     debug.addButton({ title: '跳过场景（采集第一个资产）' }).on('click', () => debugSkipScene(id))
+
+    // ---------- 摆位 ----------
+    const place = addFolder(pane, '摆位（走位快捷键）', `lookdev.fold:${id}:__place`, true)
+    const hint = { text: '走到位置，面朝要放的方向\n1–4 放资产 · 5 设出生点\n改完点 Export JSON' }
+    place.addBinding(hint, 'text', { readonly: true, label: '用法', multiline: true, rows: 3 })
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const n = Number(e.key)
+      if (!Number.isInteger(n) || n < 1 || n > 5) return
+      const msg = dropAtPlayer(id, n)
+      if (msg) say(msg)
+    }
+    window.addEventListener('keydown', onKey)
+    stopFns.push(() => window.removeEventListener('keydown', onKey))
   } else {
     const d = { combo: useDebugStore.getState().simulateCombo ?? '' }
     debug

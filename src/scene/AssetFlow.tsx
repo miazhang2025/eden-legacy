@@ -4,7 +4,7 @@ import { AudioBus } from '../audio/AudioBus'
 import { triggerConfirmGust } from '../materials/uniforms'
 import type { SceneId } from '../config/schema'
 import { assetsForScene } from '../data/assets'
-import { assetTransform } from '../state/useAssetOverrides'
+import { assetTransform } from '../state/assetPlacement'
 import { getSceneCfg } from '../state/useConfigStore'
 import { useFlowStore } from '../state/useFlowStore'
 import { useRunStore } from '../state/useRunStore'
@@ -12,23 +12,28 @@ import { useTransition } from '../ui/Transition'
 import { CollectableAsset } from './CollectableAsset'
 import { rig } from './rig'
 
+function leave() {
+  useFlowStore.getState().exit()
+  useTransition.getState().go(useRunStore.getState().nextRoute())
+}
+
 const dist2D = (ax: number, az: number, bx: number, bz: number) => Math.hypot(ax - bx, az - bz)
 
-/** 调试：直接采集本场景第一个资产并走完正常的确认 → 跳转流程（K 键 / look dev「跳过场景」） */
+/** 调试：标记全部已发现，采集本场景第一个资产并走完正常的确认 → 跳转流程（K 键 / look dev「跳过场景」） */
 export function debugSkipScene(sceneId: SceneId) {
   const flow = useFlowStore.getState()
   if (flow.phase === 'CONFIRMED' || flow.phase === 'RESOLVED' || flow.phase === 'EXIT') return
-  const id = assetsForScene(sceneId)[0].id
-  useFlowStore.setState({ phase: 'INSPECTING', assetId: id })
-  useFlowStore.getState().confirm(id)
+  const ids = assetsForScene(sceneId).map((a) => a.id)
+  useFlowStore.setState({ phase: 'INSPECTING', assetId: ids[0], discovered: ids, total: ids.length })
+  useFlowStore.getState().confirm(ids[0])
 }
 
-// §6.3 四选一流程：逐帧做采集区 / proximity 判定，CONFIRMED 后写 store 并跳转。
+// §6.3 四选一流程：逐帧做 proximity 判定；四个都看过才能收集；CONFIRMED 后写 store 并跳转。
 export function AssetFlow({ sceneId }: { sceneId: SceneId }) {
   const assets = useMemo(() => assetsForScene(sceneId), [sceneId])
 
   useEffect(() => {
-    useFlowStore.getState().reset()
+    useFlowStore.getState().reset(assetsForScene(sceneId).length)
   }, [sceneId])
 
   // 进入 CONFIRMED：写入选择，按时序推进到 RESOLVED → 跳下一页
@@ -36,7 +41,6 @@ export function AssetFlow({ sceneId }: { sceneId: SceneId }) {
     const timers: number[] = []
     const unsub = useFlowStore.subscribe((s, prev) => {
       if (s.phase === prev.phase) return
-      if (s.phase === 'PROMPTED' && prev.phase === 'IDLE') AudioBus.playSfx('zoneEnter')
       if (s.phase === 'INSPECTING' && s.assetId !== prev.assetId) AudioBus.playSfx('assetNear')
       if (s.phase === 'CONFIRMED' && s.assetId) {
         AudioBus.playSfx('collect')
@@ -47,13 +51,15 @@ export function AssetFlow({ sceneId }: { sceneId: SceneId }) {
         const total = f.selectGlowDuration + f.fadeDuration + f.resolveDelay
         timers.push(window.setTimeout(() => useFlowStore.getState().resolve(), total * 1000))
       }
-      if (s.phase === 'RESOLVED') {
-        useFlowStore.getState().exit()
-        useTransition.getState().go(useRunStore.getState().nextRoute())
-      }
+      if (s.phase === 'RESOLVED') leave()
+    })
+    // 四个都看过：提示可以选择了
+    const unsubFound = useFlowStore.subscribe((s, prev) => {
+      if (s.total > 0 && s.discovered.length === s.total && prev.discovered.length < s.total) AudioBus.playSfx('zoneEnter')
     })
     return () => {
       unsub()
+      unsubFound()
       timers.forEach(clearTimeout)
     }
   }, [sceneId])
@@ -73,11 +79,7 @@ export function AssetFlow({ sceneId }: { sceneId: SceneId }) {
     const f = getSceneCfg().flow
     const p = rig.position
 
-    if (flow.phase === 'IDLE') {
-      if (dist2D(p.x, p.z, f.zoneCenter[0], f.zoneCenter[2]) <= f.zoneRadius) flow.enterZone()
-      return
-    }
-    if (flow.phase !== 'PROMPTED' && flow.phase !== 'INSPECTING') return
+    if (flow.phase !== 'EXPLORING' && flow.phase !== 'INSPECTING') return
 
     let nearest: string | null = null
     let best = f.proximity

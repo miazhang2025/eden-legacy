@@ -94,6 +94,8 @@ function GrassField({ mask }: { mask: string }) {
   }, [mask])
   useEffect(() => {
     maskTex.colorSpace = NoColorSpace
+    // 密度图第 0 行 = 范围最小 z（与高度图 DataTexture 一致），不能按 TextureLoader 默认上下翻转
+    maskTex.flipY = false
     maskTex.magFilter = LinearFilter
     maskTex.needsUpdate = true
   }, [maskTex])

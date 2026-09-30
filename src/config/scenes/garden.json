@@ -52,13 +52,13 @@
     "exposure": 1.1,
     "pixelRatioMax": 3
   },
-  "background": "#d6cde3",
+  "background": "#ffffff",
   "fog": {
-    "type": "exp2",
-    "color": "#cdbfdf",
-    "density": 0.017,
+    "type": "linear",
+    "color": "#c09bd5",
+    "density": 8.673617379884035e-19,
     "near": 15,
-    "far": 93
+    "far": 272
   },
   "lights": {
     "ambient": {
@@ -66,8 +66,8 @@
       "intensity": 0.32999999999999996
     },
     "directional": {
-      "color": "#ffddd6",
-      "intensity": 1.52,
+      "color": "#f6f8de",
+      "intensity": 1.09,
       "position": [
         20,
         20,
@@ -115,15 +115,15 @@
     "mode": "hdri",
     "hdri": "hdri/qwantani_dusk_2_puresky.hdr",
     "intensity": 0.54,
-    "rotationY": -0.20000000000000004,
-    "background": false,
-    "hdriBackground": "",
-    "backgroundIntensity": 0.15999999999999995,
+    "rotationY": 0.19999999999999996,
+    "background": true,
+    "hdriBackground": "hdri/garden_bg.hdr",
+    "backgroundIntensity": 0.8699999999999999,
     "sunIntensity": 0
   },
   "shadows": {
-    "enabled": true,
-    "bias": -0.0005,
+    "enabled": false,
+    "bias": -0.003,
     "normalBias": 0.03,
     "radius": 3,
     "cameraSize": 35,
@@ -172,41 +172,92 @@
     "opaqueEnvMapIntensity": 2
   },
   "water": {
-    "enabled": false,
+    "enabled": true,
     "quality": "high",
-    "level": 1.26,
+    "level": 1.279,
     "center": [
+      1.26,
       0,
-      0,
-      0
+      -1.48
     ],
-    "size": 80,
-    "shallowColor": "#5a8f86",
-    "deepColor": "#1c3b3f",
-    "depthFalloff": 1.2,
-    "normalScale": 0.4,
-    "normalStrength": 0.35,
-    "flowSpeed": 0.08,
-    "flowDirectionDeg": 30,
-    "fresnelPower": 4,
-    "roughness": 0.06,
-    "reflectionIntensity": 0.8,
+    "size": 36,
+    "mesh": "/models/env/garden.water.glb",
+    "shallowColor": "#6fa3ad",
+    "deepColor": "#2e3d66",
+    "depthFalloff": 0.45,
+    "normalScale": 0.6,
+    "normalStrength": 0.25,
+    "flowSpeed": 0.12,
+    "flowDirectionDeg": -60,
+    "fresnelPower": 5.8,
+    "roughness": 0.15,
+    "reflectionIntensity": 0.45,
     "reflectionResolution": 512,
-    "reflectionLayers": "terrain",
-    "refractionStrength": 0.3,
-    "foamWidth": 0.25,
-    "foamColor": "#e8f4ee",
-    "causticsIntensity": 0.6,
+    "reflectionLayers": "terrain+vegetation",
+    "refractionStrength": 0,
+    "foamWidth": 0.08,
+    "foamColor": "#f4fbff",
+    "causticsIntensity": 0,
     "causticsScale": 0.35,
     "causticsSpeed": 0.6,
-    "opacity": 0.85,
-    "blockDepth": 0.6,
+    "opacity": 0.82,
+    "blockDepth": 0,
     "walkable": false,
-    "segments": 96,
-    "waveAmplitude": 0.04,
-    "waveLength": 3,
-    "waveSpeed": 0.55,
+    "segments": 64,
+    "waveAmplitude": 0.006,
+    "waveLength": 1.5,
+    "waveSpeed": 0.5,
     "waveSteepness": 0.35
+  },
+  "terrain": {
+    "enabled": true,
+    "model": "/models/env/garden.terrain.glb",
+    "collider": "/models/colliders/garden.terrain.glb",
+    "replaces": "SC08_land,SC09_land,SC55_land",
+    "ownsWater": true,
+    "material": "textured",
+    "near": {
+      "albedo": "textures/ground/pjvxx_albedo.ktx2",
+      "normal": "textures/ground/pjvxx_normal.ktx2",
+      "orm": "textures/ground/pjvxx_orm.ktx2",
+      "tileSize": 0.85,
+      "tint": "#ffffff",
+      "normalStrength": 1,
+      "aoStrength": 0.8,
+      "roughness": 1
+    },
+    "far": {
+      "albedo": "textures/ground/pftoh_albedo.ktx2",
+      "normal": "textures/ground/pftoh_normal.ktx2",
+      "orm": "textures/ground/pftoh_orm.ktx2",
+      "tileSize": 1,
+      "tint": "#829f6c",
+      "normalStrength": 1,
+      "aoStrength": 0.8,
+      "roughness": 1
+    },
+    "breakup": 0.45,
+    "macroStrength": 0.25,
+    "macroScale": 18,
+    "bedColor": "#95887e",
+    "bedTint": 0.4,
+    "peaks": {
+      "topColor": "#9d8fb6",
+      "baseColor": "#cdbfdf",
+      "shade": 0.5
+    },
+    "scatter": {
+      "enabled": true,
+      "model": "/models/env/garden.scatter.glb",
+      "density": 1
+    },
+    "boundary": {
+      "enabled": true,
+      "map": "/models/env/garden.terrain.bounds.png",
+      "inset": 0.6,
+      "softWidth": 1.5,
+      "pushBack": 2
+    }
   },
   "pond": {
     "enabled": true,
@@ -246,23 +297,23 @@
   },
   "grass": {
     "enabled": false,
-    "mask": "/models/env/garden.grass.png",
+    "mask": "/models/env/garden.terrain.grass.png",
     "count": 178000,
     "radius": 13,
     "fadeStart": 0.89,
     "densityThreshold": 0.24,
     "bladeHeight": [
-      0.15,
-      0.18
+      0.16,
+      0.28
     ],
-    "bladeWidth": 0.027,
+    "bladeWidth": 0.04,
     "bend": 0.21,
-    "baseColor": "#2d5f4a",
-    "tipColor": "#91af7c",
-    "colorVariation": 0.41000000000000003,
+    "baseColor": "#34431b",
+    "tipColor": "#8aa548",
+    "colorVariation": 0.3,
     "normalUp": 0.20999999999999996,
     "windInfluence": 0.12999999999999998,
-    "sss": 0.48999999999999994,
+    "sss": 0.18,
     "receiveShadow": true
   },
   "beacon": {
@@ -625,10 +676,10 @@
     "toneMapping": "aces",
     "bloom": {
       "enabled": true,
-      "intensity": 1.4100000000000001,
-      "threshold": 0.8300000000000001,
-      "smoothing": 0.73,
-      "radius": 0.5800000000000001
+      "intensity": 1.3600000000000003,
+      "threshold": 0.87,
+      "smoothing": 1,
+      "radius": 1
     },
     "vignette": {
       "enabled": true,
@@ -637,7 +688,7 @@
     },
     "chromaticAberration": {
       "enabled": false,
-      "offset": 0.0002
+      "offset": 0
     },
     "dof": {
       "enabled": false,
@@ -653,8 +704,8 @@
       "enabled": true,
       "hue": 5.204170427930421e-18,
       "saturation": 0.15000000000000002,
-      "contrast": 0.019999999999999997,
-      "brightness": -0.04
+      "contrast": 0.11,
+      "brightness": 0
     },
     "ssao": {
       "enabled": false,
@@ -707,13 +758,71 @@
     "assetRoughness": 0.45,
     "assetMetalness": 0.1
   },
+  "assets": [
+    {
+      "id": "garden_flower_01",
+      "position": [
+        -10,
+        0,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    },
+    {
+      "id": "garden_flower_02",
+      "position": [
+        -4,
+        0,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    },
+    {
+      "id": "garden_butterfly_01",
+      "position": [
+        -10,
+        0,
+        5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    },
+    {
+      "id": "garden_butterfly_02",
+      "position": [
+        -4,
+        0,
+        5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1
+    }
+  ],
   "flow": {
     "zoneCenter": [
       -7,
       0,
       3
     ],
-    "zoneRadius": 7,
+    "zoneRadius": 1.8,
     "proximity": 2.2,
     "othersFadeOut": true,
     "selectGlowDuration": 0.8,
