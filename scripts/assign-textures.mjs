@@ -1,4 +1,4 @@
-// 按名字给几何体接贴图（美术给的新场景 glb 只有几何，贴图单独放在 public/textures/<scene>/）
+// 按名字给几何体接贴图（美术给的新场景 glb 只有几何，贴图单独放在 art/textures/<scene>/；glb 自带烘焙贴图时直接用自带的）
 //   贴图文件名规则：SC<编号>[-<编号>]_<用途>.jpg|png，例如 SC08_land.jpg、SC30-41_archangel.jpg
 //   网格名就是编号（还有 stem / 水 这类特例）
 //   材质名 = 贴图文件名（不含扩展名），这样运行时能按名字里的用途自动判断材质角色（land/rock → 静态，coral/tree → 植被…）
@@ -11,6 +11,15 @@ import sharp from 'sharp'
 const OVERRIDES = {
   garden: { 13: 14, 48: 47, 49: 46, 50: 45, 12: 14 },
   ocean: {},
+  cave: { 33: 32 },
+}
+
+/**
+ * 水面 mesh（没有贴图）：材质单独命名 water_<scene>，运行时角色为 water，开了水面（Water.tsx）就隐藏。
+ * 不单独命名的话会和同样没贴图的水珠被 dedup 合成一个 droplet_crystal 材质，水面被当成水晶渲染。
+ */
+const WATER_MESHES = {
+  cave: ['59'],
 }
 
 /** 同一个编号有多张贴图时，按网格名指定用哪一张（否则取第一张并告警） */
@@ -38,10 +47,23 @@ function parseTextureDir(dir) {
 
 /** 网格名 → 编号（'8' → 8，'36.' → 36，'stem' → 1，'水' → null） */
 function meshNumber(name) {
-  if (name === '水') return null
+  if (name === '水' || name === 'waterdrop') return null
   if (/^stem/i.test(name)) return 1
   const m = name.match(/^(\d+)/)
   return m ? Number(m[1]) : null
+}
+
+const shrunk = new WeakSet()
+/** 模型自带的贴图超过上限时缩小（烘焙贴图可能是 8K） */
+async function shrinkTexture(texture, size) {
+  if (shrunk.has(texture)) return
+  shrunk.add(texture)
+  const [w, h] = texture.getSize() ?? [0, 0]
+  if (Math.max(w, h) <= size) return
+  const img = sharp(texture.getImage()).resize(size, size, { fit: 'inside' })
+  const png = texture.getMimeType() === 'image/png'
+  texture.setImage(new Uint8Array(await (png ? img.png() : img.jpeg({ quality: 92 })).toBuffer()))
+  console.log(`  ${texture.getName() || '(贴图)'} ${w}×${h} → ${size}`)
 }
 
 export async function assignTextures(doc, scene, texturesRoot) {
@@ -55,16 +77,29 @@ export async function assignTextures(doc, scene, texturesRoot) {
   }
   const overrides = OVERRIDES[scene] ?? {}
   const pick = PICK[scene] ?? {}
+  const waterMeshes = WATER_MESHES[scene] ?? []
 
   const texCache = new Map()
   const matCache = new Map()
   const missing = []
   let assigned = 0
+  /** 同名 mesh 共用烘焙材质（美术文件里有重复导出、没带材质的同名 mesh） */
+  const bakedByMesh = new Map()
 
   for (const node of doc.getRoot().listNodes()) {
     const mesh = node.getMesh()
     if (!mesh) continue
     const meshName = mesh.getName() || node.getName()
+    if (waterMeshes.includes(meshName)) {
+      const name = `water_${scene}`
+      let mat = matCache.get(name)
+      if (!mat) {
+        mat = doc.createMaterial(name).setRoughnessFactor(0.1).setMetallicFactor(0)
+        matCache.set(name, mat)
+      }
+      for (const prim of mesh.listPrimitives()) prim.setMaterial(mat)
+      continue
+    }
     const num = meshNumber(meshName)
     const lookup = overrides[num] ?? num
     let candidates = lookup === null ? [] : files.filter((f) => lookup >= f.from && lookup <= f.to)
@@ -75,11 +110,26 @@ export async function assignTextures(doc, scene, texturesRoot) {
       candidates = chosen.length ? chosen : candidates
     }
     const tex = candidates[0]
+
+    // 模型自带烘焙贴图（美术直接导出带贴图的 glb）：贴图用模型里的，材质名仍按贴图目录的规则起
+    // （运行时按名字判断材质角色，config.materials 的覆盖也按名字认）
+    const baked =
+      mesh.listPrimitives().map((p) => p.getMaterial()).find((m) => m?.getBaseColorTexture()) ?? bakedByMesh.get(meshName)
+    if (baked) {
+      bakedByMesh.set(meshName, baked)
+      const name = tex ? `SC${String(num).padStart(2, '0')}_${tex.label}` : baked.getName() || `baked_${meshName}`
+      baked.setName(name).setRoughnessFactor(0.9).setMetallicFactor(0)
+      await shrinkTexture(baked.getBaseColorTexture(), LARGE.test(name) ? SIZE_LARGE : SIZE_DEFAULT)
+      for (const prim of mesh.listPrimitives()) prim.setMaterial(baked)
+      assigned++
+      continue
+    }
+
     if (!tex) {
-      if (meshName !== '水') missing.push(meshName)
+      if (meshName !== '水' && meshName !== 'waterdrop') missing.push(meshName)
       // 没有贴图也建一个材质，名字带 mesh 名，方便在面板里认出来
       // 「水」是从花上滴落的水珠（见参考图），按玻璃质感处理，不是水面
-      const name = meshName === '水' ? 'droplet_crystal' : `untextured_${meshName}`
+      const name = meshName === '水' || meshName === 'waterdrop' ? 'droplet_crystal' : `untextured_${meshName}`
       let mat = matCache.get(name)
       if (!mat) {
         mat = doc.createMaterial(name).setRoughnessFactor(0.9).setMetallicFactor(0)

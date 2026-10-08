@@ -48,7 +48,7 @@ export const isPhysical = (m: Material): m is MeshPhysicalMaterial =>
   (m as MeshPhysicalMaterial).isMeshPhysicalMaterial === true
 
 /** 植被类关键词（材质名来自贴图文件名，如 SC25_Coral、SC16_lupin） */
-const VEGETATION = /poppy|daisy|lupin|pineapple|tree|hydrangea|lotus|archangel|arrowhead|snakeplant|stem|bud|coral|anemone|grass|plant|flower|leaf|weed/i
+const VEGETATION = /poppy|daisy|lupin|pineapple|tree|hydrangea|lotus|archangel|arrowhead|snakeplant|stem|bud|coral|anemone|grass|plant|flower|leaf|weed|fern/i
 const CRYSTAL = /crystal|bubble|shell|pearl|droplet/i
 const STATIC = /land|landscape|rock|pepple|pebble|stone|ground/i
 

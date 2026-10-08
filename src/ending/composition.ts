@@ -25,13 +25,17 @@ export interface Placement {
 }
 
 /** 字符串 → 0–1 的稳定伪随机数（同一组合每次结果相同） */
-function hash01(s: string, salt: number): number {
+export function hash01(s: string, salt: number): number {
   let h = 2166136261 ^ salt
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
   h = Math.imul(h ^ (h >>> 15), 2246822507)
   h ^= h >>> 13
   return (h >>> 0) / 4294967296
 }
+
+/** 左右镜像：auto = 按组合 id 决定（装饰花草跟着标本一起镜像） */
+export const isMirrored = (comp: EndingConfig['composition'], seed: string) =>
+  comp.mirror === 'on' || (comp.mirror === 'auto' && hash01(seed, 0) < 0.5)
 
 function pickHero(selections: Record<SceneId, string | null>, choice: EndingConfig['composition']['hero']): SceneId {
   if (choice !== 'auto' && selections[choice]) return choice
@@ -56,7 +60,7 @@ export function composeSpecimens(
 ): Placement[] {
   const hero = pickHero(selections, comp.hero)
   const accents = SCENES.filter((s) => s !== hero)
-  const mirror = comp.mirror === 'on' || (comp.mirror === 'auto' && hash01(seed, 0) < 0.5)
+  const mirror = isMirrored(comp, seed)
   const [w, h, d] = frameSize
 
   const place = (scene: SceneId, role: RoleName, salt: number): Placement => {

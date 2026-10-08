@@ -14,7 +14,7 @@
       0
     ],
     "autoFrame": true,
-    "framePadding": 0.1
+    "framePadding": 0.16
   },
   "background": "#14110d",
   "lights": {
@@ -33,7 +33,7 @@
     }
   },
   "frame": {
-    "mode": "3d",
+    "mode": "model",
     "color": "#8a6a2f",
     "backColor": "#2a2118",
     "size": [
@@ -45,7 +45,40 @@
     "planeDepth": -0.6,
     "metalness": 0.6,
     "roughness": 0.35,
-    "backRoughness": 0.9
+    "backRoughness": 0.9,
+    "models": [
+      {
+        "name": "bronze_oval",
+        "model": "/models/assets/frame01.glb",
+        "height": 5.6,
+        "offset": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "ornate_oval",
+        "model": "/models/assets/frame02.glb",
+        "height": 6.6,
+        "offset": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "name": "rim_oval",
+        "model": "/models/assets/frame03.glb",
+        "height": 5.9,
+        "offset": [
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "modelIndex": -1
   },
   "composition": {
     "hero": "auto",
@@ -215,6 +248,109 @@
       "enabled": false,
       "intensity": 1.5,
       "radius": 0.3
+    }
+  },
+  "decor": {
+    "enabled": true,
+    "model": "/models/ending/decor.glb",
+    "pieces": "cave_50,cave_55,cave_57,garden_2,garden_5,garden_32,ocean_25,ocean_19",
+    "brightness": 0.85,
+    "slots": [
+      {
+        "anchor": [
+          -0.27,
+          -0.4,
+          -0.25
+        ],
+        "height": 0.2,
+        "rotation": [
+          0,
+          0.4,
+          0.15
+        ]
+      },
+      {
+        "anchor": [
+          0.25,
+          -0.41,
+          -0.2
+        ],
+        "height": 0.17,
+        "rotation": [
+          0,
+          -0.6,
+          -0.12
+        ]
+      },
+      {
+        "anchor": [
+          0.02,
+          -0.45,
+          0.1
+        ],
+        "height": 0.1,
+        "rotation": [
+          0,
+          1.2,
+          0
+        ]
+      },
+      {
+        "anchor": [
+          -0.38,
+          -0.08,
+          -0.35
+        ],
+        "height": 0.16,
+        "rotation": [
+          0,
+          0.3,
+          -0.55
+        ]
+      },
+      {
+        "anchor": [
+          0.36,
+          0.18,
+          -0.35
+        ],
+        "height": 0.14,
+        "rotation": [
+          0,
+          -0.4,
+          0.6
+        ]
+      },
+      {
+        "anchor": [
+          -0.22,
+          0.36,
+          -0.4
+        ],
+        "height": 0.12,
+        "rotation": [
+          0,
+          0.8,
+          -0.35
+        ]
+      }
+    ],
+    "grass": {
+      "enabled": true,
+      "count": 200,
+      "radius": 0.47,
+      "inset": 0.06,
+      "arcDeg": 300,
+      "bottomBias": 0.9,
+      "size": [
+        0.05,
+        0.13
+      ],
+      "depth": [
+        -0.45,
+        -0.1
+      ],
+      "lean": 0.75
     }
   }
 }

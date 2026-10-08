@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { assetDesc, assetName, getAsset } from '../data/assets'
+import { assetDesc, assetName, assetSubname, getAsset } from '../data/assets'
 import { copy } from '../data/copy'
 import { useFlowStore } from '../state/useFlowStore'
+import { Win } from './Win'
 
 // pop up card：名称 + 一句简短描述 + 收集按钮（四个都看过才可收集）
 export function AssetInfoCard() {
@@ -18,10 +19,17 @@ export function AssetInfoCard() {
 
   const asset = getAsset(shownId)
   return (
-    <div className={`asset-card ${visible ? 'is-visible' : ''}`} aria-hidden={!visible}>
+    <Win
+      className={`asset-card ${visible ? 'is-visible' : ''}`}
+      title={copy('card.title')}
+      aria-hidden={!visible}
+    >
       {asset && (
         <>
-          <h2 className="asset-card__name">{assetName(asset)}</h2>
+          <h2 className="asset-card__name">
+            {assetName(asset)}
+            {assetSubname(asset) && <small>{assetSubname(asset)}</small>}
+          </h2>
           <p className="asset-card__desc">{assetDesc(asset)}</p>
           <button
             className="btn asset-card__collect"
@@ -32,6 +40,6 @@ export function AssetInfoCard() {
           </button>
         </>
       )}
-    </div>
+    </Win>
   )
 }

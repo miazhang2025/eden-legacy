@@ -131,7 +131,13 @@ export interface SceneConfig {
     zoneCenter: Vec3
     /** 已弃用：原采集区半径 */
     zoneRadius: number
+    /** 贴身距离：这么近时不管朝向都算在看它 */
     proximity: number
+    /** 看向判定：资产在这个距离内、且偏离画面中心（水平）不超过 inspectAngleDeg 时可以采集 */
+    inspectDistance: number
+    inspectAngleDeg: number
+    /** 进场景时底部叙事提示停留多久（秒），之后消失，全部找到时再出现 */
+    introPromptSeconds: number
     othersFadeOut: boolean
     /** 被选资产发光增强时长（秒） */
     selectGlowDuration: number
@@ -601,6 +607,41 @@ export interface CompositionRole {
 }
 
 export type HeroChoice = 'auto' | SceneId
+
+export interface FrameModelConfig {
+  name: string
+  model: string
+  /** 画框外轮廓高度（标本盒单位），宽 / 厚按模型原比例 */
+  height: number
+  /** 微调偏移（标本盒局部） */
+  offset: Vec3
+}
+
+/** 沿画框内框（按 frame.size 的椭圆）铺的一圈草：下沿最密最高，往上变稀变矮，顶部留缺口 */
+export interface DecorGrassConfig {
+  enabled: boolean
+  count: number
+  /** 椭圆半径（占内框宽 / 高的比例）与向内铺开的宽度 */
+  radius: number
+  inset: number
+  /** 铺多大一段弧（度，以正下方为中心；360 = 一整圈） */
+  arcDeg: number
+  /** 0 = 沿弧均匀；越大越往下沿集中 */
+  bottomBias: number
+  /** 每丛占地宽度（占内框高度的比例），下沿取大值、两端取小值 */
+  size: Vec2
+  /** 深度范围（按内框深度归一） */
+  depth: Vec2
+  /** 两侧的草向中心倾斜多少（0 = 都朝上，1 = 垂直于边框） */
+  lean: number
+}
+
+/** 装饰花草的一个落位：anchor 按画框内框宽 / 高 / 深归一（同构图），height 占内框高度的比例，底部落在 anchor */
+export interface DecorSlot {
+  anchor: Vec3
+  height: number
+  rotation: Vec3
+}
 export type MirrorMode = 'auto' | 'off' | 'on'
 
 export interface EndingConfig {
@@ -621,15 +662,32 @@ export interface EndingConfig {
     directional: { color: string; intensity: number; position: Vec3 }
   }
   frame: {
-    mode: '3d' | 'plane'
+    /** 3d = 占位方框；plane = 平面；model = 画框模型（models 里按组合随机挑一个） */
+    mode: '3d' | 'plane' | 'model'
     color: string
     metalness: number
     roughness: number
     backColor: string
     backRoughness: number
+    /** 画框内框尺寸（构图按它算）；model 模式下画框模型按 models[i].height 缩放，内框大致与它对齐 */
     size: Vec3
     border: number
     planeDepth: number
+    models: FrameModelConfig[]
+    /** model 模式用哪个：-1 = 按组合 id 随机（同一组合每次一样） */
+    modelIndex: number
+  }
+  /** 标本盒里的装饰花草（npm run decor 从三个场景拆出来的），点缀用，不抢标本 */
+  decor: {
+    enabled: boolean
+    model: string
+    /** 可用的花草（decor.glb 里的节点名，逗号分隔）；按组合 id 洗牌后依次放进 slots */
+    pieces: string
+    /** 颜色乘数：< 1 压暗，免得抢标本 */
+    brightness: number
+    slots: DecorSlot[]
+    /** 沿内框铺一圈草（decor.glb 里的 grass_* 草丛，实例化） */
+    grass: DecorGrassConfig
   }
   /**
    * 三件标本的构图：一件主体 + 两件点缀，全部按画框尺寸自动算位置 / 大小。
@@ -1357,7 +1415,10 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     _label: '采集流程',
     zoneCenter: vec(0.5, 'zoneCenter（已弃用）'),
     zoneRadius: num(0.5, 40, 0.1, 'zoneRadius', '已弃用（原采集区半径）'),
-    proximity: num(0.5, 10, 0.1),
+    proximity: num(0.5, 10, 0.1, 'proximity', '贴身距离：不管朝向都可采集'),
+    inspectDistance: num(1, 20, 0.1, 'inspectDistance', '看向判定的最远距离'),
+    inspectAngleDeg: num(2, 60, 0.5, 'inspectAngleDeg', '偏离画面中心（水平）多少度以内算看着它'),
+    introPromptSeconds: num(0, 30, 0.5, 'introPromptSeconds', '进场景的叙事提示停留多久'),
     othersFadeOut: bool('othersFadeOut', '确认后其余三个资产是否同步淡出'),
     selectGlowDuration: seconds(),
     fadeDuration: seconds(),
@@ -1399,7 +1460,7 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
   lights: lightsSchema,
   frame: {
     _label: '画框',
-    mode: { t: 'select', options: ['3d', 'plane'] },
+    mode: { t: 'select', options: ['3d', 'plane', 'model'] },
     color: color(),
     metalness: num(0, 1, 0.01),
     roughness: num(0, 1, 0.01),
@@ -1408,6 +1469,49 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     size: vec(0.05),
     border: num(0, 2, 0.01),
     planeDepth: num(-5, 5, 0.01),
+    models: {
+      t: 'array',
+      label: '画框模型',
+      itemLabel: (m) => m.name,
+      create: (existing) => ({ name: `frame_${existing.length + 1}`, model: '', height: 6, offset: [0, 0, 0] }),
+      item: {
+        name: { t: 'text' },
+        model: { t: 'text' },
+        height: num(0.5, 20, 0.05),
+        offset: vec(0.01),
+      },
+    },
+    modelIndex: num(-1, 9, 1, 'modelIndex', '-1 = 按组合随机'),
+  },
+  decor: {
+    _label: '装饰花草',
+    enabled: bool(),
+    model: { t: 'text' },
+    pieces: { t: 'text', label: 'pieces（逗号分隔）' },
+    brightness: num(0, 2, 0.01),
+    slots: {
+      t: 'array',
+      label: '落位',
+      itemLabel: (_s, i) => `slot ${i + 1}`,
+      create: () => ({ anchor: [0, -0.4, 0], height: 0.15, rotation: [0, 0, 0] }),
+      item: {
+        anchor: vec(0.01, 'anchor（归一）'),
+        height: num(0.01, 1, 0.005),
+        rotation: vec(0.01),
+      },
+    },
+    grass: {
+      _label: '一圈草',
+      enabled: bool(),
+      count: num(0, 400, 1),
+      radius: num(0.2, 0.7, 0.005),
+      inset: num(0, 0.3, 0.005),
+      arcDeg: num(0, 360, 1),
+      bottomBias: num(0, 3, 0.05),
+      size: range(0.005, 0.3, 0.005, 'size（占内框高）'),
+      depth: range(-0.6, 0.6, 0.01, 'depth（归一）'),
+      lean: num(0, 1, 0.01),
+    },
   },
   composition: {
     _label: '标本构图',

@@ -1,4 +1,4 @@
-import { useEffect, type ReactElement } from 'react'
+import { useEffect, useMemo, type ReactElement } from 'react'
 import { useThree } from '@react-three/fiber'
 import {
   Bloom,
@@ -12,7 +12,7 @@ import {
   ToneMapping,
   Vignette,
 } from '@react-three/postprocessing'
-import { BlendFunction, ToneMappingMode } from 'postprocessing'
+import { BlendFunction, Effect, ToneMappingMode } from 'postprocessing'
 import {
   ACESFilmicToneMapping,
   AgXToneMapping,
@@ -20,6 +20,7 @@ import {
   NeutralToneMapping,
   ReinhardToneMapping,
   Vector2,
+  type ColorSpace,
   type ToneMapping as ThreeToneMapping,
 } from 'three'
 import type { PostConfig } from '../config/schema'
@@ -45,12 +46,29 @@ const THREE_MODE: Record<PostConfig['toneMapping'], ThreeToneMapping> = {
   linear: LinearToneMapping,
 }
 
+/**
+ * 把负值截到 0。HueSaturation 提饱和度 / BrightnessContrast 提对比度都会把高饱和暗色（如深蓝岩石）的
+ * 某些通道推成负数；EffectPass 在效果之间插入的 sRGB ↔ 线性转换里有 pow()，负数进去得到 NaN，
+ * 画面上就是一块块纯黑。inputColorSpace = null：本效果不触发色彩空间转换，在哪个空间都能直接截。
+ */
+class ClampNegativeEffect extends Effect {
+  constructor() {
+    super(
+      'ClampNegativeEffect',
+      'void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) { outputColor = vec4(max(inputColor.rgb, 0.0), inputColor.a); }',
+    )
+    this.inputColorSpace = null as unknown as ColorSpace
+  }
+}
+
 /** post 不传时用当前场景的配置（ending 页传自己的） */
 export function PostFX({ post }: { post?: PostConfig }) {
   const scenePost = useSceneCfg((c) => c.post)
   const p = post ?? scenePost
   const tier = useTier()
   const gl = useThree((s) => s.gl)
+  const clamps = useMemo(() => [new ClampNegativeEffect(), new ClampNegativeEffect()], [])
+  useEffect(() => () => clamps.forEach((c) => c.dispose()), [clamps])
 
   // 不走后处理时由渲染器做色调映射；走后处理时由 ToneMapping effect 在最后做（渲染到 RT 时 three 不做色调映射）
   useEffect(() => {
@@ -91,7 +109,9 @@ export function PostFX({ post }: { post?: PostConfig }) {
   }
   if (p.grade.enabled) {
     fx.push(<HueSaturation key="hs" hue={p.grade.hue} saturation={p.grade.saturation} />)
+    fx.push(<primitive key="clamp-hs" object={clamps[0]} />)
     fx.push(<BrightnessContrast key="bc" brightness={p.grade.brightness} contrast={p.grade.contrast} />)
+    fx.push(<primitive key="clamp-bc" object={clamps[1]} />)
   }
   if (full && p.chromaticAberration.enabled) {
     const o = p.chromaticAberration.offset

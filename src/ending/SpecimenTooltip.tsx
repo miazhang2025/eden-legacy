@@ -1,4 +1,4 @@
-import { assetDesc, assetName, getAsset } from '../data/assets'
+import { assetDesc, assetName, assetSubname, getAsset } from '../data/assets'
 import { useEndingUi } from './useEndingUi'
 
 /** 悬停 / 点按标本时的名称与描述（spec §8.3） */
@@ -15,6 +15,7 @@ export function SpecimenTooltip() {
       {asset && (
         <>
           <strong>{assetName(asset)}</strong>
+          {assetSubname(asset) && <small>{assetSubname(asset)}</small>}
           <span>{assetDesc(asset)}</span>
         </>
       )}

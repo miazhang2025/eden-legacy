@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { MathUtils, Vector3 } from 'three'
 import { AudioBus } from '../audio/AudioBus'
 import { triggerConfirmGust } from '../materials/uniforms'
 import type { SceneId } from '../config/schema'
@@ -18,6 +19,10 @@ function leave() {
 }
 
 const dist2D = (ax: number, az: number, bx: number, bz: number) => Math.hypot(ax - bx, az - bz)
+const DEG = Math.PI / 180
+/** 已在看的资产放宽一点再丢掉，避免在边界上来回闪 */
+const HOLD = 1.4
+const forward = new Vector3()
 
 /** 调试：标记全部已发现，采集本场景第一个资产并走完正常的确认 → 跳转流程（K 键 / look dev「跳过场景」） */
 export function debugSkipScene(sceneId: SceneId) {
@@ -28,7 +33,8 @@ export function debugSkipScene(sceneId: SceneId) {
   useFlowStore.getState().confirm(ids[0])
 }
 
-// §6.3 四选一流程：逐帧做 proximity 判定；四个都看过才能收集；CONFIRMED 后写 store 并跳转。
+// §6.3 四选一流程：逐帧做看向判定；四个都看过才能收集；CONFIRMED 后写 store 并跳转。
+// 看向判定：资产在 inspectDistance 内、且在画面中间附近（水平夹角 ≤ inspectAngleDeg）；贴身（proximity 内）时不管朝向。
 export function AssetFlow({ sceneId }: { sceneId: SceneId }) {
   const assets = useMemo(() => assetsForScene(sceneId), [sceneId])
 
@@ -74,24 +80,35 @@ export function AssetFlow({ sceneId }: { sceneId: SceneId }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [sceneId])
 
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const flow = useFlowStore.getState()
     const f = getSceneCfg().flow
     const p = rig.position
 
     if (flow.phase !== 'EXPLORING' && flow.phase !== 'INSPECTING') return
 
-    let nearest: string | null = null
-    let best = f.proximity
+    camera.getWorldDirection(forward)
+    const yaw = Math.atan2(forward.x, forward.z)
+    let picked: string | null = null
+    let best = Infinity
     for (const a of assets) {
       const [ax, , az] = assetTransform(a).position
       const d = dist2D(p.x, p.z, ax, az)
-      if (d <= best) {
-        best = d
-        nearest = a.id
+      // 夹角从相机算（第三人称时相机在角色身后，画面中心对的是相机视线）
+      const angle = Math.abs(
+        MathUtils.euclideanModulo(Math.atan2(ax - camera.position.x, az - camera.position.z) - yaw + Math.PI, Math.PI * 2) - Math.PI,
+      )
+      const held = flow.phase === 'INSPECTING' && flow.assetId === a.id ? HOLD : 1
+      const inView = d <= f.inspectDistance * held && angle <= f.inspectAngleDeg * DEG * held
+      if (!inView && d > f.proximity) continue
+      // 越居中越优先；贴身的直接优先
+      const score = d <= f.proximity ? -1 / (d + 0.01) : angle
+      if (score < best) {
+        best = score
+        picked = a.id
       }
     }
-    if (nearest) flow.inspect(nearest)
+    if (picked) flow.inspect(picked)
     else flow.uninspect()
   })
 

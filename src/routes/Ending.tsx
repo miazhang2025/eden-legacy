@@ -19,6 +19,7 @@ import { useConfigStore, useEndingCfg } from '../state/useConfigStore'
 import { useDebugStore } from '../state/useDebugStore'
 import { useRunStore } from '../state/useRunStore'
 import { useRevealOnMount, useTransition } from '../ui/Transition'
+import { Win } from '../ui/Win'
 import { EndingGuard } from './SceneGuard'
 
 /** 快门闪光到最亮的时刻（与 styles.css 里 .shutter 动画对应） */
@@ -85,8 +86,10 @@ function EndingInner() {
   return (
     <main className="page ending">
       <header className={`ending__text ${textShown ? 'is-visible' : ''}`}>
-        <h1 className="ending__name">{box.name}</h1>
-        <p className="ending__desc">{box.description}</p>
+        <Win title={copy('ending.window.title')}>
+          <h1 className="ending__name">{box.name}</h1>
+          <p className="ending__desc">{box.description}</p>
+        </Win>
       </header>
       <div
         className="ending__stage"

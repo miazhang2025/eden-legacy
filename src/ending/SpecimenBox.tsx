@@ -1,9 +1,11 @@
-import { useMemo, useRef } from 'react'
+import { Suspense, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { MathUtils, type Group } from 'three'
 import { useEndingCfg } from '../state/useConfigStore'
 import type { SceneId } from '../config/schema'
 import { composeSpecimens } from './composition'
+import { EndingDecor } from './EndingDecor'
+import { FrameModel, pickFrameModel } from './FrameModel'
 import { photoSubject } from './ExportPhoto'
 import { segment } from './reveal'
 import { SpecimenSlot } from './SpecimenSlot'
@@ -53,6 +55,7 @@ function FramePlane() {
 export function SpecimenBox({ selections, seed }: { selections: Record<SceneId, string | null>; seed: string }) {
   const mode = useEndingCfg((c) => c.frame.mode)
   const frameSize = useEndingCfg((c) => c.frame.size)
+  const frameModel = useEndingCfg((c) => pickFrameModel(c.frame.models, c.frame.modelIndex, seed))
   const composition = useEndingCfg((c) => c.composition)
   const reveal = useEndingCfg((c) => c.reveal)
   const group = useRef<Group>(null)
@@ -70,7 +73,18 @@ export function SpecimenBox({ selections, seed }: { selections: Record<SceneId, 
   return (
     <group ref={group}>
       {/* 照片裁切以画框为准 */}
-      <group ref={(g) => void (photoSubject.current = g)}>{mode === '3d' ? <Frame3D /> : <FramePlane />}</group>
+      <group ref={(g) => void (photoSubject.current = g)}>
+        {mode === 'model' && frameModel ? (
+          <Suspense fallback={null}>
+            <FrameModel key={frameModel.model} cfg={frameModel} />
+          </Suspense>
+        ) : mode === 'plane' ? (
+          <FramePlane />
+        ) : (
+          <Frame3D />
+        )}
+      </group>
+      <EndingDecor seed={seed} />
       {placements.map((p, i) => (
         <SpecimenSlot key={p.scene} index={i} placement={p} />
       ))}

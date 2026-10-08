@@ -47,6 +47,9 @@ const COLLIDER_RULES = {
   // include：明确列出可站立的地形 mesh（大花大树不进碰撞体，否则挡路）
   garden: { include: ['8', '9', '55', '54', '53'], exclude: ['水'], minExtent: 0.12, maxTriangles: 20000 },
   ocean: { include: ['1', '2', '3', '4', '5', '6', '7', '8'], exclude: [], minExtent: 0.08, maxTriangles: 20000 },
+  // 洞穴：岩石、地面都进碰撞体（高的岩石负责挡路），水珠、大株植物（34）、水面（59）不进
+  // 水面不进碰撞体：水深图从碰撞体烘（打到水面自己就全是浅水）；站在水上靠 water.walkable
+  cave: { include: null, exclude: ['waterdrop', '34', '59'], minExtent: 0.08, maxTriangles: 20000 },
   default: { include: null, exclude: [], minExtent: 0.1, maxTriangles: 20000 },
 }
 

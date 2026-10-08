@@ -33,16 +33,16 @@
   "character": {
     "moveSpeed": 2.0000000000000004,
     "sprintMultiplier": 1.8,
-    "turnSpeed": 10,
+    "turnSpeed": 5.5,
     "radius": 0.35,
     "height": 1.7,
     "color": "#e0f0ff",
     "spawn": [
-      18.735,
+      17.509,
       0,
-      -2.704
+      -4.476
     ],
-    "spawnYaw": 1.8946,
+    "spawnYaw": 2.4546,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
     "groundSmoothing": 0.08,
@@ -875,9 +875,9 @@
     "grade": {
       "enabled": true,
       "hue": 0,
-      "saturation": 0.17,
+      "saturation": 0.24,
       "contrast": 0.11,
-      "brightness": 0
+      "brightness": 0.02
     },
     "ssao": {
       "enabled": false,
@@ -1004,7 +1004,7 @@
       0
     ],
     "zoneRadius": 1.8,
-    "proximity": 2.2,
+    "proximity": 1.2,
     "othersFadeOut": true,
     "selectGlowDuration": 1.1500000000000001,
     "fadeDuration": 1.2,
@@ -1020,7 +1020,10 @@
     "breatheDepth": 0.25,
     "emissiveDamping": 0.15,
     "spinSpeed": 0.3,
-    "assetLift": 0.8
+    "assetLift": 0.8,
+    "inspectDistance": 6,
+    "inspectAngleDeg": 12,
+    "introPromptSeconds": 6
   },
   "mobile": {
     "pixelRatioMax": 1,

@@ -61,4 +61,6 @@ export function assetsForScene(scene: SceneId): CollectableAssetDef[] {
 }
 
 export const assetName = (a: CollectableAssetDef) => copy(`${a.copyKey}.name`)
+/** 名字下方的小字（中文版显示英文名）；英文版为空串 */
+export const assetSubname = (a: CollectableAssetDef) => copy(`${a.copyKey}.subname`)
 export const assetDesc = (a: CollectableAssetDef) => copy(`${a.copyKey}.desc`)

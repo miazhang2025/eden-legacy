@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, PerspectiveCamera, Vector3, type Group } from 'three'
 import { dampFactor } from '../scene/rig'
 import { useConfigStore } from '../state/useConfigStore'
+import { frameExtent } from './FrameModel'
 import { useEndingUi } from './useEndingUi'
 
 // 标本盒的有限交互（spec §8.3）：拖拽旋转 yaw / pitch 各限制在 ±N 度，滚轮小幅缩放（min / max clamp）。
@@ -100,8 +101,10 @@ export function BoxInteraction({ children }: { children: ReactNode }) {
       // 画框（含边框）按画布宽高比装进视野，横竖屏都不会被裁
       const tan = Math.tan((camera.fov * DEG) / 2)
       const pad = 1 + camCfg.framePadding
-      const halfW = (frame.size[0] / 2 + frame.border) * pad
-      const halfH = (frame.size[1] / 2 + frame.border) * pad
+      // 画框模型按实际外轮廓取景（加载前先按内框 + 边框估）
+      const model = frame.mode === 'model' && frameExtent.halfH > 0
+      const halfW = (model ? frameExtent.halfW : frame.size[0] / 2 + frame.border) * pad
+      const halfH = (model ? frameExtent.halfH : frame.size[1] / 2 + frame.border) * pad
       const dist = Math.max(halfH / tan, halfW / (tan * camera.aspect)) + frame.size[2] / 2
       camPos.setLength(dist)
     }

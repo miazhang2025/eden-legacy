@@ -12,6 +12,7 @@
     "terrain": "node scripts/build-terrain.mjs",
     "ground": "node scripts/build-ground-textures.mjs",
     "scatter": "node scripts/build-scatter.mjs",
+    "decor": "node scripts/build-ending-decor.mjs",
     "bake:theatre": "node scripts/bake-theatre.ts",
     "check:bundle": "node scripts/check-bundle.mjs",
     "hdri": "node scripts/process-hdri.mjs"

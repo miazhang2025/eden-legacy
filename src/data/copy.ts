@@ -1,37 +1,38 @@
 // 唯一文案出口。界面里不出现硬编码字符串，所有文字按 key 从这里取。
 
+import { useLangStore } from '../state/useLangStore'
+
 const COPY: Record<string, string> = {
   // ---------- 项目 ----------
   'app.name': '伊甸遗存录',
   'app.brand': '伊甸遗存录 · EDEN LEGACY',
 
   // ---------- Landing ----------
-  'landing.eyebrow': 'EDEN LEGACY',
-  'landing.lede.1': '很久以后，伊甸只剩下三处仍在呼吸的遗境。地层深处的晶簇、潮汐之下的回声、花园里最后一季花期，都在缓慢地褪色。',
-  'landing.lede.2': '你是最后一位记录者。穿过这三处遗境，从每一处带走一件生命的痕迹，把它们安放进同一只标本匣——那将是伊甸留给未来的全部记忆。',
-  'landing.journey': '三处遗境 · 三件标本',
-  'landing.button.enter': '开始记录',
-  'landing.chapter.cave.num': '壹',
-  'landing.chapter.cave.name': '地层遗境',
-  'landing.chapter.cave.place': '水晶洞穴',
-  'landing.chapter.cave.desc': '无光的岩缝里，晶簇与菌光替大地记住了时间。',
-  'landing.chapter.cave.finds': '矿石 · 菌菇',
-  'landing.chapter.ocean.num': '贰',
-  'landing.chapter.ocean.name': '潮汐圣殿',
-  'landing.chapter.ocean.place': '海洋',
-  'landing.chapter.ocean.desc': '潮水一遍遍退去，贝壳与游鱼守着圣殿的回声。',
-  'landing.chapter.ocean.finds': '贝壳 · 游鱼',
-  'landing.chapter.garden.num': '叁',
-  'landing.chapter.garden.name': '万物花园',
-  'landing.chapter.garden.place': '花园',
-  'landing.chapter.garden.desc': '最后一季花期里，花与蝶仍在追逐落日的余温。',
-  'landing.chapter.garden.finds': '花卉 · 蝴蝶',
+  'landing.eyebrow': '未来自然的生命档案',
+  'landing.title': '伊甸遗存录',
+  'landing.about': 'ABOUT PROJECT',
+  'landing.lede.1': '这里保存的不是已经死亡的自然标本，而是仍然持续生长、回应与变化的生命系统。',
+  'landing.lede.2': '穿越矿洞、海洋与花园。观察它们。靠近它们。感知它们的回应。',
+  'landing.lede.3': '你所留下的，不是收藏，而是一份关于自然的记忆。',
+  'landing.button.enter': '开始游戏',
+  'landing.tagline': '每一次相遇，都会留下痕迹。',
+  'landing.howto': 'HOW TO PLAY',
+  'landing.lang.switch': '切换语言',
+  // 步骤句子里的 {name} 会替换成场景名并高亮
+  'landing.step.cave.name': '水晶矿洞 The Crystal Cave',
+  'landing.step.cave.text': '进入 {name}，激活其中的矿物晶体。',
+  'landing.step.ocean.name': '海洋领域 The Ocean Realm',
+  'landing.step.ocean.text': '穿过 {name}，追随漂浮与流动的生命体。',
+  'landing.step.garden.name': '未来花园 The Future Garden',
+  'landing.step.garden.text': '进入 {name}，与不断生长的生物互动。',
+  'landing.howto.end': '完成探索后，生成属于你的 Living Archive / 生命档案。',
 
   // ---------- 场景提示语 ----------
-  'scene.cave.prompt': '请选择一种你希望保存的地下生命痕迹',
-  'scene.ocean.prompt': '请选择一种你希望保存的海洋生命',
-  'scene.garden.prompt': '请选择一种你希望保存的花园生命',
+  'scene.cave.prompt': '岩层替时间藏住了许多东西。选一份，让它跟你离开。',
+  'scene.ocean.prompt': '潮水会带走大多数相遇。留下一个，不让它消失。',
+  'scene.garden.prompt': '花园从不停止更替。挑一种，让它在别处继续存在。',
   'card.button.collect': '收集',
+  'card.title': '标本档案',
   'card.button.locked': '先去看看其他 {n} 件',
   'scene.progress': '已发现 {found} / {total}',
   'scene.progress.done': '都找到了，选择一件带走吧',
@@ -39,35 +40,60 @@ const COPY: Record<string, string> = {
   // ---------- 竖屏提示 ----------
   'orientation.hint': '请将设备横向放置',
 
+  // 资产 key：.name 主名 / .subname 名字下方的小字（英文版留空） / .desc 描述。注释里是原型物种。
   // ---------- 资产：洞穴 ----------
-  'asset.cave_ore_01.name': '霜晶簇',
-  'asset.cave_ore_01.desc': '在无光的岩缝里生长了上万年，每一道棱面都封存着一次地壳的呼吸。',
-  'asset.cave_ore_02.name': '紫夜石',
-  'asset.cave_ore_02.desc': '暗紫色的矿脉只在深处的寂静中缓慢结晶，触手微凉。',
-  'asset.cave_mushroom_01.name': '萤伞菇',
-  'asset.cave_mushroom_01.desc': '吸收岩壁的湿气发出幽绿微光，是洞穴里唯一会呼吸的灯。',
-  'asset.cave_mushroom_02.name': '琥珀菌',
-  'asset.cave_mushroom_02.desc': '菌伞像凝固的树脂，在黑暗中为路过的生命指出方向。',
+  // 摩洛哥蓝色重晶石
+  'asset.cave_ore_01.name': '沉蓝晶脉',
+  'asset.cave_ore_01.subname': 'Deep Azure Vein',
+  'asset.cave_ore_01.desc': '生长于岩层裂隙中的蓝色晶体群，记录着地层深处缓慢结晶的时间。',
+  // 水晶兰
+  'asset.cave_ore_02.name': '幽辉隐花',
+  'asset.cave_ore_02.subname': 'Ghostglow Bloom',
+  'asset.cave_ore_02.desc': '一种不依赖阳光生长的半透明植物，只在微弱矿物反光中显现幽冷的光泽。',
+  // Oxygyne
+  'asset.cave_mushroom_01.name': '深隙异兰',
+  'asset.cave_mushroom_01.subname': 'Riftveil Oxygyne',
+  'asset.cave_mushroom_01.desc': '栖息于幽暗缝隙中的稀有异种植物，脆弱却始终保持着安静而隐秘的生命力。',
+  // Mycena roseoflava
+  'asset.cave_mushroom_02.name': '绯雾菌群',
+  'asset.cave_mushroom_02.subname': 'Rose Mist Colony',
+  'asset.cave_mushroom_02.desc': '附着在矿物裂隙间的微型菌群，在靠近时会释放出细微而柔亮的孢子光尘。',
 
   // ---------- 资产：海洋 ----------
-  'asset.ocean_shell_01.name': '月纹贝',
-  'asset.ocean_shell_01.desc': '壳上的螺纹记录着每一次潮起潮落，像一本合上的潮汐年历。',
-  'asset.ocean_shell_02.name': '镜光螺',
-  'asset.ocean_shell_02.desc': '螺壳内壁如镜，能把深海里微弱的光放大成一片星空。',
-  'asset.ocean_fish_01.name': '蓝鳞游鱼',
-  'asset.ocean_fish_01.desc': '成群游过时像一阵流动的蓝色的风，从不在同一片水域停留。',
-  'asset.ocean_fish_02.name': '霞尾鱼',
-  'asset.ocean_fish_02.desc': '尾鳍染着落日的颜色，只在黄昏时分游近海面。',
+  // 砗磲
+  'asset.ocean_shell_01.name': '潮光巨贝',
+  'asset.ocean_shell_01.subname': 'Tidal Lumen Clam',
+  'asset.ocean_shell_01.desc': '一种巨大而缓慢的海洋生命，壳体内部储存着如潮汐般流动的柔和光泽。',
+  // 笠螺
+  'asset.ocean_shell_02.name': '附岩笠灵',
+  'asset.ocean_shell_02.subname': 'Stoneveil Limpet',
+  'asset.ocean_shell_02.desc': '紧贴岩面的微小贝类，以沉默而持久的方式守护着潮间带留下的痕迹。',
+  // 裸海蝶
+  'asset.ocean_fish_01.name': '浮翼海蝶',
+  'asset.ocean_fish_01.subname': 'Driftwing Sea Angel',
+  'asset.ocean_fish_01.desc': '轻盈透明的海洋生物，如同漂浮于水中的一枚薄翼，在流动中显露短暂而梦幻的身影。',
+  // 斗鱼
+  'asset.ocean_fish_02.name': '镜鳍游斗',
+  'asset.ocean_fish_02.subname': 'Mirrorfin Betta',
+  'asset.ocean_fish_02.desc': '拥有流动鳍翼与鲜明色彩的敏感鱼类，在光线变化中展现出近乎幻觉般的姿态。',
 
   // ---------- 资产：花园 ----------
-  'asset.garden_flower_01.name': '晨露蔷薇',
-  'asset.garden_flower_01.desc': '花瓣在清晨收集露水，正午之前便把它们还给土地。',
-  'asset.garden_flower_02.name': '日轮菊',
-  'asset.garden_flower_02.desc': '花盘永远追随阳光转动，阴天里也记得太阳的方向。',
-  'asset.garden_butterfly_01.name': '青翼蝶',
-  'asset.garden_butterfly_01.desc': '翅上的蓝并非色素，而是光在鳞片之间折射出的幻影。',
-  'asset.garden_butterfly_02.name': '暮光蛾',
-  'asset.garden_butterfly_02.desc': '黄昏时从花丛中醒来，循着最后一缕余温飞行。',
+  // 黑蝙蝠花
+  'asset.garden_flower_01.name': '夜蝠幽花',
+  'asset.garden_flower_01.subname': 'Nocturne Bat Bloom',
+  'asset.garden_flower_01.desc': '形态如黑翼展开的异色花卉，在静止中带着一种神秘而近乎仪式般的气息。',
+  // 翡翠葛
+  'asset.garden_flower_02.name': '碧垂藤华',
+  'asset.garden_flower_02.subname': 'Jade Cascade Vine',
+  'asset.garden_flower_02.desc': '垂落生长的翡翠色花序如同被凝固的瀑流，为花园留下明亮而冷冽的生命痕迹。',
+  // luna moth
+  'asset.garden_butterfly_01.name': '月辉夜蛾',
+  'asset.garden_butterfly_01.subname': 'Moonveil Moth',
+  'asset.garden_butterfly_01.desc': '一只仿佛被夜色与月光共同塑成的蝶蛾，拖曳着柔长尾翼轻盈掠过花间。',
+  // 杜伯矩蛱蝶
+  'asset.garden_butterfly_02.name': '琥纹矩蝶',
+  'asset.garden_butterfly_02.subname': 'Amber Crest Butterfly',
+  'asset.garden_butterfly_02.desc': '拥有清晰纹路与稳定节奏的蝶类生命，在短暂停驻中展现花园最精致的秩序感。',
 
   // ---------- 标本盒（cave × ocean × garden 类别组合） ----------
   'box.ore_shell_flower.name': '恒久之匣',
@@ -90,15 +116,143 @@ const COPY: Record<string, string> = {
 
   // ---------- Ending ----------
   'ending.button.export': '导出照片',
+  'ending.window.title': '生命档案',
   'ending.button.restart': '重新开始',
   'ending.photo.title': '标本照片',
   'ending.photo.save': '保存照片',
   'ending.photo.close': '关闭',
 }
 
-/** 按 key 取文案。缺失的 key 在开发环境下报警告并原样返回 key，方便发现遗漏。 */
+// 英文表只需覆盖已翻译的 key，缺的回落到中文。
+const COPY_EN: Record<string, string> = {
+  // ---------- 项目 ----------
+  'app.name': 'Relics of Eden',
+  'app.brand': 'RELICS OF EDEN',
+
+  // ---------- Landing ----------
+  'landing.eyebrow': 'A Living Archive of Future Nature',
+  'landing.title': 'RELICS OF EDEN',
+  'landing.about': 'ABOUT PROJECT',
+  'landing.lede.1':
+    'What is preserved here is not a collection of lifeless specimens, but a living system that continues to grow, respond, and change.',
+  'landing.lede.2': 'Travel through the cave, ocean, and garden. Observe them. Approach them. Sense how they respond.',
+  'landing.lede.3': 'What you leave behind is not a collection, but a memory of nature.',
+  'landing.button.enter': 'START GAME',
+  'landing.tagline': 'Every encounter leaves a trace.',
+  'landing.howto': 'HOW TO PLAY',
+  'landing.lang.switch': 'Switch language',
+  'landing.step.cave.name': 'Veins of the Deep',
+  'landing.step.cave.text': 'Enter {name}, explore and activate the mineral formations within.',
+  'landing.step.ocean.name': 'Sanctuary of Tides',
+  'landing.step.ocean.text': 'Cross {name}, explore and follow the drifting, flowing life forms.',
+  'landing.step.garden.name': 'Garden of Becoming',
+  'landing.step.garden.text': 'Enter {name}, explore and interact with organisms that continue to grow and transform.',
+  'landing.howto.end': 'Complete your journey to reveal your own Living Archive.',
+
+  // ---------- 场景提示语 ----------
+  'scene.cave.prompt': 'The rock strata have hidden many things for time. Choose one, and let it leave with you.',
+  'scene.ocean.prompt': 'The tide carries most encounters away. Leave one behind, and do not let it disappear.',
+  'scene.garden.prompt': 'The garden never stops changing. Choose one, and let it continue somewhere else.',
+  'card.button.collect': 'Collect',
+  'card.title': 'Specimen File',
+  'card.button.locked': 'See {n} more first',
+  'scene.progress': 'Discovered {found} / {total}',
+  'scene.progress.done': 'All found. Choose one to take with you.',
+
+  // ---------- 竖屏提示 ----------
+  'orientation.hint': 'Please rotate your device to landscape',
+
+  // ---------- 资产：洞穴 ----------
+  'asset.cave_ore_01.name': 'Deep Azure Vein',
+  'asset.cave_ore_01.subname': '',
+  'asset.cave_ore_01.desc':
+    'A cluster of blue crystals growing within the fissures of rock strata, recording the slow passage of crystallization deep beneath the earth.',
+  'asset.cave_ore_02.name': 'Ghostglow Bloom',
+  'asset.cave_ore_02.subname': '',
+  'asset.cave_ore_02.desc':
+    'A translucent plant that grows without relying on sunlight, revealing its cold, spectral sheen only in the faint reflection of nearby minerals.',
+  'asset.cave_mushroom_01.name': 'Riftveil Oxygyne',
+  'asset.cave_mushroom_01.subname': '',
+  'asset.cave_mushroom_01.desc':
+    'A rare and unusual plant dwelling in dark crevices, fragile in form yet quietly sustaining a hidden vitality.',
+  'asset.cave_mushroom_02.name': 'Rose Mist Colony',
+  'asset.cave_mushroom_02.subname': '',
+  'asset.cave_mushroom_02.desc':
+    'A miniature fungal colony attached to mineral cracks, releasing fine, softly luminous spore-dust when approached.',
+
+  // ---------- 资产：海洋 ----------
+  'asset.ocean_shell_01.name': 'Tidal Lumen Clam',
+  'asset.ocean_shell_01.subname': '',
+  'asset.ocean_shell_01.desc':
+    'A vast and slow-moving marine life form whose shell holds a soft radiance, flowing gently like the rhythm of the tide.',
+  'asset.ocean_shell_02.name': 'Stoneveil Limpet',
+  'asset.ocean_shell_02.subname': '',
+  'asset.ocean_shell_02.desc':
+    'A small shell creature clinging closely to rock surfaces, quietly and persistently guarding the traces left behind by the shoreline.',
+  'asset.ocean_fish_01.name': 'Driftwing Sea Angel',
+  'asset.ocean_fish_01.subname': '',
+  'asset.ocean_fish_01.desc':
+    'A light, translucent marine being, like a delicate wing suspended in water, revealing a fleeting and dreamlike presence as it drifts.',
+  'asset.ocean_fish_02.name': 'Mirrorfin Betta',
+  'asset.ocean_fish_02.subname': '',
+  'asset.ocean_fish_02.desc':
+    'A sensitive fish with flowing fins and striking colors, shifting through the light with an almost hallucinatory grace.',
+
+  // ---------- 资产：花园 ----------
+  'asset.garden_flower_01.name': 'Nocturne Bat Bloom',
+  'asset.garden_flower_01.subname': '',
+  'asset.garden_flower_01.desc':
+    'An otherworldly flower unfolding like a pair of dark wings, carrying a mysterious, almost ritualistic presence in stillness.',
+  'asset.garden_flower_02.name': 'Jade Cascade Vine',
+  'asset.garden_flower_02.subname': '',
+  'asset.garden_flower_02.desc':
+    'Cascading clusters of jade-green blossoms hang like a frozen waterfall, leaving a vivid yet cool trace of life within the garden.',
+  'asset.garden_butterfly_01.name': 'Moonveil Moth',
+  'asset.garden_butterfly_01.subname': '',
+  'asset.garden_butterfly_01.desc':
+    'A moth seemingly shaped by moonlight and night itself, gliding softly through the flowers with long, trailing tails.',
+  'asset.garden_butterfly_02.name': 'Amber Crest Butterfly',
+  'asset.garden_butterfly_02.subname': '',
+  'asset.garden_butterfly_02.desc':
+    'A butterfly marked by precise patterns and measured rhythm, revealing the garden’s delicate sense of order in each brief pause.',
+
+  // ---------- 标本盒（placeholder 译文，跟随分组调整后再定稿） ----------
+  'box.ore_shell_flower.name': 'Box of Endurance',
+  'box.ore_shell_flower.desc': 'Ore, shell and flower: three slow kinds of time, laid to rest in the same darkness.',
+  'box.ore_shell_butterfly.name': 'Stillness & Wing',
+  'box.ore_shell_butterfly.desc': 'Hard sediment meets a weightless wingbeat, and earth meets sky inside the box.',
+  'box.ore_fish_flower.name': 'Box of Flowing Light',
+  'box.ore_fish_flower.desc':
+    'The cold light of crystal, the drift of fish and the bloom of a flower reflect one another here.',
+  'box.ore_fish_butterfly.name': 'The Migrants',
+  'box.ore_fish_butterfly.desc': 'A stone that never moves, keeping watch over two lives that are always on the way.',
+  'box.mushroom_shell_flower.name': 'A Damp Dream',
+  'box.mushroom_shell_flower.desc': 'Mycelium, tide and petal are all letters that water wrote to the earth.',
+  'box.mushroom_shell_butterfly.name': 'Age of Glimmer',
+  'box.mushroom_shell_butterfly.desc':
+    'Fungal glow, shell sheen and the iridescence of wings, gathered into a single night.',
+  'box.mushroom_fish_flower.name': 'Box of Becoming',
+  'box.mushroom_fish_flower.desc': 'From deep earth to ocean to garden, life found its own shape everywhere it went.',
+  'box.mushroom_fish_butterfly.name': 'The Wanderers',
+  'box.mushroom_fish_butterfly.desc':
+    'They never belonged to any one place, yet here they grow still for the first time.',
+  'box.fallback.desc': 'Three specimens from three different worlds, laid together in one box.',
+
+  // ---------- Ending ----------
+  'ending.button.export': 'Export Photo',
+  'ending.window.title': 'Living Archive',
+  'ending.button.restart': 'Restart',
+  'ending.photo.title': 'Specimen Photo',
+  'ending.photo.save': 'Save Photo',
+  'ending.photo.close': 'Close',
+}
+
+/**
+ * 按 key 取当前语言的文案。缺失的 key 在开发环境下报警告并原样返回 key，方便发现遗漏。
+ * 组件里需要随语言切换重渲染时，自己订阅 useLangStore。
+ */
 export function copy(key: string): string {
-  const text = COPY[key]
+  const text = (useLangStore.getState().lang === 'en' ? COPY_EN[key] : undefined) ?? COPY[key]
   if (text === undefined) {
     if (import.meta.env.DEV) console.warn(`[copy] 缺少文案: ${key}`)
     return key

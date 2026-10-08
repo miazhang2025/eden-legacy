@@ -38,11 +38,11 @@
     "height": 0.8999999999999999,
     "color": "#fff8e8",
     "spawn": [
-      -1,
+      0.638,
       0,
-      18
+      21.253
     ],
-    "spawnYaw": 0,
+    "spawnYaw": -0.125,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
     "groundSmoothing": 0.08,
@@ -182,8 +182,8 @@
     ],
     "size": 36,
     "mesh": "/models/env/garden.water.glb",
-    "shallowColor": "#6fa3ad",
-    "deepColor": "#2e3d66",
+    "shallowColor": "#b6ffec",
+    "deepColor": "#5aa0b8",
     "depthFalloff": 0.45,
     "normalScale": 0.6,
     "normalStrength": 0.25,
@@ -762,9 +762,9 @@
     {
       "id": "garden_flower_01",
       "position": [
-        -10,
+        -1.254,
         0,
-        2
+        12.776
       ],
       "rotation": [
         0,
@@ -776,9 +776,9 @@
     {
       "id": "garden_flower_02",
       "position": [
-        -4,
+        5.44,
         0,
-        2
+        5.95
       ],
       "rotation": [
         0,
@@ -790,9 +790,9 @@
     {
       "id": "garden_butterfly_01",
       "position": [
-        -10,
+        2.308,
         0,
-        5
+        0.351
       ],
       "rotation": [
         0,
@@ -804,9 +804,9 @@
     {
       "id": "garden_butterfly_02",
       "position": [
-        -4,
+        -8.275,
         0,
-        5
+        -6.73
       ],
       "rotation": [
         0,
@@ -823,7 +823,7 @@
       3
     ],
     "zoneRadius": 1.8,
-    "proximity": 2.2,
+    "proximity": 1.2,
     "othersFadeOut": true,
     "selectGlowDuration": 0.8,
     "fadeDuration": 1.2,
@@ -839,7 +839,10 @@
     "breatheDepth": 0.25,
     "emissiveDamping": 0.15,
     "spinSpeed": 0.3,
-    "assetLift": 0.8
+    "assetLift": 0.8,
+    "inspectDistance": 6,
+    "inspectAngleDeg": 12,
+    "introPromptSeconds": 6
   },
   "mobile": {
     "pixelRatioMax": 1.5,
