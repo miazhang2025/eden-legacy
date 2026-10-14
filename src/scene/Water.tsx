@@ -13,6 +13,8 @@ import { url, useEnvTransform } from './EnvModel'
 import { LAYER_VEGETATION } from './envMaterials'
 
 const DEG = Math.PI / 180
+/** 水深图在场景边界外多烘几米（边界外远处的水看不清，按深水处理） */
+const DEPTH_PAD = 4
 const reflMatrix = new Matrix4()
 const inverse = new Matrix4()
 const local = new Vector3()
@@ -120,14 +122,22 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
   const material = useMemo(() => createWaterMaterial(uniforms), [uniforms])
   useEffect(() => () => material.dispose(), [material])
 
-  // 水深图（只有方形平面用）：碰撞体就绪后按水面范围烘一次；范围 / 高度变化时重烘
+  // 水深图（只有方形平面用）：碰撞体就绪后烘一次，只烘水面与场景边界（外扩一点）的交集；范围 / 高度变化时重烘
   const [colliderReady, setColliderReady] = useState(hasCollider)
   const [cx, , cz] = w.center
-  const depthMap = useMemo(
-    () => (!vertexDepth && colliderReady ? bakeDepthMap(w.level, cx, cz, w.size) : null),
-    [vertexDepth, colliderReady, w.level, cx, cz, w.size],
-  )
-  useEffect(() => () => depthMap?.dispose(), [depthMap])
+  const [bx0, , bz0] = useSceneCfg((c) => c.bounds.min)
+  const [bx1, , bz1] = useSceneCfg((c) => c.bounds.max)
+  const depthMap = useMemo(() => {
+    if (vertexDepth || !colliderReady) return null
+    const half = w.size / 2
+    const x0 = Math.max(cx - half, bx0 - DEPTH_PAD)
+    const x1 = Math.min(cx + half, bx1 + DEPTH_PAD)
+    const z0 = Math.max(cz - half, bz0 - DEPTH_PAD)
+    const z1 = Math.min(cz + half, bz1 + DEPTH_PAD)
+    if (x1 <= x0 || z1 <= z0) return null
+    return bakeDepthMap(w.level, [x0, z0, x1 - x0, z1 - z0])
+  }, [vertexDepth, colliderReady, w.level, cx, cz, w.size, bx0, bz0, bx1, bz1])
+  useEffect(() => () => depthMap?.texture.dispose(), [depthMap])
   const hasDepth = vertexDepth || depthMap !== null
 
   // 实时反射（mid 及以上）：分辨率是最大的性能旋钮，移动端减半
@@ -190,8 +200,8 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
     u.uUseVertexDepth.value = vertexDepth ? 1 : 0
     u.uUseDepthColor.value = quality !== 'low' && hasDepth ? 1 : 0
     u.uUseFoam.value = quality === 'high' && hasDepth ? 1 : 0
-    u.uDepthMap.value = depthMap
-    u.uDepthBounds.value.set(cx - c.size / 2, cz - c.size / 2, c.size, c.size)
+    u.uDepthMap.value = depthMap?.texture ?? null
+    if (depthMap) u.uDepthBounds.value.set(...depthMap.bounds)
     u.uMaxDepth.value = MAX_DEPTH
     u.uWaveAmp.value = c.waveAmplitude
     u.uWaveLen.value = c.waveLength

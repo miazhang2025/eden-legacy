@@ -50,7 +50,8 @@ const RULES = {
       grassScale: 4.6,
       stampSpacing: 2.6,
       inset: 0.4,
-      color: { base: '#2c3d16', tip: '#9db25a', variation: 0.18 },
+      // 往地面手绘贴图的苔绿（色相 ~105°）靠，叶尖不要太亮太黄，否则一丛丛草在地上很跳
+      color: { base: '#2b4224', tip: '#6a8c55', variation: 0.18 },
     },
     plants: {
       // SC14 大罂粟（bigpoppy）不撒：块面太硬，远处看着丑

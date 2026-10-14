@@ -5,13 +5,13 @@ import type { Category } from '../data/assets'
 // 所有子 mesh 共用传入的 material，方便外部统一控制发光与淡出。
 export function PlaceholderModel({ category, material }: { category: Category; material: Material }) {
   switch (category) {
-    case 'ore':
+    case 'mineral':
       return (
         <mesh material={material} castShadow>
           <octahedronGeometry args={[0.5, 0]} />
         </mesh>
       )
-    case 'mushroom':
+    case 'plant':
       return (
         <group>
           <mesh material={material} position={[0, -0.15, 0]} castShadow>

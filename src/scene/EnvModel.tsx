@@ -62,13 +62,36 @@ export function useEnvTransform() {
   return { scale, position, rotation: [0, rotationY, 0] as [number, number, number] }
 }
 
-/** 渲染用环境模型 */
-export function EnvModel({ path }: { path: string }) {
-  const { scene } = useGLTF(url(path), DRACO_PATH, undefined, useKTX2Extension())
+const EXTRA = 'edenEnvExtra'
+
+/**
+ * 渲染用环境模型。
+ * extras（env.extras，如海洋的气泡）挂在主模型 scene 下面当子节点：主模型怎么变换它就跟着怎么动，
+ * 材质也和主模型走同一套流水线（登记进 look dev 面板）；叠加模型（玻璃类）不投阴影。
+ */
+export function EnvModel({ path, extras = [] }: { path: string; extras?: string[] }) {
+  const ktx2 = useKTX2Extension()
+  const [{ scene }, ...extraGltfs] = useGLTF([path, ...extras].map(url), DRACO_PATH, undefined, ktx2)
   const t = useEnvTransform()
   const sceneId = useConfigStore((s) => s.scene)
+  const extraScenes: Object3D[] = extraGltfs.map((g) => g.scene)
+
+  // 必须在材质收集（useEnvMaterials 的 useMemo）之前挂好，所以放在渲染阶段（重复 add 只是重新挂一次）
+  const extraMeshes = useMemo(() => {
+    for (const child of [...scene.children]) if (child.userData[EXTRA] && !extraScenes.includes(child)) scene.remove(child)
+    const meshes = new Set<Object3D>()
+    for (const s of extraScenes) {
+      s.userData[EXTRA] = true
+      scene.add(s)
+      s.traverse((o) => meshes.add(o))
+    }
+    return meshes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene, ...extraScenes])
+
   useDisposeOnUnmount(path, scene)
-  useEnvMaterials(sceneId, scene)
+  useEffect(() => () => extras.forEach((p) => useGLTF.clear(url(p))), [extras.join(',')])
+  useEnvMaterials(sceneId, scene, { castShadow: (mesh) => !extraMeshes.has(mesh) })
   return (
     <group {...t}>
       <primitive object={scene} />

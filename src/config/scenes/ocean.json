@@ -17,11 +17,12 @@
     "minGroundClearance": 0.4,
     "occlusionPadding": 0.3,
     "minDistance": 0.5,
-    "initialPitch": 0.25
+    "initialPitch": -1.0408340855860843e-17
   },
   "env": {
     "model": "/models/env/ocean.glb",
     "collider": "/models/colliders/ocean.glb",
+    "extras": "/models/env/bubble.glb",
     "scale": 1,
     "position": [
       -2.03,
@@ -42,7 +43,7 @@
       0,
       -4.476
     ],
-    "spawnYaw": 2.4546,
+    "spawnYaw": 2.0446,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
     "groundSmoothing": 0.08,
@@ -171,6 +172,23 @@
     "mainMinSize": 1.8,
     "opaqueEnvMapIntensity": 2
   },
+  "bubble": {
+    "centerOpacity": 0.08,
+    "rimOpacity": 0.75,
+    "fresnelPower": 2.5,
+    "tint": "#e8f6ff",
+    "textureStrength": 0.6,
+    "rimColor": "#dff4ff",
+    "rimGlow": 0.15,
+    "roughness": 0.05,
+    "envMapIntensity": 1.5,
+    "iridescence": 1,
+    "iridescenceIOR": 1.3,
+    "filmThicknessMin": 250,
+    "filmThicknessMax": 650,
+    "bobAmplitude": 0.08,
+    "bobSpeed": 1.2
+  },
   "water": {
     "enabled": true,
     "quality": "high",
@@ -216,6 +234,7 @@
     "replaces": "",
     "ownsWater": false,
     "material": "textured",
+    "paintBrightness": 1,
     "near": {
       "albedo": "",
       "normal": "",
@@ -896,22 +915,13 @@
     },
     "SC12_bubble": {
       "transparent": true,
-      "roughness": 3.469446951953614e-18,
-      "opacity": 0.73,
-      "transmission": 1
+      "opacity": 0.73
     },
     "SC11_bubble": {
-      "transparent": true,
-      "roughness": 3.469446951953614e-18,
-      "transmission": 1
+      "transparent": true
     },
     "SC10_bubble": {
-      "transparent": true,
-      "roughness": 0.1,
-      "transmission": 1
-    },
-    "SC09_bubble": {
-      "transmission": 1
+      "transparent": true
     }
   },
   "audio": {
@@ -943,9 +953,9 @@
     {
       "id": "ocean_shell_01",
       "position": [
-        10.613,
+        -1.179,
         0,
-        -1.708
+        3.509
       ],
       "rotation": [
         0,
@@ -971,16 +981,16 @@
     {
       "id": "ocean_fish_01",
       "position": [
-        -0.732,
+        9.843,
         0,
-        3.839
+        -1.398
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 1
+      "scale": 0.6900000000000001
     },
     {
       "id": "ocean_fish_02",
@@ -1013,6 +1023,9 @@
     "activeEmissive": 0.6,
     "inspectEmissive": 1.4,
     "selectedEmissive": 4,
+    "assetSize": 1,
+    "assetSelfGlow": 0.35,
+    "assetGlowGain": 0.35,
     "breatheSpeed": 1.6,
     "floatAmplitude": 0.12,
     "floatSpeed": 1.1,

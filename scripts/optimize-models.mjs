@@ -1,11 +1,12 @@
 // 环境模型处理流水线（spec §4.3）
 //   art/env/<name>.glb  ──►  public/models/env/<name>.glb        渲染用：Draco + KTX2（ETC1S；没装 KTX-Software 时回落 WebP）
 //                       └─►  public/models/colliders/<name>.glb  碰撞用：只留地形类大物体，减面 ≥90%，无材质贴图
+//   叠加模型（OVERLAYS，如 bubble）只出渲染用的，由场景 config 的 env.extras 加载
 //
 // 用法：npm run models            处理 art/env 下全部模型
 //       npm run models -- garden  只处理指定模型
 
-import { readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { NodeIO, getBounds } from '@gltf-transform/core'
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
@@ -18,6 +19,7 @@ import sharp from 'sharp'
 import { checkKTXSoftware, toktx } from '@gltf-transform/cli'
 import { bakeGrassMask } from './bake-grass-mask.mjs'
 import { assignTextures } from './assign-textures.mjs'
+import { smoothNormals } from './smooth-normals.mjs'
 
 // KTX-Software 的 bin 目录（默认装在 ~/tools/KTX，可用环境变量 KTX_BIN 覆盖）
 const KTX_BIN = process.env.KTX_BIN ?? join(process.env.USERPROFILE ?? process.env.HOME ?? '', 'tools', 'KTX', 'bin')
@@ -53,6 +55,21 @@ const COLLIDER_RULES = {
   default: { include: null, exclude: [], minExtent: 0.1, maxTriangles: 20000 },
 }
 
+/**
+ * 叠加模型：不单独成场景，由某个场景的 env.extras 一起加载（与主模型同一套 env 变换）。
+ * 不出碰撞体 / 草地图；material = 统一换成的材质名（运行时按名字定角色，*_bubble → 泡泡），texture = 同时接上的贴图（贴图目录下）。
+ * 与主模型里的同名材质用同一张贴图：运行时按材质名合并，两边共用一个材质（look dev 面板里也是同一项）。
+ * C4D 导出的玻璃材质是 alpha 0 的 BLEND，直接用会完全看不见，这里换成不透明，透明度交给运行时的泡泡材质。
+ */
+const OVERLAYS = {
+  bubble: { material: 'SC09_bubble', texture: 'ocean/SC09_bubble.jpg' }, // 海洋：贴地的一片气泡，与场景里的泡泡同材质同贴图
+}
+
+/** 平滑着色（重算法线，抹掉美术导出的硬边）：按材质名匹配。洞穴：岩壁 / 地面（SC01–27_LAND） */
+const SMOOTH = {
+  cave: /land/i,
+}
+
 const countTriangles = (doc) =>
   doc.getRoot().listMeshes().flatMap((m) => m.listPrimitives())
     .reduce((sum, p) => sum + (p.getIndices()?.getCount() ?? p.getAttribute('POSITION').getCount()) / 3, 0)
@@ -68,11 +85,28 @@ const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)}MB`
 
 async function buildRender(src, name) {
   const doc = await io.read(src)
+  const overlay = OVERLAYS[name]
+  if (overlay) {
+    const texture = overlay.texture
+      ? doc.createTexture(basename(overlay.texture)).setImage(readFileSync(join(TEXTURES, overlay.texture))).setMimeType('image/jpeg')
+      : null
+    for (const mat of doc.getRoot().listMaterials()) {
+      mat.setName(overlay.material).setAlphaMode('OPAQUE')
+      // 有贴图时底色归白（贴图颜色原样显示，与主模型同名材质一致）
+      if (texture) mat.setBaseColorFactor([1, 1, 1, 1]).setBaseColorTexture(texture)
+      else mat.setBaseColorFactor([...mat.getBaseColorFactor().slice(0, 3), 1])
+    }
+  }
   // 美术给的场景 glb 只有几何：按名字接贴图、建材质（材质名带用途，运行时据此判断角色）
-  const tex = await assignTextures(doc, name, TEXTURES)
+  const tex = overlay ? { assigned: 0 } : await assignTextures(doc, name, TEXTURES)
   if (tex.assigned) {
     console.log(`  贴图     → ${tex.assigned} 个 mesh / ${tex.materials} 个材质 / ${tex.textures} 张贴图`)
     if (tex.missing.length) console.warn(`  ⚠ 没找到贴图的 mesh：${tex.missing.join(', ')}`)
+  }
+  const smooth = SMOOTH[name]
+  if (smooth) {
+    const n = smoothNormals(doc, (_, prim) => smooth.test(prim.getMaterial()?.getName() ?? ''))
+    console.log(`  平滑着色 → ${n} 个图元`)
   }
   await doc.transform(
     dedup(),
@@ -154,6 +188,7 @@ for (const f of files) {
   console.log(`\n▸ ${name}  (${mb(statSync(src).size)})`)
   const render = await buildRender(src, name)
   console.log(`  render   → ${render}  ${mb(statSync(render).size)}`)
+  if (OVERLAYS[name]) continue
   const col = await buildCollider(src, name)
   console.log(`  collider → ${col.out}  ${mb(statSync(col.out).size)}  ${Math.round(col.triangles)} 三角面`)
   console.log(`    保留 ${col.kept.length} 个 mesh：${col.kept.join(', ')}`)

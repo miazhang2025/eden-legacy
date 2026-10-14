@@ -64,11 +64,16 @@ function Terrain() {
   const env = useSceneCfg((c) => c.env)
   const terrain = useSceneCfg((c) => c.terrain)
   if (!env.model) return <PlaceholderGround />
+  const extras = (env.extras ?? '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
   const generated = terrain.enabled && terrain.model !== ''
   const collider = generated ? terrain.collider : env.collider
   return (
     <>
-      <EnvModel path={env.model} />
+      {/* key：叠加模型变了就重新挂载（材质要重新收集） */}
+      <EnvModel key={extras.join(',')} path={env.model} extras={extras} />
       {generated && <GeneratedTerrain path={terrain.model} />}
       {generated && terrain.scatter.enabled && terrain.scatter.model && <Scatter path={terrain.scatter.model} />}
       {generated && terrain.boundary.enabled && terrain.boundary.map && <BoundaryField map={terrain.boundary.map} />}

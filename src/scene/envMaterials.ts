@@ -3,6 +3,7 @@ import { Box3, Mesh, MeshDepthMaterial, RGBADepthPacking, Vector3, type Material
 import { create } from 'zustand'
 import CustomShaderMaterial from 'three-custom-shader-material/vanilla'
 import { waterOn, type MaterialOverride, type MaterialRole, type SceneConfig, type SceneId, type TierSettings } from '../config/schema'
+import { applyBubbleValues, bakeBubblePhase, createBubbleMaterial } from '../materials/BubbleMaterial'
 import { createCrystalMaterial } from '../materials/CrystalMaterial'
 import { shared } from '../materials/uniforms'
 import { bakeVegetationAttributes, createVegetationMaterial, vegetationVertexShader } from '../materials/VegetationMaterial'
@@ -55,13 +56,15 @@ function collect(root: Object3D): Collected[] {
   return [...map.values()]
 }
 
-/** 植被阴影：深度材质也要带同样的风动位移，否则阴影不摆 */
-function vegetationDepthMaterial() {
+/** 植被阴影：深度材质也要带同样的风动位移，否则阴影不摆；镂空的（alpha 裁切，如蕨类）阴影也按贴图镂空 */
+function vegetationDepthMaterial(src: MeshStandardMaterial) {
+  const cutout = src.alphaTest > 0 && src.map ? { map: src.map, alphaTest: src.alphaTest } : {}
   return new CustomShaderMaterial({
     baseMaterial: MeshDepthMaterial,
     vertexShader: vegetationVertexShader,
     uniforms: shared,
     depthPacking: RGBADepthPacking,
+    ...cutout,
     cacheKey: () => 'eden-vegetation-depth-v1',
   }) as unknown as Material
 }
@@ -71,6 +74,11 @@ function vegetationDepthMaterial() {
  * 晶体是否透射取决于档位与尺寸（spec §12.1：low 全部不透明，mid 仅主体，high 主体 + 次级）。
  */
 function roleBase(e: MaterialEntry, cfg: SceneConfig, tier: TierSettings): Partial<MaterialOverride> {
+  if (e.role === 'bubble') {
+    const b = cfg.bubble
+    // 泡泡靠透明混合，不用 transmission
+    return { transparent: true, transmission: 0, roughness: b.roughness, envMapIntensity: b.envMapIntensity }
+  }
   if (e.role !== 'crystal') return {}
   const c = cfg.crystal
   const isMain = e.size >= c.mainMinSize
@@ -83,7 +91,7 @@ function roleBase(e: MaterialEntry, cfg: SceneConfig, tier: TierSettings): Parti
 /**
  * 环境模型的材质流水线：
  * 1. 收集所有材质（按 name）
- * 2. 按角色转换：vegetation → 风动 + SSS；crystal → 透射；emitter → 隐藏并登记发射点；water → 水面平面开启时隐藏
+ * 2. 按角色转换：vegetation → 风动 + SSS；crystal → 透射；bubble → 透明薄膜 + 上下浮动（不投阴影）；emitter → 隐藏并登记发射点；water → 水面平面开启时隐藏
  * 3. 登记到材质注册表（look dev 面板用）
  * 4. 应用 config.materials 覆盖（叠加在角色基础值之上）
  *
@@ -123,7 +131,7 @@ export function useEnvMaterials(
     const entries: Record<string, MaterialEntry> = {}
     const emitters: [number, number, number][] = []
     /** 每个 mesh 要挂的材质 / 深度材质 / 图层 / 可见性 */
-    const assign: Array<{ mesh: Mesh; material: Material; depth?: Material; layer: number; visible: boolean }> = []
+    const assign: Array<{ mesh: Mesh; material: Material; depth?: Material; layer: number; visible: boolean; castShadow?: boolean }> = []
     const created: Material[] = []
     const hidden = new Set(replaced.split(',').map((s) => s.trim()).filter(Boolean))
 
@@ -137,7 +145,7 @@ export function useEnvMaterials(
 
       if (role === 'vegetation') {
         const m = createVegetationMaterial(src)
-        const depth = vegetationDepthMaterial()
+        const depth = vegetationDepthMaterial(src)
         created.push(m, depth)
         for (const mesh of c.meshes) {
           bakeVegetationAttributes(mesh, stiffness, thickness)
@@ -148,6 +156,15 @@ export function useEnvMaterials(
         const m = createCrystalMaterial(src)
         created.push(m)
         for (const mesh of c.meshes) assign.push({ mesh, material: m, layer: 0, visible: true })
+        active = [m]
+      } else if (role === 'bubble') {
+        const m = createBubbleMaterial(src)
+        created.push(m)
+        for (const mesh of c.meshes) {
+          bakeBubblePhase(mesh)
+          // 阴影深度材质不跟着浮动，透明薄膜也不该投实心影子
+          assign.push({ mesh, material: m, layer: 0, visible: true, castShadow: false })
+        }
         active = [m]
       } else if (role === 'emitter') {
         c.meshes.forEach((mesh, i) => {
@@ -197,7 +214,7 @@ export function useEnvMaterials(
       a.mesh.customDepthMaterial = a.depth
       a.mesh.layers.set(a.layer)
       a.mesh.visible = a.visible
-      a.mesh.castShadow = castShadowRef.current?.(a.mesh) ?? true
+      a.mesh.castShadow = a.castShadow ?? castShadowRef.current?.(a.mesh) ?? true
       a.mesh.receiveShadow = true
     }
     if (register) {
@@ -222,6 +239,7 @@ export function useEnvMaterials(
   useEffect(() => {
     for (const e of Object.values(entries)) {
       applyValues(e.active, { ...e.original, ...roleBase(e, cfg, tier), ...overrides[e.name], role: e.role })
+      if (e.role === 'bubble') for (const m of e.active) applyBubbleValues(m, cfg.bubble)
     }
   }, [entries, overrides, cfg, tier])
 }

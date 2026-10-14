@@ -1,6 +1,6 @@
 // HDRI 降采样：art/hdri/*.hdr → public/hdri/*.hdr（默认 1k，spec §12.3 要求 1k/2k，不用 4k）
 // Radiance RGBE 格式自己解码 / 编码（sharp 不支持 .hdr）。
-// 用法：npm run hdri [目标宽度]
+// 用法：npm run hdri [目标宽度] [文件名片段]   只处理文件名包含该片段的（如 npm run hdri 2048 rogland）
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -127,6 +127,7 @@ function encodeHDR(img) {
 }
 
 const targetWidth = Number(process.argv[2] ?? 1024)
+const only = process.argv[3]?.toLowerCase()
 if (!existsSync(SRC)) {
   console.error(`没有 ${SRC}，把原始 .hdr 放进去再运行`)
   process.exit(1)
@@ -134,7 +135,7 @@ if (!existsSync(SRC)) {
 mkdirSync(OUT, { recursive: true })
 const mb = (n) => `${(n / 1024 / 1024).toFixed(1)}MB`
 
-for (const file of readdirSync(SRC).filter((f) => f.toLowerCase().endsWith('.hdr'))) {
+for (const file of readdirSync(SRC).filter((f) => f.toLowerCase().endsWith('.hdr') && (!only || f.toLowerCase().includes(only)))) {
   const src = join(SRC, file)
   const raw = readFileSync(src)
   const img = decodeHDR(raw)

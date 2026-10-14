@@ -64,7 +64,8 @@ function GrassBed({ scene, cfg, seed, brightness }: { scene: Object3D; cfg: Deco
     const r = (i: number, k: number) => hash01(seed, 300 + i * 7 + k)
     const arc = (cfg.arcDeg * Math.PI) / 180
     for (let i = 0; i < cfg.count; i++) {
-      const u = r(i, 0) * 2 - 1
+      // 分层抖动：每丛占弧上一小格、在格内随机，整圈铺得均匀，不会扎堆或留空
+      const u = ((i + r(i, 0)) / cfg.count) * 2 - 1
       const uw = Math.sign(u) * Math.pow(Math.abs(u), 1 + cfg.bottomBias)
       const theta = -Math.PI / 2 + (uw * arc) / 2
       const rad = cfg.radius - cfg.inset * r(i, 1)

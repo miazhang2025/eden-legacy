@@ -1,0 +1,5 @@
+# 美术源文件（模型 / HDRI / 动画）走 Git LFS：GitHub 单文件上限 100MB，砗磲原模型 226MB
+art/**/*.glb filter=lfs diff=lfs merge=lfs -text
+art/**/*.gltf filter=lfs diff=lfs merge=lfs -text
+art/**/*.hdr filter=lfs diff=lfs merge=lfs -text
+art/**/*.fbx filter=lfs diff=lfs merge=lfs -text

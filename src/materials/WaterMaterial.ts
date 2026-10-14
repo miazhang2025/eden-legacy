@@ -1,12 +1,13 @@
 import {
   Color,
   DataTexture,
+  DataUtils,
+  HalfFloatType,
   LinearFilter,
   Matrix4,
   MeshPhysicalMaterial,
-  RGBAFormat,
+  RedFormat,
   Texture,
-  UnsignedByteType,
   Vector2,
   Vector4,
 } from 'three'
@@ -202,28 +203,38 @@ export function createWaterMaterial(uniforms: WaterUniforms): EdenCSM {
   return m
 }
 
+/** 水深图每个像素覆盖多少米、单边最多多少像素（泡沫带只有 0.3 米宽，太粗会烘出一格格的方块） */
+const DEPTH_TEXEL = 0.1
+const DEPTH_MAX_RES = 512
+
+export interface DepthMap {
+  texture: DataTexture
+  /** 覆盖的世界范围 x0, z0, 宽, 深（给 uDepthBounds） */
+  bounds: [number, number, number, number]
+}
+
 /**
- * 从碰撞体烘水深图（一次性）：在水面高度向下发射线，R = 深度 / MAX_DEPTH；
+ * 从碰撞体烘水深图（一次性）：在水面高度向下发射线，R = 深度（米，半精度浮点）；
  * 水面以下没有地形（如 ocean 的浮岛之间）记为最大深度。
+ * 只烘 area（水面与场景边界的交集）：水面往往比能走到的范围大得多，烘整片会把分辨率浪费在看不到的地方。
  */
-export function bakeDepthMap(level: number, cx: number, cz: number, size: number, res = 128): DataTexture {
-  const data = new Uint8Array(res * res * 4)
-  const x0 = cx - size / 2
-  const z0 = cz - size / 2
-  for (let j = 0; j < res; j++) {
-    for (let i = 0; i < res; i++) {
-      const x = x0 + ((i + 0.5) / res) * size
-      const z = z0 + ((j + 0.5) / res) * size
+export function bakeDepthMap(level: number, area: [number, number, number, number]): DepthMap {
+  const [x0, z0, w, h] = area
+  const resX = Math.max(2, Math.min(DEPTH_MAX_RES, Math.ceil(w / DEPTH_TEXEL)))
+  const resZ = Math.max(2, Math.min(DEPTH_MAX_RES, Math.ceil(h / DEPTH_TEXEL)))
+  const data = new Uint16Array(resX * resZ)
+  for (let j = 0; j < resZ; j++) {
+    for (let i = 0; i < resX; i++) {
+      const x = x0 + ((i + 0.5) / resX) * w
+      const z = z0 + ((j + 0.5) / resZ) * h
       const g = terrainHeight(x, z, level + 0.01, MAX_DEPTH)
       const depth = g === null ? MAX_DEPTH : Math.max(0, level - g)
-      const k = (j * res + i) * 4
-      data[k] = Math.round((depth / MAX_DEPTH) * 255)
-      data[k + 3] = 255
+      data[j * resX + i] = DataUtils.toHalfFloat(depth / MAX_DEPTH)
     }
   }
-  const tex = new DataTexture(data, res, res, RGBAFormat, UnsignedByteType)
-  tex.magFilter = LinearFilter
-  tex.minFilter = LinearFilter
-  tex.needsUpdate = true
-  return tex
+  const texture = new DataTexture(data, resX, resZ, RedFormat, HalfFloatType)
+  texture.magFilter = LinearFilter
+  texture.minFilter = LinearFilter
+  texture.needsUpdate = true
+  return { texture, bounds: area }
 }

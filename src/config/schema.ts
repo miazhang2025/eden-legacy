@@ -43,6 +43,8 @@ export interface SceneConfig {
   env: {
     model: string
     collider: string
+    /** 叠加模型（逗号分隔），与主模型同一套变换一起加载，不进碰撞体，如海洋的 /models/env/bubble.glb */
+    extras: string
     scale: number
     position: Vec3
     rotationY: number
@@ -92,6 +94,8 @@ export interface SceneConfig {
   wind: WindConfig
   sss: SSSConfig
   crystal: CrystalConfig
+  /** 泡泡（材质角色 bubble，ocean 的气泡） */
+  bubble: BubbleConfig
   water: WaterConfig
   /** 生成地形（npm run terrain）：替换美术地形 + 无边界远景裙边 + 可玩区软边界 */
   terrain: TerrainConfig
@@ -149,6 +153,12 @@ export interface SceneConfig {
     activeEmissive: number
     inspectEmissive: number
     selectedEmissive: number
+    /** 本场景 4 个资产的整体大小倍数（再乘 assets[].scale） */
+    assetSize: number
+    /** 真实模型的常驻自发光（自发光颜色 = 模型自己的 base 贴图），暗处也能看清 */
+    assetSelfGlow: number
+    /** 真实模型：上面 idle/active/inspect/selected 的发光强度乘这个倍数再叠加到自发光上（那几个值按占位几何体调的，直接用太亮） */
+    assetGlowGain: number
     breatheSpeed: number
     /** 呼吸幅度 0–1：发光在 (1-depth)~1 倍之间起伏 */
     breatheDepth: number
@@ -175,7 +185,7 @@ export interface AssetPlacement {
 
 export type MaterialSide = 'front' | 'back' | 'double'
 /** 材质角色：决定用哪套自定义 shader。默认按材质名前缀（veg_ / crystal_ / water_ / emitter_），面板可改 */
-export type MaterialRole = 'static' | 'vegetation' | 'crystal' | 'water' | 'emitter'
+export type MaterialRole = 'static' | 'vegetation' | 'crystal' | 'bubble' | 'water' | 'emitter'
 
 export interface MaterialOverride {
   role?: MaterialRole
@@ -313,6 +323,30 @@ export interface CrystalConfig {
   opaqueEnvMapIntensity: number
 }
 
+export interface BubbleConfig {
+  /** 正对视线处的不透明度（泡泡中间几乎透明） */
+  centerOpacity: number
+  /** 边缘的不透明度（按菲涅尔从中间过渡到边缘） */
+  rimOpacity: number
+  fresnelPower: number
+  /** 泡泡底色；贴图（烘焙的环境反射）按 textureStrength 叠在上面 */
+  tint: string
+  textureStrength: number
+  /** 边缘额外的自发光 */
+  rimColor: string
+  rimGlow: number
+  roughness: number
+  envMapIntensity: number
+  /** 薄膜干涉彩虹色（physical iridescence）强度、薄膜折射率、膜厚范围（纳米） */
+  iridescence: number
+  iridescenceIOR: number
+  filmThicknessMin: number
+  filmThicknessMax: number
+  /** 上下浮动：幅度（米）、速度（弧度/秒，每个泡泡在 ±25% 内随机） */
+  bobAmplitude: number
+  bobSpeed: number
+}
+
 export interface WaterConfig {
   enabled: boolean
   quality: QualityTier
@@ -383,6 +417,8 @@ export interface TerrainConfig {
   ownsWater: boolean
   /** textured = 原地形范围用 near 贴图、外面用 far 贴图；painted = 原地形范围用原来的手绘贴图 */
   material: 'textured' | 'painted'
+  /** painted：手绘贴图的亮度倍数（颜色再乘 near.tint），用来和草、花的颜色对齐 */
+  paintBrightness: number
   /** 原地形范围（中心）的贴图 */
   near: GroundLayer
   /** 远景裙边的贴图 */
@@ -595,7 +631,7 @@ export interface PointLightConfig {
 
 /**
  * 标本构图里的一个角色（主体 / 前景点缀 / 远景点缀）。
- * anchor 与 region 都按画框内框的宽 / 高 / 深归一：anchor 是中心点（-0.5–0.5），region 是可占据的范围（0–1）。
+ * anchor 与 region 都按画框内框的宽 / 高 / 深归一：anchor 的 x / y 是中心点、z 是标本背面贴的位置（-0.5 = 背板；-0.5–0.5），region 是可占据的范围（0–1）。
  * 模型会在套用 rotation 之后按包围盒等比缩放到刚好装进 region，并把包围盒中心对齐 anchor。
  */
 export interface CompositionRole {
@@ -927,7 +963,7 @@ const lightsSchema = {
 
 /** 材质面板里可调的字段（spec §9.3 Materials）；physical 为 true 的只对 MeshPhysicalMaterial 显示 */
 export const MATERIAL_FIELDS: Array<{ key: keyof MaterialOverride; leaf: Leaf; physical?: boolean }> = [
-  { key: 'role', leaf: { t: 'select', options: ['static', 'vegetation', 'crystal', 'water', 'emitter'], label: 'role 角色' } },
+  { key: 'role', leaf: { t: 'select', options: ['static', 'vegetation', 'crystal', 'bubble', 'water', 'emitter'], label: 'role 角色' } },
   { key: 'color', leaf: color() },
   { key: 'roughness', leaf: num(0, 1, 0.01) },
   { key: 'metalness', leaf: num(0, 1, 0.01) },
@@ -1044,6 +1080,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     _label: '环境模型',
     model: { t: 'text' },
     collider: { t: 'text' },
+    extras: { t: 'text', label: 'extras（叠加模型）', hint: '逗号分隔' },
     scale: num(0.1, 50, 0.01, 'scale', '模型缩放。碰撞体同步，但资产/出生点/采集区坐标不会跟着缩放'),
     position: vec(0.1),
     rotationY: num(-Math.PI, Math.PI, 0.01),
@@ -1192,6 +1229,24 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     mainMinSize: num(0, 20, 0.1, 'mainMinSize', '包围盒最长边 ≥ 此值算主体；mid 档只有主体透射'),
     opaqueEnvMapIntensity: intensity(5),
   },
+  bubble: {
+    _label: '泡泡 bubble',
+    centerOpacity: num(0, 1, 0.01, 'centerOpacity', '正对视线处的不透明度（越小越通透）'),
+    rimOpacity: num(0, 1, 0.01, 'rimOpacity', '边缘的不透明度'),
+    fresnelPower: num(0.5, 10, 0.1, 'fresnelPower', '越大边缘越窄'),
+    tint: color(),
+    textureStrength: num(0, 1, 0.01, 'textureStrength', '烘焙反射贴图叠多少'),
+    rimColor: color(),
+    rimGlow: intensity(5),
+    roughness: num(0, 1, 0.01),
+    envMapIntensity: intensity(5),
+    iridescence: num(0, 1, 0.01, 'iridescence', '薄膜彩虹色'),
+    iridescenceIOR: num(1, 2.333, 0.01),
+    filmThicknessMin: num(0, 1200, 10, 'filmThicknessMin', '膜厚下限（nm）'),
+    filmThicknessMax: num(0, 1200, 10, 'filmThicknessMax', '膜厚上限（nm）'),
+    bobAmplitude: num(0, 1, 0.005, 'bobAmplitude', '上下浮动幅度（米）'),
+    bobSpeed: num(0, 5, 0.05, 'bobSpeed', '浮动速度'),
+  },
   water: {
     _label: '水面 water',
     enabled: bool(),
@@ -1235,6 +1290,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     replaces: { t: 'text', label: 'replaces（隐藏的原地形材质）', hint: '逗号分隔' },
     ownsWater: bool('ownsWater', '关掉生成地形时同时关掉 water 水面'),
     material: select('textured', 'painted'),
+    paintBrightness: num(0.3, 2, 0.01, 'paintBrightness', 'painted：手绘贴图亮度（颜色再乘 near 的 tint）'),
     near: { _label: 'near（中心贴图）', ...groundLayer },
     far: { _label: 'far（远景贴图）', ...groundLayer },
     breakup: num(0, 1, 0.01, 'breakup（打散平铺）'),
@@ -1427,6 +1483,9 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     activeEmissive: intensity(10),
     inspectEmissive: intensity(10),
     selectedEmissive: intensity(20),
+    assetSize: num(0.1, 5, 0.01, 'assetSize', '本场景交互资产整体大小（× 资产摆位里各自的 scale）'),
+    assetSelfGlow: num(0, 2, 0.01, 'assetSelfGlow', '真实模型常驻自发光（颜色取自 base 贴图）'),
+    assetGlowGain: num(0, 1, 0.01, 'assetGlowGain', '真实模型：上面四档发光 × 该倍数，叠加到自发光上'),
     breatheSpeed: num(0, 10, 0.05),
     breatheDepth: num(0, 1, 0.01),
     emissiveDamping: num(0, 1, 0.01),

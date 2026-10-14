@@ -7,7 +7,7 @@ import { terrainGlobals } from './terrainGlobals'
 //   r = 原地形范围（1 = 中心，边缘向外渐变到 0 = 远景裙边）
 //   g = 水域（池底着色）
 // textured：中心用 near 一套、裙边用 far 一套（Megascans 平铺：颜色 / 法线 / ORM），按 r 混合；
-// painted ：中心颜色换成原地形的手绘贴图（法线、粗糙度仍用 near）。
+// painted ：中心颜色换成原地形的手绘贴图 × near.tint × paintBrightness（法线、粗糙度仍用 near）。
 // 平铺 uv = 世界 XZ ÷ tileSize；颜色再混一套旋转缩小的 uv、叠大尺度明暗，远看不出平铺周期。
 
 const layerUniforms = () => ({
@@ -29,6 +29,7 @@ const far = layerUniforms()
 export const terrainUniforms = {
   uTerrainMode: { value: 0 },
   uTerrainPaint: { value: null as Texture | null },
+  uTerrainPaintGain: { value: 1 },
   uNearAlbedo: near.albedo,
   uNearNormal: near.normal,
   uNearOrm: near.orm,
@@ -79,6 +80,7 @@ export function updateTerrainUniforms(cfg: SceneConfig) {
   const t = cfg.terrain
   const u = terrainUniforms
   u.uTerrainMode.value = t.material === 'painted' ? 1 : 0
+  u.uTerrainPaintGain.value = t.paintBrightness
   updateLayer(near, t.near)
   updateLayer(far, t.far)
   u.uTerrainBreakup.value = t.breakup
@@ -93,6 +95,7 @@ const PATCHED = Symbol('eden-terrain')
 const header = /* glsl */ `
 uniform float uTerrainMode;
 uniform sampler2D uTerrainPaint;
+uniform float uTerrainPaintGain;
 uniform sampler2D uNearAlbedo;
 uniform sampler2D uNearNormal;
 uniform sampler2D uNearOrm;
@@ -195,7 +198,7 @@ export function patchTerrain(material: Material) {
             EdenGround n = edenSampleGround(uNearAlbedo, uNearNormal, uNearOrm, uvN, dxN, dyN, uvNB, dxNB, dyNB);
             n.albedo *= uNearTint;
             // painted：颜色换成原地形手绘贴图
-            if (uTerrainMode > 0.5) n.albedo = textureGrad(uTerrainPaint, vEdenTerrainUv, dxP, dyP).rgb;
+            if (uTerrainMode > 0.5) n.albedo = textureGrad(uTerrainPaint, vEdenTerrainUv, dxP, dyP).rgb * uNearTint * uTerrainPaintGain;
             g.albedo += n.albedo * w; g.normal += n.normal * w; g.orm += n.orm * w;
             aoS += uNearAO * w; roughS += uNearRough * w; nS += uNearNormalStrength * w;
           }

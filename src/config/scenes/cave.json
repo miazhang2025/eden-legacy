@@ -22,6 +22,7 @@
   "env": {
     "model": "/models/env/cave.glb",
     "collider": "/models/colliders/cave.glb",
+    "extras": "",
     "scale": 1,
     "position": [
       0,
@@ -38,36 +39,36 @@
     "height": 1.7,
     "color": "#e8e0ff",
     "spawn": [
-      5.832,
+      3.19,
       0,
-      -9.497
+      -12.939
     ],
-    "spawnYaw": 2.5932,
+    "spawnYaw": 2.9314,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
     "groundSmoothing": 0.08,
     "visible": true
   },
   "render": {
-    "exposure": 1.15,
+    "exposure": 1.9599999999999997,
     "pixelRatioMax": 2
   },
-  "background": "#c7b0ef",
+  "background": "#623ca2",
   "fog": {
     "type": "linear",
-    "color": "#b9a0df",
-    "density": 0.024,
-    "near": 10,
-    "far": 80
+    "color": "#302a39",
+    "density": 0.013000000000000001,
+    "near": 17.5,
+    "far": 77
   },
   "lights": {
     "ambient": {
-      "color": "#d6bde2",
-      "intensity": 0.3799999999999999
+      "color": "#fffee7",
+      "intensity": 0.15999999999999986
     },
     "directional": {
-      "color": "#fff9f3",
-      "intensity": 1.5199999999999996,
+      "color": "#faeaff",
+      "intensity": 0,
       "position": [
         25,
         40,
@@ -78,7 +79,7 @@
       {
         "name": "pink_right",
         "color": "#ffa8d8",
-        "intensity": 24.459999999999997,
+        "intensity": 1.629999999999997,
         "distance": 14,
         "decay": 2,
         "position": [
@@ -89,8 +90,8 @@
       },
       {
         "name": "lilac_back",
-        "color": "#fbfff3",
-        "intensity": 14.129999999999997,
+        "color": "#fcdaff",
+        "intensity": 5.979999999999997,
         "distance": 16,
         "decay": 2,
         "position": [
@@ -115,15 +116,15 @@
   },
   "sky": {
     "enabled": true,
-    "topColor": "#9a82d4",
-    "midColor": "#c9a8e6",
-    "horizonColor": "#f2c4dc",
-    "bottomColor": "#7a62b4",
+    "topColor": "#7b5ec2",
+    "midColor": "#5552a5",
+    "horizonColor": "#383149",
+    "bottomColor": "#000000",
     "midHeight": 0.3,
-    "horizonWidth": 0.1,
+    "horizonWidth": 0.06,
     "sunColor": "#ffe2b0",
     "sunSize": 0,
-    "sunIntensity": 0,
+    "sunIntensity": 1.3,
     "sunGlow": 0.2,
     "sunGlowSpread": 8,
     "moon": {
@@ -137,10 +138,10 @@
     }
   },
   "environment": {
-    "mode": "procedural",
-    "hdri": "",
-    "intensity": 0.9,
-    "rotationY": 0,
+    "mode": "hdri",
+    "hdri": "hdri/rogland_clear_night.hdr",
+    "intensity": 0.8200000000000003,
+    "rotationY": -0.2700000000000001,
     "background": false,
     "hdriBackground": "",
     "backgroundIntensity": 1,
@@ -184,54 +185,71 @@
   },
   "crystal": {
     "enabled": true,
-    "transmission": 1,
-    "thickness": 1,
+    "transmission": 0.91,
+    "thickness": 1.75,
     "ior": 1.45,
-    "roughness": 0.05,
+    "roughness": 1.734723475976807e-18,
     "attenuationColor": "#e6c8ff",
-    "attenuationDistance": 2,
-    "glowColor": "#ffb8f0",
-    "glowIntensity": 1.2,
+    "attenuationDistance": 1.97,
+    "glowColor": "#ffc4f2",
+    "glowIntensity": 0.6499999999999999,
     "fresnelPower": 3,
-    "mainMinSize": 1.8,
-    "opaqueEnvMapIntensity": 2
+    "mainMinSize": 2.6,
+    "opaqueEnvMapIntensity": 1.6300000000000001
+  },
+  "bubble": {
+    "centerOpacity": 0.08,
+    "rimOpacity": 0.75,
+    "fresnelPower": 2.5,
+    "tint": "#e8f6ff",
+    "textureStrength": 0.6,
+    "rimColor": "#dff4ff",
+    "rimGlow": 0.15,
+    "roughness": 0.05,
+    "envMapIntensity": 1.5,
+    "iridescence": 1,
+    "iridescenceIOR": 1.3,
+    "filmThicknessMin": 250,
+    "filmThicknessMax": 650,
+    "bobAmplitude": 0.08,
+    "bobSpeed": 1.2
   },
   "water": {
     "enabled": true,
     "quality": "high",
-    "level": -0.42999999999999994,
+    "level": -0.4000000000000001,
     "center": [
       -1,
       0,
       6.5
     ],
-    "size": 30,
+    "size": 55,
     "mesh": "",
-    "shallowColor": "#a6cbf8",
-    "deepColor": "#2dbdef",
-    "depthFalloff": 0.22999999999999993,
-    "normalScale": 0.49,
-    "normalStrength": 0.18,
-    "flowSpeed": 0.08,
-    "flowDirectionDeg": 30,
-    "fresnelPower": 5,
-    "roughness": 0.1,
-    "reflectionIntensity": 0.3,
-    "reflectionResolution": 512,
+    "shallowColor": "#72caca",
+    "deepColor": "#5ecdd7",
+    "depthFalloff": 5.4399999999999995,
+    "normalScale": 0.36000000000000004,
+    "normalStrength": 0.39,
+    "flowSpeed": 0.33,
+    "flowDirectionDeg": -60,
+    "fresnelPower": 5.8,
+    "roughness": 0.44999999999999996,
+    "reflectionIntensity": 0.25,
+    "reflectionResolution": 1024,
     "reflectionLayers": "terrain+vegetation",
-    "refractionStrength": 0.45,
-    "foamWidth": 0.25,
-    "foamColor": "#f2fdff",
-    "causticsIntensity": 0.8,
+    "refractionStrength": 0,
+    "foamWidth": 0.35,
+    "foamColor": "#f4fbff",
+    "causticsIntensity": 0.5,
     "causticsScale": 0.35,
     "causticsSpeed": 0.6,
-    "opacity": 0.88,
-    "blockDepth": 0.6,
+    "opacity": 0.9500000000000001,
+    "blockDepth": 4.6,
     "walkable": true,
-    "segments": 96,
-    "waveAmplitude": 0.02,
-    "waveLength": 3,
-    "waveSpeed": 0.55,
+    "segments": 137,
+    "waveAmplitude": 0.009999999999999993,
+    "waveLength": 5,
+    "waveSpeed": 0.7499999999999999,
     "waveSteepness": 0.35
   },
   "terrain": {
@@ -241,6 +259,7 @@
     "replaces": "",
     "ownsWater": false,
     "material": "textured",
+    "paintBrightness": 1,
     "near": {
       "albedo": "",
       "normal": "",
@@ -342,7 +361,7 @@
     "receiveShadow": true
   },
   "beacon": {
-    "falloffNear": 6,
+    "falloffNear": 0,
     "falloffFar": 40,
     "zoneFarIntensity": 1.6,
     "zoneNearIntensity": 0.8,
@@ -787,10 +806,10 @@
     "toneMapping": "aces",
     "bloom": {
       "enabled": true,
-      "intensity": 1.2,
+      "intensity": 0.9799999999999999,
       "threshold": 0.72,
       "smoothing": 0.3,
-      "radius": 0.75
+      "radius": 0.51
     },
     "vignette": {
       "enabled": true,
@@ -808,15 +827,15 @@
       "bokehScale": 2
     },
     "noise": {
-      "enabled": true,
+      "enabled": false,
       "opacity": 0.035
     },
     "grade": {
       "enabled": true,
       "hue": 0,
-      "saturation": 0.1,
+      "saturation": 0.09,
       "contrast": 0.02,
-      "brightness": 0.03
+      "brightness": 0.009999999999999993
     },
     "ssao": {
       "enabled": false,
@@ -826,63 +845,106 @@
   },
   "materials": {
     "SC38_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true
     },
     "SC39_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true,
+      "side": "front",
+      "transmission": 0.75,
+      "opacity": 0.85,
+      "normalScale": 0,
+      "envMapIntensity": 0.8200000000000001,
+      "clearcoat": 0.24
     },
     "SC40_CRYSTAL": {
       "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true,
+      "roughness": 0.13,
+      "transmission": 0.6,
+      "opacity": 0.76
     },
     "SC41_CRYSTAL": {
       "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true,
+      "roughness": 0.21,
+      "clearcoat": 0.1,
+      "transmission": 0.87,
+      "opacity": 0.62
     },
     "SC42_CRYSTAL": {
       "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true,
+      "roughness": 0.07,
+      "opacity": 0.52,
+      "transmission": 0.8300000000000001
     },
     "SC43_CRYSTAL": {
       "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
-    },
-    "SC44_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true,
+      "roughness": 0.08
     },
     "SC45_CRYSTAL": {
       "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true,
+      "roughness": 0.62,
+      "opacity": 0.49999999999999994,
+      "transmission": 0.35000000000000003,
+      "envMapIntensity": 1.09,
+      "normalScale": 1.6300000000000001
     },
     "SC46_CRYSTAL": {
       "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true,
+      "roughness": 0.11,
+      "transmission": 0.64,
+      "opacity": 0.75
     },
     "SC47_CRYSTAL": {
       "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true,
+      "roughness": 0.16,
+      "transmission": 0.3,
+      "opacity": 0.5800000000000001
     },
     "SC48_CRYSTAL": {
       "emissive": "#d8a8ff",
-      "emissiveIntensity": 0.35
+      "emissiveIntensity": 0,
+      "transparent": true,
+      "transmission": 0.79,
+      "opacity": 0.76,
+      "roughness": 0.09
     },
-    "SC01_LAND": {
-      "color": "#ffd2ea"
+    "SC29_plants": {
+      "emissive": "#363636",
+      "roughness": 0.24,
+      "transparent": true
     },
-    "SC07_LAND": {
-      "color": "#ffd2ea"
+    "SC33_plants": {
+      "role": "static"
     },
-    "SC08_LAND": {
-      "color": "#ffd2ea"
+    "SC36_PLANTS": {
+      "emissive": "#f5f5f5",
+      "transparent": true,
+      "roughness": 1,
+      "emissiveIntensity": 0,
+      "envMapIntensity": 0.65,
+      "opacity": 0.86,
+      "role": "static",
+      "transmission": 0.51,
+      "clearcoat": 1,
+      "normalScale": 1.04
     },
-    "SC10_LAND": {
-      "color": "#ffd2ea"
-    },
-    "SC12_LAND": {
-      "color": "#ffd2ea"
+    "droplet_crystal": {
+      "emissive": "#858585"
     }
   },
   "audio": {
@@ -914,58 +976,58 @@
     {
       "id": "cave_ore_01",
       "position": [
-        -0.525,
-        0,
-        1.619
+        -2.595,
+        -0.2,
+        5.934
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 1
+      "scale": 1.48
     },
     {
       "id": "cave_ore_02",
       "position": [
-        0.522,
+        2.0329999999999995,
         0,
-        13.828
+        5.9910000000000005
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 1
+      "scale": 1.86
     },
     {
       "id": "cave_mushroom_01",
       "position": [
-        0.678,
+        -0.038,
         0,
-        -5.82
+        -0.826
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 1
+      "scale": 1.01
     },
     {
       "id": "cave_mushroom_02",
       "position": [
-        4.649,
+        0.377,
         0,
-        7.215
+        -7.292
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 1
+      "scale": 1.22
     }
   ],
   "flow": {
@@ -984,6 +1046,9 @@
     "activeEmissive": 0.6,
     "inspectEmissive": 1.4,
     "selectedEmissive": 4,
+    "assetSize": 1,
+    "assetSelfGlow": 0.15,
+    "assetGlowGain": 0.25,
     "breatheSpeed": 1.6,
     "floatAmplitude": 0.12,
     "floatSpeed": 1.1,

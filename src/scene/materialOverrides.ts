@@ -49,7 +49,8 @@ export const isPhysical = (m: Material): m is MeshPhysicalMaterial =>
 
 /** 植被类关键词（材质名来自贴图文件名，如 SC25_Coral、SC16_lupin） */
 const VEGETATION = /poppy|daisy|lupin|pineapple|tree|hydrangea|lotus|archangel|arrowhead|snakeplant|stem|bud|coral|anemone|grass|plant|flower|leaf|weed|fern/i
-const CRYSTAL = /crystal|bubble|shell|pearl|droplet/i
+const CRYSTAL = /crystal|shell|pearl|droplet/i
+const BUBBLE = /bubble/i
 const STATIC = /land|landscape|rock|pepple|pebble|stone|ground/i
 
 /**
@@ -65,6 +66,7 @@ export function defaultRole(name: string): MaterialRole {
   if (n.startsWith('emitter_')) return 'emitter'
   if (n.includes('水') || /water/i.test(n)) return 'water'
   if (STATIC.test(n)) return 'static'
+  if (BUBBLE.test(n)) return 'bubble'
   if (CRYSTAL.test(n)) return 'crystal'
   if (VEGETATION.test(n)) return 'vegetation'
   return 'static'

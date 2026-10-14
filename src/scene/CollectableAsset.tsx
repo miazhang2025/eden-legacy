@@ -1,13 +1,30 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { Color, DoubleSide, MathUtils, MeshStandardMaterial, type Group } from 'three'
+import { Color, DoubleSide, MathUtils, MeshStandardMaterial, type Group, type Material } from 'three'
 import type { CollectableAssetDef } from '../data/assets'
 import { assetTransform, useAssetTransform } from '../state/assetPlacement'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
 import { nowSec, useFlowStore } from '../state/useFlowStore'
 import { groundHeightFromSky } from './collision'
+import { AssetModel } from './AssetModel'
 import { PlaceholderModel } from './PlaceholderModel'
 import { dampFactor } from './rig'
+
+/**
+ * 真实模型的自发光：自发光贴图直接用 base 贴图（白色 × 贴图 = 按自己的颜色发光），没有贴图的用底色。
+ * 只改 AssetModel 给的每实例材质副本，不影响结尾标本盒里同一个模型。
+ */
+function applyBaseColorGlow(m: Material) {
+  const std = m as MeshStandardMaterial
+  if (!std.emissive) return
+  if (std.map) {
+    std.emissiveMap = std.map
+    std.emissive.set('#ffffff')
+  } else {
+    std.emissive.copy(std.color)
+  }
+  std.needsUpdate = true
+}
 
 export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
   const group = useRef<Group>(null)
@@ -16,6 +33,8 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
   const ground = useRef<{ x: number; z: number; y: number } | null>(null)
   const roughness = useSceneCfg((c) => c.placeholder.assetRoughness)
   const metalness = useSceneCfg((c) => c.placeholder.assetMetalness)
+  /** 本场景资产整体大小（× 各自摆位里的 scale） */
+  const assetSize = useSceneCfg((c) => c.flow.assetSize)
   const transform = useAssetTransform(def)
   const phaseOffset = useMemo(() => Math.random() * Math.PI * 2, [])
 
@@ -33,6 +52,18 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     [def.placeholderColor, def.glowColor, roughness, metalness],
   )
   useEffect(() => () => material.dispose(), [material])
+
+  // 逐帧控制淡出与发光的材质：占位几何体就是上面那一个，真实模型由 AssetModel 交过来（每实例一份副本）。
+  // 真实模型用自己的 base 贴图做自发光（常驻一点 + 靠近 / 选中时增强），不再用背后的光晕精灵（会被模型穿插切开）
+  const placeholder = def.model === 'placeholder'
+  const mats = useRef<Material[]>([])
+  useEffect(() => {
+    if (placeholder) mats.current = [material]
+  }, [placeholder, material])
+  const onMaterials = useCallback((m: Material[]) => {
+    m.forEach(applyBaseColorGlow)
+    mats.current = m
+  }, [])
 
   useFrame((state, rawDt) => {
     const g = group.current
@@ -82,9 +113,14 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     }
 
     emissive.current = MathUtils.lerp(emissive.current, targetEmissive, dampFactor(f.emissiveDamping, dt))
-    material.emissiveIntensity = emissive.current
-    material.opacity = opacity
-    material.depthWrite = opacity > 0.99
+    const glow = placeholder ? emissive.current : f.assetSelfGlow + emissive.current * f.assetGlowGain
+    for (const m of mats.current) {
+      if ('emissiveIntensity' in m) (m as MeshStandardMaterial).emissiveIntensity = glow
+      m.opacity = opacity
+      // 真实模型平时不透明（免得排序出错），淡出时才切透明
+      m.transparent = placeholder || opacity < 0.999
+      m.depthWrite = opacity > 0.99
+    }
     g.visible = opacity > 0.001
 
     const lift = floating ? Math.sin(t * f.floatSpeed + phaseOffset) * f.floatAmplitude : 0
@@ -114,12 +150,18 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
       ref={group}
       // position 逐帧在 useFrame 里设置（贴地 + 浮动）
       rotation={transform.rotation}
-      scale={transform.scale}
+      scale={transform.scale * assetSize}
       onClick={onClick}
       onPointerOver={onOver}
       onPointerOut={onOut}
     >
-      <PlaceholderModel category={def.category} material={material} />
+      {placeholder ? (
+        <PlaceholderModel category={def.category} material={material} />
+      ) : (
+        <Suspense fallback={null}>
+          <AssetModel def={def} onMaterials={onMaterials} />
+        </Suspense>
+      )}
     </group>
   )
 }

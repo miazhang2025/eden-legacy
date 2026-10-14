@@ -1,10 +1,11 @@
 import type { SceneId } from '../config/schema'
 import { copy } from './copy'
 
-export type Category = 'ore' | 'mushroom' | 'shell' | 'fish' | 'flower' | 'butterfly'
+/** 结尾标本盒的文案按「洞穴类别 × 海洋类别 × 花园类别」查（8 种组合，见 data/specimenBoxes.ts） */
+export type Category = 'mineral' | 'plant' | 'shell' | 'fish' | 'flower' | 'butterfly'
 
 export const SCENE_CATEGORIES: Record<SceneId, [Category, Category]> = {
-  cave: ['ore', 'mushroom'],
+  cave: ['mineral', 'plant'],
   ocean: ['shell', 'fish'],
   garden: ['flower', 'butterfly'],
 }
@@ -15,23 +16,26 @@ export interface CollectableAssetDef {
   category: Category
   /** 文案 key：通过 copy(`${copyKey}.name`) / copy(`${copyKey}.desc`) 取 */
   copyKey: string
-  /** '/models/assets/xxx.glb'；美术资产未到位时为 'placeholder' */
+  /** '/models/assets/<id>.glb'（npm run assets）；美术资产未到位时为 'placeholder' */
   model: string
+  /** 真实模型最长边缩放到多少米（占位几何体约 1 米） */
+  size: number
   specimenScale?: number
   glowColor: string
   /** 占位几何体的底色，接入真实模型后不再使用 */
   placeholderColor: string
 }
 
-type Seed = Omit<CollectableAssetDef, 'copyKey' | 'model'> & { model?: string }
+type Seed = Omit<CollectableAssetDef, 'copyKey' | 'model' | 'size'> & { model?: string; size?: number }
 
 // 资产的静态定义（类别、颜色、文案）。摆位（位置 / 旋转 / 缩放）在 config/scenes/<scene>.json 的 assets 段，
 // look dev 面板里调、随 JSON 导出；探索时按 1–4 可把对应资产放到角色前方。
 const SEEDS: Seed[] = [
-  { id: 'cave_ore_01', scene: 'cave', category: 'ore', glowColor: '#7ef9ff', placeholderColor: '#6a7fa8', specimenScale: 1 },
-  { id: 'cave_ore_02', scene: 'cave', category: 'ore', glowColor: '#c78bff', placeholderColor: '#8a6aa8', specimenScale: 1 },
-  { id: 'cave_mushroom_01', scene: 'cave', category: 'mushroom', glowColor: '#9dff8a', placeholderColor: '#b89a7a', specimenScale: 1 },
-  { id: 'cave_mushroom_02', scene: 'cave', category: 'mushroom', glowColor: '#ffb86b', placeholderColor: '#a87a6a', specimenScale: 1 },
+  // 资产 id 沿用最早的占位命名（也是模型文件名），类别以 category 为准
+  { id: 'cave_ore_01', scene: 'cave', category: 'mineral', glowColor: '#7ef9ff', placeholderColor: '#6a7fa8', specimenScale: 1 },
+  { id: 'cave_ore_02', scene: 'cave', category: 'plant', glowColor: '#c78bff', placeholderColor: '#8a6aa8', specimenScale: 1 },
+  { id: 'cave_mushroom_01', scene: 'cave', category: 'plant', glowColor: '#9dff8a', placeholderColor: '#b89a7a', specimenScale: 1 },
+  { id: 'cave_mushroom_02', scene: 'cave', category: 'plant', glowColor: '#ffb86b', placeholderColor: '#a87a6a', specimenScale: 1 },
 
   { id: 'ocean_shell_01', scene: 'ocean', category: 'shell', glowColor: '#ffd1e8', placeholderColor: '#e8d6c8', specimenScale: 1 },
   { id: 'ocean_shell_02', scene: 'ocean', category: 'shell', glowColor: '#b3f0ff', placeholderColor: '#c8d6e8', specimenScale: 1 },
@@ -45,7 +49,8 @@ const SEEDS: Seed[] = [
 ]
 
 export const ASSETS: CollectableAssetDef[] = SEEDS.map((s) => ({
-  model: 'placeholder',
+  model: `/models/assets/${s.id}.glb`,
+  size: 1,
   ...s,
   copyKey: `asset.${s.id}`,
 }))

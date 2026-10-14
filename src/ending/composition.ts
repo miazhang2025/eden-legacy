@@ -7,7 +7,7 @@ import { getAsset, type Category, type CollectableAssetDef } from '../data/asset
 export type RoleName = 'heroRole' | 'accentNear' | 'accentFar'
 
 /** hero = auto 时的主体优先级：越靠前越适合做视觉中心 */
-export const HERO_RANK: Category[] = ['shell', 'flower', 'mushroom', 'fish', 'butterfly', 'ore']
+export const HERO_RANK: Category[] = ['butterfly', 'shell', 'flower', 'plant', 'fish', 'mineral']
 
 const SCENES: SceneId[] = ['cave', 'ocean', 'garden']
 const DEG = Math.PI / 180
@@ -73,7 +73,8 @@ export function composeSpecimens(
       role,
       asset: getAsset(selections[scene]),
       position: [sx * r.anchor[0] * w, r.anchor[1] * h, r.anchor[2] * d],
-      rotation: [r.rotation[0] + j(0) * 0.5, sx * (r.rotation[1] + j(1)), sx * (r.rotation[2] + j(2) * 0.5)],
+      // 标本已摊平正对背板（flatten.ts），扰动只加在平面内（绕 Z），不让它前后倾斜
+      rotation: [r.rotation[0], sx * r.rotation[1], sx * (r.rotation[2] + j(2))],
       region: [r.region[0] * w, r.region[1] * h, r.region[2] * d],
       scale: r.scale,
     }

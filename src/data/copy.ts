@@ -96,22 +96,22 @@ const COPY: Record<string, string> = {
   'asset.garden_butterfly_02.desc': '拥有清晰纹路与稳定节奏的蝶类生命，在短暂停驻中展现花园最精致的秩序感。',
 
   // ---------- 标本盒（cave × ocean × garden 类别组合） ----------
-  'box.ore_shell_flower.name': '恒久之匣',
-  'box.ore_shell_flower.desc': '矿石、贝壳与花，三种缓慢的时间被安放在同一片黑暗里。',
-  'box.ore_shell_butterfly.name': '静与翼',
-  'box.ore_shell_butterfly.desc': '坚硬的沉积与轻盈的振翅，大地与天空在匣中相遇。',
-  'box.ore_fish_flower.name': '流光之匣',
-  'box.ore_fish_flower.desc': '晶体的冷光、鱼群的游动与花的绽放，在这里彼此映照。',
-  'box.ore_fish_butterfly.name': '迁徙者',
-  'box.ore_fish_butterfly.desc': '一块不会移动的石头，守护着两种永远在路上的生命。',
-  'box.mushroom_shell_flower.name': '潮湿的梦',
-  'box.mushroom_shell_flower.desc': '菌丝、潮汐与花瓣，都是水写给大地的信。',
-  'box.mushroom_shell_butterfly.name': '微光纪',
-  'box.mushroom_shell_butterfly.desc': '菌光、螺光与蝶翼的虹光，被收进同一个夜晚。',
-  'box.mushroom_fish_flower.name': '生生之匣',
-  'box.mushroom_fish_flower.desc': '从地底到海洋再到花园，生命在每一处都找到了自己的形状。',
-  'box.mushroom_fish_butterfly.name': '游离者',
-  'box.mushroom_fish_butterfly.desc': '它们从不属于某一个地方，却在这里第一次安静下来。',
+  'box.mineral_shell_flower.name': '恒久之匣',
+  'box.mineral_shell_flower.desc': '矿石、贝壳与花，三种缓慢的时间被安放在同一片黑暗里。',
+  'box.mineral_shell_butterfly.name': '静与翼',
+  'box.mineral_shell_butterfly.desc': '坚硬的沉积与轻盈的振翅，大地与天空在匣中相遇。',
+  'box.mineral_fish_flower.name': '流光之匣',
+  'box.mineral_fish_flower.desc': '晶体的冷光、鱼群的游动与花的绽放，在这里彼此映照。',
+  'box.mineral_fish_butterfly.name': '迁徙者',
+  'box.mineral_fish_butterfly.desc': '一块不会移动的石头，守护着两种永远在路上的生命。',
+  'box.plant_shell_flower.name': '潮湿的梦',
+  'box.plant_shell_flower.desc': '菌丝、潮汐与花瓣，都是水写给大地的信。',
+  'box.plant_shell_butterfly.name': '微光纪',
+  'box.plant_shell_butterfly.desc': '菌光、螺光与蝶翼的虹光，被收进同一个夜晚。',
+  'box.plant_fish_flower.name': '生生之匣',
+  'box.plant_fish_flower.desc': '从地底到海洋再到花园，生命在每一处都找到了自己的形状。',
+  'box.plant_fish_butterfly.name': '游离者',
+  'box.plant_fish_butterfly.desc': '它们从不属于某一个地方，却在这里第一次安静下来。',
   'box.fallback.desc': '三件来自不同世界的标本，被安放在同一个匣中。',
 
   // ---------- Ending ----------
@@ -216,26 +216,33 @@ const COPY_EN: Record<string, string> = {
   'asset.garden_butterfly_02.desc':
     'A butterfly marked by precise patterns and measured rhythm, revealing the garden’s delicate sense of order in each brief pause.',
 
-  // ---------- 标本盒（placeholder 译文，跟随分组调整后再定稿） ----------
-  'box.ore_shell_flower.name': 'Box of Endurance',
-  'box.ore_shell_flower.desc': 'Ore, shell and flower: three slow kinds of time, laid to rest in the same darkness.',
-  'box.ore_shell_butterfly.name': 'Stillness & Wing',
-  'box.ore_shell_butterfly.desc': 'Hard sediment meets a weightless wingbeat, and earth meets sky inside the box.',
-  'box.ore_fish_flower.name': 'Box of Flowing Light',
-  'box.ore_fish_flower.desc':
-    'The cold light of crystal, the drift of fish and the bloom of a flower reflect one another here.',
-  'box.ore_fish_butterfly.name': 'The Migrants',
-  'box.ore_fish_butterfly.desc': 'A stone that never moves, keeping watch over two lives that are always on the way.',
-  'box.mushroom_shell_flower.name': 'A Damp Dream',
-  'box.mushroom_shell_flower.desc': 'Mycelium, tide and petal are all letters that water wrote to the earth.',
-  'box.mushroom_shell_butterfly.name': 'Age of Glimmer',
-  'box.mushroom_shell_butterfly.desc':
-    'Fungal glow, shell sheen and the iridescence of wings, gathered into a single night.',
-  'box.mushroom_fish_flower.name': 'Box of Becoming',
-  'box.mushroom_fish_flower.desc': 'From deep earth to ocean to garden, life found its own shape everywhere it went.',
-  'box.mushroom_fish_butterfly.name': 'The Wanderers',
-  'box.mushroom_fish_butterfly.desc':
-    'They never belonged to any one place, yet here they grow still for the first time.',
+  // ---------- 标本盒 ----------
+  // 矿物 × 贝类 × 花
+  'box.mineral_shell_flower.name': 'Stone Tide Bloom',
+  'box.mineral_shell_flower.desc': 'Stone, tide, and bloom converge here, preserving three different rhythms of nature.',
+  // 矿物 × 贝类 × 蝶蛾
+  'box.mineral_shell_butterfly.name': 'Shellwing Trace',
+  'box.mineral_shell_butterfly.desc': 'Crystal and shell remain still, while wings carry their quiet memory elsewhere.',
+  // 矿物 × 游动生命 × 花
+  'box.mineral_fish_flower.name': 'Crystal Tide Bloom',
+  'box.mineral_fish_flower.desc': 'Crystal stillness, drifting life, and fleeting bloom form a memory held in motion.',
+  // 矿物 × 游动生命 × 蝶蛾
+  'box.mineral_fish_butterfly.name': 'Crystal Drift Flight',
+  'box.mineral_fish_butterfly.desc':
+    'From buried crystal veins to moving waters and wandering wings, life continues across changing environments.',
+  // 植物 × 贝类 × 花
+  'box.plant_shell_flower.name': 'Rooted Tide Bloom',
+  'box.plant_shell_flower.desc':
+    'Rooted growth, tidal attachment, and garden bloom reveal the same quiet persistence of life.',
+  // 植物 × 贝类 × 蝶蛾
+  'box.plant_shell_butterfly.name': 'Root and Wing Passage',
+  'box.plant_shell_butterfly.desc': 'Some lives root and remain, while others take wing toward new places to belong.',
+  // 植物 × 游动生命 × 花
+  'box.plant_fish_flower.name': 'Living Current Bloom',
+  'box.plant_fish_flower.desc': 'From hidden growth to drifting waters and open bloom, life continues through constant change.',
+  // 植物 × 游动生命 × 蝶蛾
+  'box.plant_fish_butterfly.name': 'Wandering Life Trace',
+  'box.plant_fish_butterfly.desc': 'Growth, drift, and flight form an unfinished journey, with life still moving onward.',
   'box.fallback.desc': 'Three specimens from three different worlds, laid together in one box.',
 
   // ---------- Ending ----------

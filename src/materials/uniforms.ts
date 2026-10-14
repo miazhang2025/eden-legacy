@@ -44,6 +44,16 @@ export const shared = {
   uCrystalGlowColor: { value: new Color('#ffffff') },
   uCrystalGlowIntensity: { value: 0 },
   uCrystalFresnelPower: { value: 3 },
+  // 泡泡
+  uBubbleTint: { value: new Color('#ffffff') },
+  uBubbleTextureStrength: { value: 0.5 },
+  uBubbleCenterOpacity: { value: 0.1 },
+  uBubbleRimOpacity: { value: 0.8 },
+  uBubbleFresnelPower: { value: 2.5 },
+  uBubbleRimColor: { value: new Color('#ffffff') },
+  uBubbleRimGlow: { value: 0 },
+  uBubbleBobAmplitude: { value: 0 },
+  uBubbleBobSpeed: { value: 1 },
   // 焦散（水下地形）
   uWaterLevel: { value: -1e4 },
   uCausticsEnabled: { value: 0 },
@@ -113,6 +123,18 @@ export function SharedUniformDriver() {
     shared.uCrystalGlowColor.value.set(c.glowColor)
     shared.uCrystalGlowIntensity.value = c.glowIntensity
     shared.uCrystalFresnelPower.value = c.fresnelPower
+
+    // 泡泡
+    const b = cfg.bubble
+    shared.uBubbleTint.value.set(b.tint)
+    shared.uBubbleTextureStrength.value = b.textureStrength
+    shared.uBubbleCenterOpacity.value = b.centerOpacity
+    shared.uBubbleRimOpacity.value = b.rimOpacity
+    shared.uBubbleFresnelPower.value = b.fresnelPower
+    shared.uBubbleRimColor.value.set(b.rimColor)
+    shared.uBubbleRimGlow.value = b.rimGlow
+    shared.uBubbleBobAmplitude.value = b.bobAmplitude
+    shared.uBubbleBobSpeed.value = b.bobSpeed
 
     // 焦散：只在 high 档水面开启时投射
     const water = cfg.water
