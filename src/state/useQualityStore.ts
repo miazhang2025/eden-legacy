@@ -7,8 +7,8 @@ import { isTouchMode } from '../input/useInput'
 import { getGlobalCfg, useGlobalCfg } from './useConfigStore'
 
 // 质量档位（spec §12.1 / §12.2）
-// 判定顺序：?quality= 强制 > 设备默认（移动端 low / 桌面 high）> detect-gpu 细化（只会往下调）
-// 运行时帧率守门：连续不达标 → 降一档，只降不升。
+// 判定顺序：?quality= 强制 > 设备默认（移动端 low / 桌面 high）> detect-gpu 细化（只会往下调，只用于移动端）
+// 运行时帧率守门：连续不达标 → 降一档，只降不升（默认只在移动端开启）。
 
 const ORDER: QualityTier[] = ['low', 'mid', 'high']
 const lower = (a: QualityTier, b: QualityTier) => (ORDER.indexOf(a) <= ORDER.indexOf(b) ? a : b)
@@ -40,16 +40,17 @@ const initial = (): Pick<QualityState, 'tier' | 'source'> => {
 
 export const useQualityStore = create<QualityState>()((set) => ({
   ...initial(),
-  // ?quality= 强制指定时视为锁定，不自动降档
-  autoDowngrade: getGlobalCfg().quality.frameGuard.enabled && !queryTier(),
+  // ?quality= 强制指定时视为锁定，不自动降档；桌面固定 high，不自动降档（加载时的掉帧会被误判），只在移动端默认开启
+  autoDowngrade: getGlobalCfg().quality.frameGuard.enabled && !queryTier() && isTouchMode(),
   log: [],
   setTier: (tier, source) =>
     set((s) => ({ tier, source, log: [...s.log, `${new Date().toLocaleTimeString()} ${s.tier} → ${tier}（${source}）`].slice(-20) })),
   setAutoDowngrade: (autoDowngrade) => set({ autoDowngrade }),
 }))
 
-// 启动时用 detect-gpu 细化一次（跑分表自托管在 public/benchmarks，不走外部 CDN）
-if (useQualityStore.getState().source === 'default') {
+// 启动时用 detect-gpu 细化一次（跑分表自托管在 public/benchmarks，不走外部 CDN）。
+// 只用于移动端：桌面的跑分表经常把能流畅跑 high 的显卡判成低档，桌面固定用 desktopDefault
+if (useQualityStore.getState().source === 'default' && isTouchMode()) {
   getGPUTier({ benchmarksURL: `${import.meta.env.BASE_URL}benchmarks` })
     .then((r) => {
       const s = useQualityStore.getState()

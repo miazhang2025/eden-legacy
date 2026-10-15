@@ -27,14 +27,44 @@ import { ColliderModel, EnvModel } from './EnvModel'
 import { FollowCamera } from './FollowCamera'
 import { BoundaryField, GeneratedTerrain, Scatter } from './GeneratedTerrain'
 
-/** Suspense 内的内容全部就绪后才挂载，此时 fade in */
+/** 等几帧（R3F 每帧渲染一次） */
+const nextFrames = (n: number) =>
+  new Promise<void>((resolve) => {
+    const step = () => (--n <= 0 ? resolve() : requestAnimationFrame(step))
+    requestAnimationFrame(step)
+  })
+
+/**
+ * Suspense 内的内容全部就绪后才挂载。揭开前还在遮罩下面做两件事，免得渐入时卡顿（看起来像黑屏直接切进来）：
+ *   1. 异步编译所有着色器（KHR_parallel_shader_compile，不阻塞主线程）
+ *   2. 再渲染几帧：贴图上传、阴影图、实时反射、水深烘焙等第一次的开销都在这里付掉
+ */
 function RevealWhenReady() {
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+  const camera = useThree((s) => s.camera)
   useEffect(() => {
-    const id = requestAnimationFrame(() => useTransition.getState().reveal())
-    return () => cancelAnimationFrame(id)
+    let alive = true
+    void (async () => {
+      try {
+        await gl.compileAsync(scene, camera)
+      } catch {
+        /* 不支持异步编译时直接在首帧编译 */
+      }
+      await nextFrames(REVEAL_WARMUP_FRAMES)
+      if (alive) useTransition.getState().reveal()
+    })()
+    return () => {
+      alive = false
+    }
+    // 只在挂载时做一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return null
 }
+
+/** 揭开前预热渲染的帧数 */
+const REVEAL_WARMUP_FRAMES = 4
 
 /** 背景 / 雾 / 曝光（灯光与环境光见 Lighting.tsx） */
 function Atmosphere() {
@@ -101,6 +131,8 @@ function InputBinder() {
 
 export function SceneShell({ sceneId }: { sceneId: SceneId }) {
   const current = useConfigStore((s) => s.scene)
+  // 遮罩揭开时画面从轻微模糊、放大、偏亮慢慢清晰（styles.css 的 scene-in），不是从黑屏硬切进来
+  const revealed = useTransition((s) => !s.covered)
 
   useEffect(() => {
     useConfigStore.getState().setScene(sceneId)
@@ -122,7 +154,7 @@ export function SceneShell({ sceneId }: { sceneId: SceneId }) {
   if (current !== sceneId) return null
 
   return (
-    <div className="scene-root">
+    <div className={`scene-root ${revealed ? 'is-revealed' : ''}`}>
       <Canvas
         dpr={[1, pixelRatioMax]}
         camera={{ fov }}

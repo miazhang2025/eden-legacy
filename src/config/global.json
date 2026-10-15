@@ -2,9 +2,9 @@
   "version": 1,
   "scene": "global",
   "transition": {
-    "fadeOut": 0.6,
-    "fadeIn": 0.8,
-    "color": "#000000"
+    "fadeOut": 0.7,
+    "fadeIn": 1.6,
+    "color": "#140e16"
   },
   "quality": {
     "desktopDefault": "high",

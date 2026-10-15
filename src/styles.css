@@ -57,7 +57,21 @@ body,
   inset: 0;
   z-index: 1000;
   transition-property: opacity;
-  transition-timing-function: ease;
+  transition-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+}
+/* 场景揭开：画面从轻微模糊、放大、偏亮慢慢变清晰，与遮罩渐隐同时进行 */
+.scene-root canvas {
+  transform-origin: 50% 50%;
+}
+.scene-root.is-revealed canvas {
+  animation: scene-in 2.2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes scene-in {
+  from { filter: blur(10px) brightness(1.25) saturate(0.85); transform: scale(1.05); }
+  to { filter: none; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-root.is-revealed canvas { animation: none; }
 }
 
 /* ---------- 按钮：药丸形，带一点立体 ---------- */
@@ -653,12 +667,37 @@ body,
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: repeating-linear-gradient(-45deg, var(--pink-300) 0 6px, var(--pink-200) 6px 12px);
-  animation: loading-fill 6s ease-in-out infinite;
+  background: repeating-linear-gradient(-45deg, var(--pink-300) 0 6px, var(--pink-200) 6px 12px) 0 0 / 17px 17px;
+  transition: width 0.4s ease;
+  /* 条纹流动：加载中一直在动 */
+  animation: loading-stripes 0.8s linear infinite;
 }
-@keyframes loading-fill {
-  0% { width: 8%; }
-  70%, 100% { width: 100%; }
+.landing__loading.is-done i {
+  background: linear-gradient(to right, var(--pink-300), var(--pink-400));
+  animation: none;
+}
+@keyframes loading-stripes {
+  to { background-position: 17px 0; }
+}
+/* 加载中的开始按钮：不可点，轻轻呼吸 */
+.landing__enter.is-loading:disabled {
+  opacity: 0.85;
+  cursor: progress;
+  animation: loading-breathe 1.6s ease-in-out infinite;
+}
+@keyframes loading-breathe {
+  0%, 100% { filter: saturate(0.7) brightness(1.02); }
+  50% { filter: saturate(1) brightness(1.06); }
+}
+/* 开始页的隐藏预加载画布 */
+.preloader {
+  position: fixed;
+  left: -8px;
+  top: -8px;
+  width: 4px;
+  height: 4px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* 底部滚动横幅：左边一颗爱心徽章 + 胶囊条里循环滚动的标语（参考图底部那条） */

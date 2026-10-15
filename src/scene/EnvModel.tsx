@@ -127,11 +127,3 @@ export function ColliderModel({ path }: { path: string }) {
     </group>
   )
 }
-
-/**
- * Landing 期间预热：只预取文件进 HTTP 缓存。
- * （useGLTF.preload 需要在有渲染器时才能配置 KTX2 解码器，Landing 是纯 2D 页面，没有渲染器）
- */
-export function preloadEnv(model: string, collider: string) {
-  for (const p of [model, collider]) if (p) void fetch(url(p)).catch(() => {})
-}

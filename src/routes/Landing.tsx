@@ -1,8 +1,7 @@
 import { AudioBus } from '../audio/AudioBus'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { copy } from '../data/copy'
-import { preloadEnv } from '../scene/EnvModel'
-import { FILE_DEFAULTS } from '../state/useConfigStore'
+import { ScenePreloader } from '../scene/Preloader'
 import { useLangStore, type Lang } from '../state/useLangStore'
 import { SCENE_ORDER, useRunStore } from '../state/useRunStore'
 import { useRevealOnMount, useTransition } from '../ui/Transition'
@@ -14,6 +13,9 @@ function LandingArtifactSlot() {
   // TODO: 3D 物件设计确定后在这里实现（独立的小 Canvas，绝对定位，不影响现有排版）
   return null
 }
+
+/** 预加载最长等多久（毫秒），超时后开始按钮也放行 */
+const PRELOAD_TIMEOUT_MS = 45000
 
 const LANGS: { id: Lang; label: string }[] = [
   { id: 'en', label: 'EN' },
@@ -53,13 +55,19 @@ export default function Landing() {
   const lang = useLangStore((s) => s.lang)
   const setLang = useLangStore((s) => s.setLang)
 
-  // 停留在 landing 期间后台预热第一个场景的环境模型
+  // 停留在开始页期间把三个场景和结尾要用的模型 / 贴图全部加载解码（见 scene/Preloader.tsx），
+  // 加载完才能开始；万一卡住，超时后也放行（进场景时再加载）
+  const [progress, setProgress] = useState({ done: 0, total: 1 })
+  const [timedOut, setTimedOut] = useState(false)
   useEffect(() => {
-    const { model, collider } = FILE_DEFAULTS.cave.env
-    preloadEnv(model, collider)
+    const id = window.setTimeout(() => setTimedOut(true), PRELOAD_TIMEOUT_MS)
+    return () => clearTimeout(id)
   }, [])
+  const ready = timedOut || (progress.total > 0 && progress.done >= progress.total)
+  const percent = Math.round((Math.min(progress.done, progress.total) / Math.max(1, progress.total)) * 100)
 
   const enter = () => {
+    if (!ready) return
     AudioBus.resume()
     useRunStore.getState().reset()
     useTransition.getState().go('/cave')
@@ -113,9 +121,14 @@ export default function Landing() {
           </h1>
           <p className="landing__tagline">{copy('landing.tagline')}</p>
           <div className="landing__cta">
-            <button className="btn btn--primary landing__enter" onClick={enter}>
+            <button
+              className={`btn btn--primary landing__enter ${ready ? '' : 'is-loading'}`}
+              onClick={enter}
+              disabled={!ready}
+              aria-busy={!ready}
+            >
               <PlayIcon className="btn__icon" />
-              {copy('landing.button.enter')}
+              {ready ? copy('landing.button.enter') : `${copy('landing.button.loading')} ${percent}%`}
             </button>
           </div>
         </header>
@@ -151,8 +164,9 @@ export default function Landing() {
                   <span className="landing__player-btn">
                     <NextIcon />
                   </span>
-                  <div className="landing__loading">
-                    <i />
+                  {/* 进度条：真实的预加载进度 */}
+                  <div className={`landing__loading ${ready ? 'is-done' : ''}`}>
+                    <i style={{ width: `${Math.max(6, percent)}%` }} />
                   </div>
                 </div>
                 <p>{copy('landing.howto.end')}</p>
@@ -161,6 +175,7 @@ export default function Landing() {
           </section>
         </div>
       </div>
+      <ScenePreloader onProgress={(done, total) => setProgress({ done, total })} />
       <div className="landing__marquee" aria-hidden="true">
         <span className="landing__marquee-badge">
           <GlossyHeart />

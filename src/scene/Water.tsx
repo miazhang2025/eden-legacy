@@ -5,10 +5,10 @@ import { Matrix4, Mesh, PlaneGeometry, Vector3, type BufferGeometry } from 'thre
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { waterOn } from '../config/schema'
 import { isTouchMode } from '../input/useInput'
-import { MAX_DEPTH, bakeDepthMap, createWaterMaterial, createWaterUniforms } from '../materials/WaterMaterial'
+import { DEPTH_BLUR, MAX_DEPTH, bakeDepthMap, createWaterMaterial, createWaterUniforms } from '../materials/WaterMaterial'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
 import { capQuality, useTier } from '../state/useQualityStore'
-import { getWaterBedVersion, hasCollider, setWalkPlane } from './collision'
+import { getWaterBedVersion, hasCollider, setWalkPlane, waterBedMeshes } from './collision'
 import { url, useEnvTransform } from './EnvModel'
 import { LAYER_VEGETATION } from './envMaterials'
 
@@ -115,6 +115,7 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
   const tier = useTier()
   const quality = capQuality(w.quality, tier.water)
   const scene = useThree((s) => s.scene)
+  const gl = useThree((s) => s.gl)
   const mesh = useRef<Mesh>(null)
   const planeY = useRef(NaN)
 
@@ -122,7 +123,7 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
   const material = useMemo(() => createWaterMaterial(uniforms), [uniforms])
   useEffect(() => () => material.dispose(), [material])
 
-  // 水深图（只有方形平面用）：碰撞体就绪后烘一次，只烘水面与场景边界（外扩一点）的交集；范围 / 高度变化时重烘
+  // 水深图（只有方形平面用，GPU 烘焙只要几毫秒）：碰撞体就绪后烘一次，只烘水面与场景边界（外扩一点）的交集；范围 / 高度变化时重烘
   const [colliderReady, setColliderReady] = useState(hasCollider)
   // 水底 mesh（渲染模型的地形）登记 / 变化时重烘
   const [bedVersion, setBedVersion] = useState(getWaterBedVersion)
@@ -137,9 +138,9 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
     const z0 = Math.max(cz - half, bz0 - DEPTH_PAD)
     const z1 = Math.min(cz + half, bz1 + DEPTH_PAD)
     if (x1 <= x0 || z1 <= z0) return null
-    return bakeDepthMap(w.level, [x0, z0, x1 - x0, z1 - z0])
-  }, [vertexDepth, colliderReady, bedVersion, w.level, cx, cz, w.size, bx0, bz0, bx1, bz1])
-  useEffect(() => () => depthMap?.texture.dispose(), [depthMap])
+    return bakeDepthMap(gl, waterBedMeshes(), w.level, [x0, z0, x1 - x0, z1 - z0])
+  }, [gl, vertexDepth, colliderReady, bedVersion, w.level, cx, cz, w.size, bx0, bz0, bx1, bz1])
+  useEffect(() => () => depthMap?.dispose(), [depthMap])
   const hasDepth = vertexDepth || depthMap !== null
 
   // 实时反射（mid 及以上）：分辨率是最大的性能旋钮，移动端减半
@@ -207,6 +208,7 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
     u.uDepthMap.value = depthMap?.texture ?? null
     if (depthMap) u.uDepthBounds.value.set(...depthMap.bounds)
     u.uMaxDepth.value = MAX_DEPTH
+    u.uDepthBlur.value = DEPTH_BLUR
     u.uWaveAmp.value = c.waveAmplitude
     u.uWaveLen.value = c.waveLength
     u.uWaveSpeed.value = c.waveSpeed
