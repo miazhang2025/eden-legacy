@@ -40,6 +40,9 @@ Mesh.prototype.raycast = acceleratedRaycast
  * - keepInCollider：原模型里仍要进碰撞体的 mesh（石头、汀步）
  * - step：可玩区网格间距（米）；裙边间距按 grow 倍率逐圈放大，直到 reach 米外
  * - paintRes：手绘贴图长边像素
+ * - repaint：{ 源 mesh: { mesh, at } }，俯视最高面是源 mesh 时，颜色改取 mesh 的贴图（只换颜色，高度、水域判定照旧）：
+ *            按 mesh 在地面上的比例（世界 xz → uv 的线性拟合）铺，源 mesh 的中心对到贴图里的 at（uv）。
+ *            garden：湖心岛（55）换成最大那块地面（8）的草地；8 号贴图在岛正下方画的是池塘，所以取 at 处的一片草
  * - water：池塘在贴图里是紫色，按「蓝 − 绿」「红 − 绿」判断（0–255）；离水 darkReach 米内比 darkCut 暗的也算水；
  *          close 为补小洞的半径（米）；池底在水面下挖 bedDepth，岸坡宽约 bank 米；
  *          水面高度 = 原池面高度的平滑（半径 smooth 米）再降 drop；原高度比水面高出 surfaceTol 以上的不挖（横跨池塘的石脊）
@@ -55,6 +58,7 @@ const RULES = {
     reach: 160,
     paintRes: 2048,
     paintFade: 1.5,
+    repaint: { 55: { mesh: '8', at: [0.3, 0.72] } },
     water: { blueOverGreen: [12, 28], redOverGreen: 6, darkCut: 0.09, darkReach: 0.8, band: 0.6, close: 0.4, bedDepth: 0.55, shore: 0.2, bank: 0.9, smooth: 0.6, surfaceTol: 0.08, drop: 0.03 },
     far: {
       blend: 12, rise: 4, riseStart: 20, riseEnd: 110, hills: 2.5,
@@ -204,6 +208,46 @@ function topHit(x, z) {
   const hits = ray.intersectObjects(sources, false)
   return hits[0] ?? null
 }
+const sourceByName = new Map(sources.map((m) => [m.name, m]))
+
+/** 世界 xz → uv 的线性拟合（最小二乘）：u = a·x + b·z + c，v 同理 */
+function fitUV(m) {
+  const pos = m.geometry.getAttribute('position')
+  const uv = m.geometry.getAttribute('uv')
+  const N = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+  const ru = [0, 0, 0]
+  const rv = [0, 0, 0]
+  for (let i = 0; i < pos.count; i++) {
+    const r = [pos.getX(i), pos.getZ(i), 1]
+    for (let a = 0; a < 3; a++) {
+      for (let b = 0; b < 3; b++) N[a * 3 + b] += r[a] * r[b]
+      ru[a] += r[a] * uv.getX(i)
+      rv[a] += r[a] * uv.getY(i)
+    }
+  }
+  const M = new Matrix4().set(N[0], N[1], N[2], 0, N[3], N[4], N[5], 0, N[6], N[7], N[8], 0, 0, 0, 0, 1).invert().elements
+  // elements 是列主序；只用左上 3×3
+  const solve = (rhs) => [0, 1, 2].map((r) => M[r] * rhs[0] + M[4 + r] * rhs[1] + M[8 + r] * rhs[2])
+  return { u: solve(ru), v: solve(rv) }
+}
+
+/** repaint 规则展开：源 mesh 名 → 取色函数 (x, z) → rgb */
+const repaints = new Map()
+for (const [from, rule] of Object.entries(R.repaint ?? {})) {
+  const src = sourceByName.get(from)
+  const target = sourceByName.get(rule.mesh)
+  const tex = textures.get(rule.mesh)
+  if (!src || !target || !tex) {
+    console.warn(`  ⚠ repaint ${from} → ${rule.mesh}：找不到 mesh 或贴图，跳过`)
+    continue
+  }
+  src.geometry.computeBoundingBox()
+  const c = src.geometry.boundingBox.getCenter(new Vector3())
+  const { u, v } = fitUV(target)
+  repaints.set(from, (x, z) =>
+    sampleTexture(tex, rule.at[0] + u[0] * (x - c.x) + u[1] * (z - c.z), rule.at[1] + v[0] * (x - c.x) + v[1] * (z - c.z)),
+  )
+}
 
 function sampleTexture(t, u, v) {
   // glTF 的 uv 原点在左上，与图像行序一致；双线性
@@ -239,18 +283,29 @@ const pix = bw / PW
 const paint = new Float32Array(PW * PH * 3)
 const cover = new Float32Array(PW * PH)
 const height = new Float32Array(PW * PH)
+// 输出的手绘贴图：在 paint 的基础上按 repaint 换色（paint 本身保持原样，水域按原贴图判定）
+const paintOut = new Float32Array(PW * PH * 3)
+let repainted = 0
 for (let j = 0; j < PH; j++) {
   for (let i = 0; i < PW; i++) {
-    const hit = topHit(box.x0 + ((i + 0.5) / PW) * bw, box.z0 + ((j + 0.5) / PH) * bh)
+    const x = box.x0 + ((i + 0.5) / PW) * bw
+    const z = box.z0 + ((j + 0.5) / PH) * bh
+    const hit = topHit(x, z)
     if (!hit) continue
     const k = j * PW + i
     cover[k] = 1
     height[k] = hit.point.y
     const t = textures.get(hit.object.name)
     if (t && hit.uv) paint.set(sampleTexture(t, hit.uv.x, hit.uv.y), k * 3)
+    paintOut.set(paint.subarray(k * 3, k * 3 + 3), k * 3)
+    const repaint = repaints.get(hit.object.name)
+    if (repaint) {
+      paintOut.set(repaint(x, z), k * 3)
+      repainted++
+    }
   }
 }
-log(`俯视烘焙 ${PW}×${PH}（${(pix * 100).toFixed(1)}cm/像素）`)
+log(`俯视烘焙 ${PW}×${PH}（${(pix * 100).toFixed(1)}cm/像素）${repainted ? `，换色 ${repainted} 像素` : ''}`)
 
 // ---------- 3. 水域：按贴图颜色找池塘，定水位 ----------
 // 池塘是紫色（蓝、红都明显高于绿）；草地哪怕偏蓝也是绿通道占优，按「蓝 − 绿」「红 − 绿」判断比颜色距离稳
@@ -790,9 +845,9 @@ function pushPull(rgb, alpha, w, h) {
     }
   }
 }
-pushPull(paint, cover.slice(), PW, PH)
+pushPull(paintOut, cover.slice(), PW, PH)
 const paintRGB = Buffer.alloc(PW * PH * 3)
-for (let k = 0; k < PW * PH * 3; k++) paintRGB[k] = Math.round(clamp(paint[k], 0, 255))
+for (let k = 0; k < PW * PH * 3; k++) paintRGB[k] = Math.round(clamp(paintOut[k], 0, 255))
 const paintJpg = await sharp(paintRGB, { raw: { width: PW, height: PH, channels: 3 } }).jpeg({ quality: 92 }).toBuffer()
 log(`手绘贴图 ${PW}×${PH}`)
 

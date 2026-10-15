@@ -7,6 +7,7 @@ import { AssetModel } from '../scene/AssetModel'
 import { PlaceholderModel } from '../scene/PlaceholderModel'
 import { useEndingUi } from './useEndingUi'
 import { flatteningQuaternion, relativeMatrix } from './flatten'
+import { velvetSurface } from './FrameModel'
 import { segment } from './reveal'
 import type { ThreeEvent } from '@react-three/fiber'
 
@@ -15,6 +16,8 @@ const part = new Box3()
 const size = new Vector3()
 const center = new Vector3()
 const rel = new Matrix4()
+/** 标本背面离绒布表面的最小距离（标本盒单位） */
+const VELVET_GAP = 0.01
 
 /** 在 root 自身局部空间里的包围盒（不受父级旋转缩放影响） */
 function localBounds(root: Group, out: Box3) {
@@ -91,10 +94,12 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
     if (!g || !material) return
     const p = segment(reveal.boxDuration * 0.5 + index * reveal.specimenStagger, reveal.specimenDuration)
     const bob = Math.sin(state.clock.elapsedTime * floatSpeed * Math.PI * 2 + index * 2.1) * floatAmplitude * p
+    // 落位深度不低于绒布表面（各画框背板深浅不一，薄的标本会被绒布盖住）
+    const z = Number.isFinite(velvetSurface.z) ? Math.max(position[2], velvetSurface.z + VELVET_GAP) : position[2]
     g.position.set(
       position[0] + reveal.specimenFrom[0] * (1 - p),
       position[1] + reveal.specimenFrom[1] * (1 - p) + bob,
-      position[2] + reveal.specimenFrom[2] * (1 - p),
+      z + reveal.specimenFrom[2] * (1 - p),
     )
     material.emissiveIntensity = useEndingUi.getState().hoveredId === asset?.id ? hoverEmissive : emissiveIntensity
     for (const m of mats.current) {
@@ -109,11 +114,11 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
   // z 把背面贴在落位点上（像钉在背板上的标本，厚的只往前凸，不会穿进背板）
   useLayoutEffect(() => {
     const g = fit.current
-    // 摊平（占位几何体不转）
+    // 摊平（占位几何体、upright 的资产不转）
     const f = flat.current
     if (f) {
       f.quaternion.identity()
-      if (!placeholder && loaded > 0) f.quaternion.copy(flatteningQuaternion(f))
+      if (!placeholder && loaded > 0 && asset?.specimenPose !== 'upright') f.quaternion.copy(flatteningQuaternion(f))
     }
     if (!g || !asset) return
     g.scale.setScalar(1)

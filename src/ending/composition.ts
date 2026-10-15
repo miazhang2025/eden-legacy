@@ -1,13 +1,10 @@
 import type { CompositionRole, EndingConfig, SceneId, Vec3 } from '../config/schema'
-import { getAsset, type Category, type CollectableAssetDef } from '../data/assets'
+import { getAsset, type CollectableAssetDef } from '../data/assets'
 
 // 标本盒构图：三件标本里挑一件做主体，另两件做点缀，按画框尺寸算出每件的落位点 / 可占区域 / 旋转。
 // 具体「装进区域」的缩放在 SpecimenSlot 里按模型包围盒完成。
 
 export type RoleName = 'heroRole' | 'accentNear' | 'accentFar'
-
-/** hero = auto 时的主体优先级：越靠前越适合做视觉中心 */
-export const HERO_RANK: Category[] = ['butterfly', 'shell', 'flower', 'plant', 'fish', 'mineral']
 
 const SCENES: SceneId[] = ['cave', 'ocean', 'garden']
 const DEG = Math.PI / 180
@@ -37,16 +34,16 @@ export function hash01(s: string, salt: number): number {
 export const isMirrored = (comp: EndingConfig['composition'], seed: string) =>
   comp.mirror === 'on' || (comp.mirror === 'auto' && hash01(seed, 0) < 0.5)
 
+/** hero = auto：三件里 heroWeight 最高的做主体（同分取场景顺序靠前的） */
 function pickHero(selections: Record<SceneId, string | null>, choice: EndingConfig['composition']['hero']): SceneId {
   if (choice !== 'auto' && selections[choice]) return choice
   let best: SceneId = 'garden'
-  let bestRank = Infinity
+  let bestWeight = -Infinity
   for (const scene of SCENES) {
-    const cat = getAsset(selections[scene])?.category
-    const rank = cat ? HERO_RANK.indexOf(cat) : -1
-    if (rank >= 0 && rank < bestRank) {
+    const asset = getAsset(selections[scene])
+    if (asset && asset.heroWeight > bestWeight) {
       best = scene
-      bestRank = rank
+      bestWeight = asset.heroWeight
     }
   }
   return best

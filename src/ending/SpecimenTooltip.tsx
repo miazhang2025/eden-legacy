@@ -1,3 +1,4 @@
+import { copy } from '../data/copy'
 import { assetDesc, assetName, assetSubname, getAsset } from '../data/assets'
 import { useEndingUi } from './useEndingUi'
 
@@ -12,12 +13,13 @@ export function SpecimenTooltip() {
       style={{ left: x, top: y }}
       aria-hidden={!visible}
     >
+      <div className="specimen-tooltip__bar">{copy('card.title')}</div>
       {asset && (
-        <>
+        <div className="specimen-tooltip__body">
           <strong>{assetName(asset)}</strong>
           {assetSubname(asset) && <small>{assetSubname(asset)}</small>}
           <span>{assetDesc(asset)}</span>
-        </>
+        </div>
       )}
     </div>
   )

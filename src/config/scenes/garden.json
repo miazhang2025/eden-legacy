@@ -70,9 +70,9 @@
       "color": "#f6f8de",
       "intensity": 1.09,
       "position": [
-        20,
-        20,
-        100
+        60,
+        90,
+        40
       ]
     },
     "points": []
@@ -215,6 +215,7 @@
     "refractionStrength": 0,
     "foamWidth": 0.35,
     "foamColor": "#f4fbff",
+    "shoreFade": 0,
     "causticsIntensity": 0.5,
     "causticsScale": 0.35,
     "causticsSpeed": 0.6,

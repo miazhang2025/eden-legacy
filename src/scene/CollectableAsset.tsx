@@ -11,19 +11,12 @@ import { PlaceholderModel } from './PlaceholderModel'
 import { dampFactor } from './rig'
 
 /**
- * 真实模型的自发光：自发光贴图直接用 base 贴图（白色 × 贴图 = 按自己的颜色发光），没有贴图的用底色。
+ * 真实模型的自发光：emissive 设成白色，着色器里再乘上（调色后的）底色 = 按自己的颜色发光（见 materials/specimenLook.ts）。
  * 只改 AssetModel 给的每实例材质副本，不影响结尾标本盒里同一个模型。
  */
 function applyBaseColorGlow(m: Material) {
   const std = m as MeshStandardMaterial
-  if (!std.emissive) return
-  if (std.map) {
-    std.emissiveMap = std.map
-    std.emissive.set('#ffffff')
-  } else {
-    std.emissive.copy(std.color)
-  }
-  std.needsUpdate = true
+  if (std.emissive) std.emissive.set('#ffffff')
 }
 
 export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
@@ -113,7 +106,7 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     }
 
     emissive.current = MathUtils.lerp(emissive.current, targetEmissive, dampFactor(f.emissiveDamping, dt))
-    const glow = placeholder ? emissive.current : f.assetSelfGlow + emissive.current * f.assetGlowGain
+    const glow = placeholder ? emissive.current : f.assetSelfGlow + (def.selfGlow ?? 0) + emissive.current * f.assetGlowGain
     for (const m of mats.current) {
       if ('emissiveIntensity' in m) (m as MeshStandardMaterial).emissiveIntensity = glow
       m.opacity = opacity

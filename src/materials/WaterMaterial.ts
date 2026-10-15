@@ -11,7 +11,7 @@ import {
   Vector2,
   Vector4,
 } from 'three'
-import { terrainHeight } from '../scene/collision'
+import { waterBedHeight, waterBedTargets } from '../scene/collision'
 import { createCSM, type EdenCSM } from './csm'
 import { shared } from './uniforms'
 import noise from './chunks/noise.glsl?raw'
@@ -47,6 +47,7 @@ export function createWaterUniforms() {
     uFoamWidth: { value: 0.3 },
     uFoamColor: { value: new Color() },
     uUseFoam: { value: 0 },
+    uShoreFade: { value: 0 },
     uOpacity: { value: 0.85 },
     uDepthMap: { value: null as Texture | null },
     /** 高度图覆盖范围：xy = 最小 x/z，zw = 边长 */
@@ -137,6 +138,7 @@ const fragmentShader = /* glsl */ `
   uniform float uFoamWidth;
   uniform vec3 uFoamColor;
   uniform float uUseFoam;
+  uniform float uShoreFade;
   uniform float uOpacity;
   uniform sampler2D uDepthMap;
   uniform vec4 uDepthBounds;
@@ -179,7 +181,10 @@ const fragmentShader = /* glsl */ `
       foam = (1.0 - smoothstep(0.0, uFoamWidth, depth)) * (0.55 + 0.45 * edenNoise(vEdenWaterWorld.xz * 3.0 + flow * 4.0));
       col = mix(col, uFoamColor, foam);
     }
-    csm_DiffuseColor = vec4(col, mix(uOpacity, 1.0, foam));
+    // 岸边渐隐：越浅越透明，岸线由水深决定（模糊过的水深图是连续的），不再是地形多边形与水平面硬切出的锯齿
+    // 各档位都开（只多一次水深采样）；没有水深数据时 uShoreFade = 0
+    float shore = uShoreFade > 0.0 ? smoothstep(0.0, uShoreFade, depth) : 1.0;
+    csm_DiffuseColor = vec4(col, mix(uOpacity, 1.0, foam) * shore);
 
     vec3 V = normalize(cameraPosition - vEdenWaterWorld);
     float fresnel = pow(1.0 - max(dot(nW, V), 0.0), uFresnelPower);
@@ -197,7 +202,7 @@ export function createWaterMaterial(uniforms: WaterUniforms): EdenCSM {
     vertexShader,
     fragmentShader,
     uniforms: { uTime: shared.uTime, ...uniforms },
-    cacheKey: 'eden-water-v2',
+    cacheKey: 'eden-water-v3',
   })
   m.__edenRole = 'water'
   return m
@@ -213,25 +218,59 @@ export interface DepthMap {
   bounds: [number, number, number, number]
 }
 
+/** 水面上方多高以内的地形算「岸」（深度 0）；不从天上打射线，免得打到洞顶 */
+const SHORE_PROBE = 1.2
+/** 烘完后的模糊半径（像素）：碰撞体是一块块三角面，逐像素的命中 / 未命中会在岸边烘出锯齿，模糊成连续过渡 */
+const DEPTH_BLUR = 3
+
+/** 可分离盒式模糊（原地，横竖各一遍） */
+function boxBlur(src: Float32Array, w: number, h: number, r: number) {
+  const tmp = new Float32Array(src.length)
+  const n = 2 * r + 1
+  for (let j = 0; j < h; j++) {
+    for (let i = 0; i < w; i++) {
+      let s = 0
+      for (let k = -r; k <= r; k++) s += src[j * w + Math.min(w - 1, Math.max(0, i + k))]
+      tmp[j * w + i] = s / n
+    }
+  }
+  for (let j = 0; j < h; j++) {
+    for (let i = 0; i < w; i++) {
+      let s = 0
+      for (let k = -r; k <= r; k++) s += tmp[Math.min(h - 1, Math.max(0, j + k)) * w + i]
+      src[j * w + i] = s / n
+    }
+  }
+}
+
 /**
- * 从碰撞体烘水深图（一次性）：在水面高度向下发射线，R = 深度（米，半精度浮点）；
- * 水面以下没有地形（如 ocean 的浮岛之间）记为最大深度。
+ * 烘水深图（一次性，水底见 collision.ts 的 waterBedTargets：渲染模型的地形 mesh，没有时用碰撞体）：在水面高度向下发射线，R = 深度（米，半精度浮点）。
+ * - 地形高出水面（岸上）：射线起点在地形下面打不到，单独向上探一小段，命中记为深度 0
+ *   （以前记成最大深度，岸边一圈「0 / 最大深度」逐像素交错，泡沫和深浅色烘成马赛克）
+ * - 水面以下没有地形（如 ocean 的浮岛之间）记为最大深度
+ * 烘完模糊两遍，深浅过渡连续。
  * 只烘 area（水面与场景边界的交集）：水面往往比能走到的范围大得多，烘整片会把分辨率浪费在看不到的地方。
  */
 export function bakeDepthMap(level: number, area: [number, number, number, number]): DepthMap {
   const [x0, z0, w, h] = area
   const resX = Math.max(2, Math.min(DEPTH_MAX_RES, Math.ceil(w / DEPTH_TEXEL)))
   const resZ = Math.max(2, Math.min(DEPTH_MAX_RES, Math.ceil(h / DEPTH_TEXEL)))
-  const data = new Uint16Array(resX * resZ)
+  const depths = new Float32Array(resX * resZ)
+  const beds = waterBedTargets()
   for (let j = 0; j < resZ; j++) {
     for (let i = 0; i < resX; i++) {
       const x = x0 + ((i + 0.5) / resX) * w
       const z = z0 + ((j + 0.5) / resZ) * h
-      const g = terrainHeight(x, z, level + 0.01, MAX_DEPTH)
-      const depth = g === null ? MAX_DEPTH : Math.max(0, level - g)
-      data[j * resX + i] = DataUtils.toHalfFloat(depth / MAX_DEPTH)
+      const g = waterBedHeight(beds, x, z, level + 0.01, MAX_DEPTH)
+      let depth = g === null ? MAX_DEPTH : Math.max(0, level - g)
+      if (g === null && waterBedHeight(beds, x, z, level + SHORE_PROBE, SHORE_PROBE) !== null) depth = 0
+      depths[j * resX + i] = depth
     }
   }
+  boxBlur(depths, resX, resZ, DEPTH_BLUR)
+  boxBlur(depths, resX, resZ, DEPTH_BLUR)
+  const data = new Uint16Array(resX * resZ)
+  for (let k = 0; k < data.length; k++) data[k] = DataUtils.toHalfFloat(depths[k] / MAX_DEPTH)
   const texture = new DataTexture(data, resX, resZ, RedFormat, HalfFloatType)
   texture.magFilter = LinearFilter
   texture.minFilter = LinearFilter

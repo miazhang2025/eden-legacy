@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useAnimations, useGLTF } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import { AnimationMixer, Box3, Mesh, SkinnedMesh, Vector3, type AnimationClip, type Group, type Material, type Object3D } from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { CollectableAssetDef } from '../data/assets'
+import { patchSpecimenLook, updateSpecimenUniforms } from '../materials/specimenLook'
+import { getGlobalCfg } from '../state/useConfigStore'
 import { DRACO_PATH, url, useKTX2Extension } from './EnvModel'
 
 const NO_CLIPS: AnimationClip[] = []
@@ -66,7 +69,7 @@ function poseSpread(root: Object3D, clips: AnimationClip[]) {
 }
 
 /**
- * 真实资产模型（npm run assets 的输出）：材质与贴图沿用资产自带的，不做任何改动。
+ * 真实资产模型（npm run assets 的输出）：材质与贴图沿用资产自带的，只叠一层标本影棚光（materials/specimenLook.ts）。
  * 克隆（带骨骼的用 SkeletonUtils）→ 每个实例一份材质副本（只为淡入淡出时单独改透明度）→
  * 包围盒居中、最长边缩放到 def.size 米（与占位几何体同一尺度）→ 循环播放模型自带的动画。
  * pose = spread：不播动画，停在摊得最开的一帧（标本盒里的蝴蝶展翅）。
@@ -91,6 +94,8 @@ export function AssetModel({
       let c = cache.get(m)
       if (!c) {
         c = m.clone()
+        // 标本影棚光：场景里和标本盒里同一套着色，颜色接近效果图
+        patchSpecimenLook(c, def.specimenGrade)
         cache.set(m, c)
         mats.push(c)
       }
@@ -116,6 +121,9 @@ export function AssetModel({
     onMaterials(materials)
     return () => materials.forEach((m) => m.dispose())
   }, [materials, onMaterials])
+
+  // 影棚光参数是全局共享的 uniform，每帧同步（曝光随场景配置变化，look dev 面板可调）
+  useFrame(({ gl }) => updateSpecimenUniforms(getGlobalCfg().specimenLook, gl.toneMappingExposure))
 
   const animRoot = useRef<Group>(null)
   const { actions } = useAnimations(pose === 'spread' ? NO_CLIPS : animations, animRoot)

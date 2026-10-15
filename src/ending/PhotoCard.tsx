@@ -39,7 +39,10 @@ export function PhotoCard() {
   return (
     <div className="photo-card" role="dialog" aria-modal="true" aria-label={copy('ending.photo.title')} onClick={close}>
       <figure key={photo.url} className="photo-card__paper" onClick={(e) => e.stopPropagation()}>
-        <img className="photo-card__image" src={photo.url} alt={copy('ending.photo.title')} draggable={false} />
+        {/* 蕾丝花边相框（参考图里白色蕾丝边框） */}
+        <div className="photo-card__lace">
+          <img className="photo-card__image" src={photo.url} alt={copy('ending.photo.title')} draggable={false} />
+        </div>
         <figcaption className="photo-card__actions">
           <button className="btn" onClick={close}>
             {copy('ending.photo.close')}

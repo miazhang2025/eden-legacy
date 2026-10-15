@@ -380,6 +380,8 @@ export interface WaterConfig {
   refractionStrength: number
   foamWidth: number
   foamColor: string
+  /** 岸边渐隐：水深小于该值（米）时水面逐渐透明，岸线不再是地形多边形硬切出来的锯齿；0 = 关 */
+  shoreFade: number
   causticsIntensity: number
   causticsScale: number
   causticsSpeed: number
@@ -712,6 +714,20 @@ export interface EndingConfig {
     models: FrameModelConfig[]
     /** model 模式用哪个：-1 = 按组合 id 随机（同一组合每次一样） */
     modelIndex: number
+    /** 内框里铺的绒布（像标本盒的黑绒衬底）：画框模型加载后自动量出内框椭圆与背板深度，铺在背板前 */
+    velvet: {
+      enabled: boolean
+      color: string
+      /** 掠射角的绒毛光泽 */
+      sheenColor: string
+      sheen: number
+      /** 绒毛颗粒的明暗起伏（0 = 纯色） */
+      grain: number
+      /** 比量出的内框再大多少（标本盒单位），边缘藏进画框里 */
+      margin: number
+      /** 离背板多远（标本盒单位） */
+      offset: number
+    }
   }
   /** 标本盒里的装饰花草（npm run decor 从三个场景拆出来的），点缀用，不抢标本 */
   decor: {
@@ -727,7 +743,7 @@ export interface EndingConfig {
   }
   /**
    * 三件标本的构图：一件主体 + 两件点缀，全部按画框尺寸自动算位置 / 大小。
-   * hero = auto 时按类别优先级挑主体（见 data/specimenBoxes.ts HERO_RANK），组合补丁可指定。
+   * hero = auto 时按资产的 heroWeight 挑主体（见 data/assets.ts），组合补丁可指定。
    */
   composition: {
     hero: HeroChoice
@@ -859,6 +875,28 @@ export interface GlobalConfig {
       /** 进入场景后多少秒开始监控（避开加载抖动） */
       warmup: number
     }
+  }
+  /**
+   * 交互资产（场景里的 4 件 + 结尾标本盒）的「标本影棚光」：固定在镜头空间的中性主光 / 补光 / 轮廓光，
+   * 抵消场景曝光后按 mix 混进原光照，颜色接近效果图，场景和标本盒里一致（见 materials/specimenLook.ts）
+   */
+  specimenLook: {
+    enabled: boolean
+    /** 0 = 完全用场景光照，1 = 完全用影棚光 */
+    mix: number
+    /** 影棚光整体亮度 */
+    gain: number
+    ambient: number
+    key: number
+    fill: number
+    rim: number
+    /** 高光（按材质光滑度） */
+    spec: number
+    /** 影棚光的颜色（主光暖一点、补光冷一点） */
+    keyColor: string
+    fillColor: string
+    /** 饱和度补偿（ACES 会把颜色压灰） */
+    saturation: number
   }
 }
 
@@ -1275,6 +1313,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     refractionStrength: num(0, 1, 0.01),
     foamWidth: num(0, 3, 0.01),
     foamColor: color(),
+    shoreFade: num(0, 2, 0.01, 'shoreFade（岸边渐隐 m）', '水越浅越透明，柔化岸线；0 = 关'),
     causticsIntensity: num(0, 3, 0.01),
     causticsScale: num(0.01, 2, 0.01),
     causticsSpeed: num(0, 3, 0.01),
@@ -1541,6 +1580,16 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
       },
     },
     modelIndex: num(-1, 9, 1, 'modelIndex', '-1 = 按组合随机'),
+    velvet: {
+      _label: '绒布衬底',
+      enabled: bool('enabled', '画框模型内框里铺深色绒布'),
+      color: color(),
+      sheenColor: color('sheenColor（绒毛光泽）'),
+      sheen: num(0, 1, 0.01),
+      grain: num(0, 1, 0.01, 'grain（颗粒）'),
+      margin: num(0, 0.5, 0.01, 'margin', '比内框大多少，边缘藏进画框'),
+      offset: num(0, 0.2, 0.001, 'offset', '离背板多远'),
+    },
   },
   decor: {
     _label: '装饰花草',
@@ -1689,5 +1738,19 @@ export const GLOBAL_SCHEMA: SchemaFor<GlobalConfig> = {
       window: seconds(10),
       warmup: seconds(10),
     },
+  },
+  specimenLook: {
+    _label: '交互资产影棚光',
+    enabled: bool('enabled', '场景里与标本盒里的交互资产用统一的影棚光，颜色接近效果图'),
+    mix: num(0, 1, 0.01, 'mix', '0 = 场景光照，1 = 影棚光'),
+    gain: num(0, 3, 0.01),
+    ambient: num(0, 2, 0.01),
+    key: num(0, 2, 0.01),
+    fill: num(0, 2, 0.01),
+    rim: num(0, 2, 0.01),
+    spec: num(0, 2, 0.01),
+    keyColor: color(),
+    fillColor: color(),
+    saturation: num(0, 2, 0.01, 'saturation', '饱和度补偿：ACES 色调映射会把颜色压灰'),
   },
 }

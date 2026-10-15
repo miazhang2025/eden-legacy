@@ -4,6 +4,7 @@ import { AudioBus } from '../audio/AudioBus'
 import { copy } from '../data/copy'
 import type { BoxResult } from '../data/specimenBoxes'
 import { getActiveCanvas } from '../scene/activeCanvas'
+import { useLangStore } from '../state/useLangStore'
 import { useEndingUi } from './useEndingUi'
 
 // 照片导出（spec §8.4）：
@@ -23,6 +24,8 @@ export interface Photo {
 }
 
 const FONT_DISPLAY = "'Songti SC', 'STSong', 'Noto Serif SC', 'SimSun', serif"
+/** 英文标题用页面上同一款花体（结尾页已加载过） */
+const FONT_SCRIPT = "'Pinyon Script', 'Songti SC', serif"
 const FONT_BODY = "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif"
 
 const url = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
@@ -45,17 +48,18 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
 /** 不能出现在行首的标点：超宽时也挂在上一行末尾 */
 const NO_LINE_START = new Set('，。、；：？！）」』》”’…—,.;:?!)')
 
-/** 按字符换行（中文没有空格分词） */
+/** 换行：英文按单词（连同后面的空格算一个单位），中文按字符（没有空格分词） */
 function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const tokens = text.match(/[\p{Script=Latin}\d'’-]+\s*|\s+|./gu) ?? []
   const lines: string[] = []
   let line = ''
-  for (const ch of text) {
-    if (ctx.measureText(line + ch).width > maxWidth && line && !NO_LINE_START.has(ch)) {
-      lines.push(line)
-      line = ch
-    } else line += ch
+  for (const t of tokens) {
+    if (ctx.measureText((line + t).trimEnd()).width > maxWidth && line.trim() && !NO_LINE_START.has(t[0])) {
+      lines.push(line.trimEnd())
+      line = t.trimStart()
+    } else line += t
   }
-  if (line) lines.push(line)
+  if (line.trim()) lines.push(line.trimEnd())
   return lines
 }
 
@@ -137,7 +141,7 @@ export async function exportPhoto(box: BoxResult, photo: EndingConfig['photo']):
       ctx.font = `${descPx}px ${FONT_BODY}`
       descLines = wrap(ctx, box.description, shot.width * 0.8)
     }
-    const textHeight = photo.includeText ? gap + titlePx * 1.3 + descLines.length * descPx * 1.7 : 0
+    const textHeight = photo.includeText ? gap + titlePx * 1.7 + descLines.length * descPx * 1.7 : 0
     out.width = Math.round(width)
     out.height = Math.round(margin + shot.height + textHeight + margin)
 
@@ -158,7 +162,7 @@ export async function exportPhoto(box: BoxResult, photo: EndingConfig['photo']):
       ctx.letterSpacing = `${brandPx * 0.4}px`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      const text = copy('app.brand')
+      const text = `✦  ${copy('app.brand')}  ✦`
       const w = ctx.measureText(text).width + brandPx * 2
       const y = out.height - margin / 2
       ctx.fillStyle = photo.background
@@ -173,9 +177,13 @@ export async function exportPhoto(box: BoxResult, photo: EndingConfig['photo']):
       ctx.textBaseline = 'top'
       let y = margin + shot.height + gap
       ctx.fillStyle = photo.textColor
-      ctx.font = `${titlePx}px ${FONT_DISPLAY}`
+      const zh = useLangStore.getState().lang === 'zh'
+      ctx.font = zh ? `${titlePx}px ${FONT_DISPLAY}` : `${titlePx * 1.3}px ${FONT_SCRIPT}`
+      ctx.shadowColor = photo.textColor
+      ctx.shadowBlur = titlePx * 0.35
       ctx.fillText(box.name, out.width / 2, y)
-      y += titlePx * 1.3
+      ctx.shadowBlur = 0
+      y += titlePx * 1.7
       ctx.fillStyle = photo.descColor
       ctx.font = `${descPx}px ${FONT_BODY}`
       for (const line of descLines) {

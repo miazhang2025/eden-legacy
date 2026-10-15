@@ -8,7 +8,7 @@ import { isTouchMode } from '../input/useInput'
 import { MAX_DEPTH, bakeDepthMap, createWaterMaterial, createWaterUniforms } from '../materials/WaterMaterial'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
 import { capQuality, useTier } from '../state/useQualityStore'
-import { hasCollider, setWalkPlane } from './collision'
+import { getWaterBedVersion, hasCollider, setWalkPlane } from './collision'
 import { url, useEnvTransform } from './EnvModel'
 import { LAYER_VEGETATION } from './envMaterials'
 
@@ -124,6 +124,8 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
 
   // 水深图（只有方形平面用）：碰撞体就绪后烘一次，只烘水面与场景边界（外扩一点）的交集；范围 / 高度变化时重烘
   const [colliderReady, setColliderReady] = useState(hasCollider)
+  // 水底 mesh（渲染模型的地形）登记 / 变化时重烘
+  const [bedVersion, setBedVersion] = useState(getWaterBedVersion)
   const [cx, , cz] = w.center
   const [bx0, , bz0] = useSceneCfg((c) => c.bounds.min)
   const [bx1, , bz1] = useSceneCfg((c) => c.bounds.max)
@@ -136,7 +138,7 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
     const z1 = Math.min(cz + half, bz1 + DEPTH_PAD)
     if (x1 <= x0 || z1 <= z0) return null
     return bakeDepthMap(w.level, [x0, z0, x1 - x0, z1 - z0])
-  }, [vertexDepth, colliderReady, w.level, cx, cz, w.size, bx0, bz0, bx1, bz1])
+  }, [vertexDepth, colliderReady, bedVersion, w.level, cx, cz, w.size, bx0, bz0, bx1, bz1])
   useEffect(() => () => depthMap?.texture.dispose(), [depthMap])
   const hasDepth = vertexDepth || depthMap !== null
 
@@ -183,6 +185,7 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
 
   useFrame((state, dt) => {
     if (!colliderReady && hasCollider()) setColliderReady(true)
+    if (bedVersion !== getWaterBedVersion()) setBedVersion(getWaterBedVersion())
     const c = getSceneCfg().water
     const u = uniforms
     u.uShallowColor.value.set(c.shallowColor)
@@ -196,6 +199,7 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
     u.uReflectionIntensity.value = c.reflectionIntensity
     u.uFoamWidth.value = c.foamWidth
     u.uFoamColor.value.set(c.foamColor)
+    u.uShoreFade.value = hasDepth ? c.shoreFade : 0
     u.uOpacity.value = c.opacity
     u.uUseVertexDepth.value = vertexDepth ? 1 : 0
     u.uUseDepthColor.value = quality !== 'low' && hasDepth ? 1 : 0

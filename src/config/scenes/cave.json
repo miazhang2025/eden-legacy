@@ -17,7 +17,7 @@
     "minGroundClearance": 0.4,
     "occlusionPadding": 0.3,
     "minDistance": 0.5,
-    "initialPitch": 0.25
+    "initialPitch": -0.15
   },
   "env": {
     "model": "/models/env/cave.glb",
@@ -39,11 +39,11 @@
     "height": 1.7,
     "color": "#e8e0ff",
     "spawn": [
-      3.19,
+      3.674,
       0,
-      -12.939
+      -10.215
     ],
-    "spawnYaw": 2.9314,
+    "spawnYaw": 2.7814,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
     "groundSmoothing": 0.08,
@@ -217,15 +217,15 @@
   "water": {
     "enabled": true,
     "quality": "high",
-    "level": -0.4000000000000001,
+    "level": -0.7000000000000002,
     "center": [
       -1,
       0,
       6.5
     ],
-    "size": 55,
+    "size": 80,
     "mesh": "",
-    "shallowColor": "#72caca",
+    "shallowColor": "#c2f4f4",
     "deepColor": "#5ecdd7",
     "depthFalloff": 5.4399999999999995,
     "normalScale": 0.36000000000000004,
@@ -240,6 +240,7 @@
     "refractionStrength": 0,
     "foamWidth": 0.35,
     "foamColor": "#f4fbff",
+    "shoreFade": 0.35,
     "causticsIntensity": 0.5,
     "causticsScale": 0.35,
     "causticsSpeed": 0.6,
@@ -1018,16 +1019,16 @@
     {
       "id": "cave_mushroom_02",
       "position": [
-        0.377,
-        0,
-        -7.292
+        0.977,
+        -0.2,
+        -6.992
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 1.22
+      "scale": 0.8999999999999999
     }
   ],
   "flow": {

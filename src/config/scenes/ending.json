@@ -16,7 +16,7 @@
     "autoFrame": true,
     "framePadding": 0.16
   },
-  "background": "#14110d",
+  "background": "#120d12",
   "lights": {
     "ambient": {
       "color": "#fff1dc",
@@ -78,7 +78,16 @@
         ]
       }
     ],
-    "modelIndex": -1
+    "modelIndex": -1,
+    "velvet": {
+      "enabled": true,
+      "color": "#2b2a2d",
+      "sheenColor": "#8a8590",
+      "sheen": 0.8,
+      "grain": 0.35,
+      "margin": 0.08,
+      "offset": 0.004
+    }
   },
   "composition": {
     "hero": "auto",
@@ -175,14 +184,14 @@
   "photo": {
     "scale": 2,
     "margin": 80,
-    "background": "#14110d",
+    "background": "#120d12",
     "borderWidth": 2,
-    "borderColor": "#8a6a2f",
+    "borderColor": "#f3b6d2",
     "includeText": true,
     "titleSize": 44,
     "descSize": 18,
-    "textColor": "#f4efe6",
-    "descColor": "#bfb7aa",
+    "textColor": "#f8bfd8",
+    "descColor": "#e8cfdf",
     "textGap": 40,
     "includeLogo": false,
     "logo": "/2d/logo.png",

@@ -19,8 +19,20 @@ import { useConfigStore, useEndingCfg } from '../state/useConfigStore'
 import { useDebugStore } from '../state/useDebugStore'
 import { useRunStore } from '../state/useRunStore'
 import { useRevealOnMount, useTransition } from '../ui/Transition'
-import { Win } from '../ui/Win'
+import { CameraIcon, DecoField, OrnateFrame, SparkleIcon, type DecoItem } from '../ui/Deco'
 import { EndingGuard } from './SceneGuard'
+
+// 黑底上的粉色闪光（只放在四周，不挡标本盒）：[类型, left%, top%, 尺寸px, 动画延迟s]
+const DECO: DecoItem[] = [
+  ['sparkle', 6, 10, 20, 0],
+  ['sparkle', 30, 18, 12, 1.3],
+  ['sparkle', 70, 12, 16, 0.6],
+  ['sparkle', 93, 22, 22, 2.1],
+  ['star', 88, 64, 14, 1.7],
+  ['sparkle', 26, 84, 16, 0.9],
+  ['sparkle', 74, 90, 12, 2.4],
+  ['sparkle', 4, 62, 14, 1.1],
+]
 
 /** 快门闪光到最亮的时刻（与 styles.css 里 .shutter 动画对应） */
 const SHUTTER_MS = 420
@@ -86,10 +98,16 @@ function EndingInner() {
   return (
     <main className="page ending">
       <header className={`ending__text ${textShown ? 'is-visible' : ''}`}>
-        <Win title={copy('ending.window.title')}>
+        {/* 黑底粉色卷草花框（参考 Be Where Your Feet Are Planted） */}
+        <OrnateFrame className="ending__plate">
+          <p className="ending__label">
+            <SparkleIcon className="ending__label-spark" />
+            {copy('ending.window.title')}
+            <SparkleIcon className="ending__label-spark" />
+          </p>
           <h1 className="ending__name">{box.name}</h1>
           <p className="ending__desc">{box.description}</p>
-        </Win>
+        </OrnateFrame>
       </header>
       <div
         className="ending__stage"
@@ -124,12 +142,14 @@ function EndingInner() {
           disabled={!gl || exporting || photoOpen}
           onClick={() => void takePhoto()}
         >
+          <CameraIcon className="btn__icon" />
           {copy('ending.button.export')}
         </button>
         <button className="btn btn--primary" onClick={restart}>
           {copy('ending.button.restart')}
         </button>
       </footer>
+      <DecoField items={DECO} className={`ending__deco ${textShown ? 'is-visible' : ''}`} />
       <SpecimenTooltip />
       <ShutterFlash />
       <PhotoCard />

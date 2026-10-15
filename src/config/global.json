@@ -61,5 +61,18 @@
       "window": 2,
       "warmup": 3
     }
+  },
+  "specimenLook": {
+    "enabled": true,
+    "mix": 0.85,
+    "gain": 1.05,
+    "ambient": 0.5,
+    "key": 0.6,
+    "fill": 0.25,
+    "rim": 0.2,
+    "spec": 0.3,
+    "keyColor": "#ffffff",
+    "fillColor": "#f4f6ff",
+    "saturation": 1.2
   }
 }

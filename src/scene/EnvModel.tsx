@@ -4,7 +4,8 @@ import { useThree } from '@react-three/fiber'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { Mesh, type Group, type Material, type Object3D, type Texture } from 'three'
 import { useConfigStore, useSceneCfg } from '../state/useConfigStore'
-import { registerCollider } from './collision'
+import { isTerrainName } from '../materials/detail'
+import { registerCollider, registerWaterBed } from './collision'
 import { useEnvMaterials } from './envMaterials'
 
 /** 自托管 Draco 解码器（public/draco），不走外部 CDN */
@@ -92,6 +93,14 @@ export function EnvModel({ path, extras = [] }: { path: string; extras?: string[
   useDisposeOnUnmount(path, scene)
   useEffect(() => () => extras.forEach((p) => useGLTF.clear(url(p))), [extras.join(',')])
   useEnvMaterials(sceneId, scene, { castShadow: (mesh) => !extraMeshes.has(mesh) })
+  // 地形 mesh 登记为水底（烘水深图用）；变换改变时重新登记，保证 matrixWorld 是最新的
+  useLayoutEffect(
+    () =>
+      registerWaterBed(scene, (mesh) =>
+        (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).some((m: Material) => isTerrainName(m.name)),
+      ),
+    [scene, t.scale, t.position, t.rotation[1]],
+  )
   return (
     <group {...t}>
       <primitive object={scene} />

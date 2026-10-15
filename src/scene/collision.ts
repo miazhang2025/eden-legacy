@@ -22,6 +22,48 @@ export function registerCollider(root: Object3D) {
 
 export const hasCollider = () => colliders.length > 0
 
+/**
+ * 水底：渲染模型里的地形 mesh（全精度），只给水深图烘焙用。
+ * 碰撞体减过面、还把小块地面当小物件剔掉了，用它烘出的岸线和实际看到的地形对不上（岸边一块块硬边）。
+ */
+let waterBeds: Mesh[] = []
+let waterBedVersion = 0
+export const getWaterBedVersion = () => waterBedVersion
+
+export function registerWaterBed(root: Object3D, accept: (mesh: Mesh) => boolean) {
+  root.updateWorldMatrix(true, true)
+  const meshes: Mesh[] = []
+  root.traverse((o) => {
+    if (!(o instanceof Mesh) || !accept(o)) return
+    if (!o.geometry.boundsTree) o.geometry.computeBoundsTree()
+    meshes.push(o)
+  })
+  if (!meshes.length) return () => {}
+  waterBeds = [...waterBeds, ...meshes]
+  waterBedVersion++
+  return () => {
+    waterBeds = waterBeds.filter((m) => !meshes.includes(m))
+    waterBedVersion++
+  }
+}
+
+const shown = (o: Object3D | null): boolean => !o || (o.visible && shown(o.parent))
+
+/** 烘水深时用的射线目标：当前显示的水底 mesh；没有登记水底时回落到碰撞体 */
+export function waterBedTargets(): Object3D[] {
+  const beds = waterBeds.filter(shown)
+  return beds.length ? beds : colliders
+}
+
+/** 从 (x, fromY, z) 向下在 targets（见 waterBedTargets）里找水底，maxDist 内未命中返回 null */
+export function waterBedHeight(targets: Object3D[], x: number, z: number, fromY: number, maxDist = Infinity): number | null {
+  origin.set(x, fromY, z)
+  ray.set(origin, DOWN)
+  ray.far = maxDist
+  const hit = ray.intersectObjects(targets, true)[0]
+  return hit ? hit.point.y : null
+}
+
 /** 可行走的水面高度（water.walkable 时由 Water.tsx 设置），null = 水面不能走 */
 let walkPlane: number | null = null
 export function setWalkPlane(level: number | null) {
