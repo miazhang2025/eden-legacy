@@ -98,6 +98,10 @@ function Terrain() {
     .split(',')
     .map((p) => p.trim())
     .filter(Boolean)
+  const extraColliders = (env.extraColliders ?? '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
   const generated = terrain.enabled && terrain.model !== ''
   const collider = generated ? terrain.collider : env.collider
   return (
@@ -109,6 +113,9 @@ function Terrain() {
       {generated && terrain.boundary.enabled && terrain.boundary.map && <BoundaryField map={terrain.boundary.map} />}
       {/* key：切换碰撞体时重新挂载，旧碰撞体先注销 */}
       {collider && <ColliderModel key={collider} path={collider} />}
+      {extraColliders.map((p) => (
+        <ColliderModel key={p} path={p} extra />
+      ))}
     </>
   )
 }

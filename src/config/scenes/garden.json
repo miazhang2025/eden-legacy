@@ -22,7 +22,17 @@
   "env": {
     "model": "/models/env/garden.glb",
     "collider": "/models/colliders/garden.glb",
-    "extras": "",
+    "extras": "/models/env/garden.character.glb",
+    "extraColliders": "/models/colliders/garden.character.glb",
+    "extrasTransform": {
+      "position": [
+        0.9,
+        0,
+        0
+      ],
+      "rotationY": 0,
+      "scale": 1
+    },
     "scale": 1,
     "position": [
       1.36,
@@ -58,13 +68,13 @@
     "type": "linear",
     "color": "#c09bd5",
     "density": 8.673617379884035e-19,
-    "near": 15,
-    "far": 272
+    "near": 11,
+    "far": 234
   },
   "lights": {
     "ambient": {
       "color": "#594379",
-      "intensity": 0.32999999999999996
+      "intensity": 0.42999999999999994
     },
     "directional": {
       "color": "#f6f8de",
@@ -115,11 +125,11 @@
   "environment": {
     "mode": "hdri",
     "hdri": "hdri/qwantani_dusk_2_puresky.hdr",
-    "intensity": 0.54,
+    "intensity": 0.5,
     "rotationY": 0.19999999999999996,
     "background": true,
     "hdriBackground": "hdri/garden_bg.hdr",
-    "backgroundIntensity": 0.8699999999999999,
+    "backgroundIntensity": 0.7599999999999999,
     "sunIntensity": 0
   },
   "shadows": {
@@ -171,6 +181,25 @@
     "fresnelPower": 3,
     "mainMinSize": 1.8,
     "opaqueEnvMapIntensity": 2
+  },
+  "figure": {
+    "enabled": true,
+    "breathAmplitude": 0.06,
+    "breathRate": 0.22,
+    "headSway": 0.05,
+    "headRate": 0.09,
+    "clothAmplitude": 0.03,
+    "clothScale": 0.8,
+    "clothSpeed": 0.25,
+    "blinkInterval": 4.5,
+    "blinkDuration": 0.3,
+    "blinkAngle": 1,
+    "lookInterval": 8,
+    "lookDuration": 4,
+    "lookDistance": 30,
+    "lookMaxAngle": 0.6,
+    "lookEyeAngle": 0.35,
+    "lookSpeed": 2
   },
   "bubble": {
     "centerOpacity": 0.08,
@@ -697,7 +726,7 @@
     "toneMapping": "aces",
     "bloom": {
       "enabled": true,
-      "intensity": 1.3600000000000003,
+      "intensity": 1.8500000000000003,
       "threshold": 0.87,
       "smoothing": 1,
       "radius": 1
@@ -730,8 +759,8 @@
     },
     "ssao": {
       "enabled": false,
-      "intensity": 1.5,
-      "radius": 0.4
+      "intensity": 0.39999999999999997,
+      "radius": 0.010000000000000014
     }
   },
   "materials": {
@@ -875,3 +904,4 @@
     "lookSensitivity": 1.6
   }
 }
+·

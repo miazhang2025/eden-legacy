@@ -4,6 +4,7 @@ import { waterOn } from '../config/schema'
 import { getSceneCfg } from '../state/useConfigStore'
 import { getTier } from '../state/useQualityStore'
 import { updateDetailUniforms } from './detail'
+import { updateFigureUniforms } from './figure'
 import { updatePondUniforms } from './pond'
 import { updatePeakUniforms, updateTerrainUniforms } from './terrain'
 
@@ -147,6 +148,7 @@ export function SharedUniformDriver() {
     shared.uCausticsSpeed.value = water.causticsSpeed
 
     updatePondUniforms(cfg)
+    updateFigureUniforms(cfg)
     updateDetailUniforms(cfg, tier)
     updateTerrainUniforms(cfg)
     updatePeakUniforms(cfg)

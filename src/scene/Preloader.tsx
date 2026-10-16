@@ -42,7 +42,12 @@ function sceneItems(c: SceneConfig): Item[] {
       .filter(Boolean)
     items.push(gltf([c.env.model, ...extras], true))
     const collider = generated ? c.terrain.collider : c.env.collider
-    if (collider) items.push(gltf([collider], false))
+    const extraColliders = (c.env.extraColliders ?? '')
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean)
+    // 碰撞体在场景里各自单独加载（ColliderModel），这里也逐个预加载，缓存 key 才对得上
+    for (const p of [collider, ...extraColliders]) if (p) items.push(gltf([p], false))
   }
   if (generated) {
     items.push(gltf([c.terrain.model], true))

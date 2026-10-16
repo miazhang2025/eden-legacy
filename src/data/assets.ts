@@ -57,7 +57,8 @@ const SEEDS: Seed[] = [
 
   { id: 'garden_flower_01', scene: 'garden', category: 'flower', glowColor: '#ff8ac8', placeholderColor: '#e86aa8', specimenScale: 1, heroWeight: 8, specimenGrade: { saturation: 0.75, brightness: 0.9 } },
   { id: 'garden_flower_02', scene: 'garden', category: 'flower', glowColor: '#fff08a', placeholderColor: '#e8d84a', specimenScale: 1, heroWeight: 9, specimenGrade: { hue: 165, saturation: 0.6, brightness: 1.15 } },
-  { id: 'garden_butterfly_01', scene: 'garden', category: 'butterfly', glowColor: '#8ab8ff', placeholderColor: '#4a6ae8', specimenScale: 1, heroWeight: 10 },
+  // 浅绿翅膀贴图本身很亮，停在白花上会和背景糊成一片：压暗、提饱和，常驻自发光也减一点
+  { id: 'garden_butterfly_01', scene: 'garden', category: 'butterfly', glowColor: '#8ab8ff', placeholderColor: '#4a6ae8', specimenScale: 1, heroWeight: 10, specimenGrade: { saturation: 1.6, brightness: 0.72 }, selfGlow: -0.2 },
   { id: 'garden_butterfly_02', scene: 'garden', category: 'butterfly', glowColor: '#ffc78a', placeholderColor: '#e8984a', specimenScale: 1, heroWeight: 10 },
 ]
 

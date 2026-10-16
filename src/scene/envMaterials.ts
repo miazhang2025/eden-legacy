@@ -8,6 +8,7 @@ import { createCrystalMaterial } from '../materials/CrystalMaterial'
 import { shared } from '../materials/uniforms'
 import { bakeVegetationAttributes, createVegetationMaterial, vegetationVertexShader } from '../materials/VegetationMaterial'
 import { patchCaustics } from '../materials/caustics'
+import { isFigureMaterial, patchFigure } from '../materials/figure'
 import { isTerrainName, patchDetail } from '../materials/detail'
 import { patchPond } from '../materials/pond'
 import { useSceneCfg } from '../state/useConfigStore'
@@ -184,6 +185,8 @@ export function useEnvMaterials(
           if (isTerrainName(c.name)) patchDetail(s)
           // 贴图池塘：只给画有池塘的那张地形材质打补丁（开关由 uniform 控制）
           if (c.name === pondMaterial) patchPond(s)
+          // 场景人物：idle 动画（呼吸 / 头部摆动 / 布料波动，开关由 uniform 控制）
+          if (isFigureMaterial(c.name)) patchFigure(s)
         }
         const visible = !hidden.has(c.name)
         c.meshes.forEach((mesh, i) => assign.push({ mesh, material: c.originals[i], layer: 0, visible }))

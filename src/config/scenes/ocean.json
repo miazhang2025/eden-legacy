@@ -23,6 +23,16 @@
     "model": "/models/env/ocean.glb",
     "collider": "/models/colliders/ocean.glb",
     "extras": "/models/env/bubble.glb",
+    "extraColliders": "",
+    "extrasTransform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotationY": 0,
+      "scale": 1
+    },
     "scale": 1,
     "position": [
       -2.03,
@@ -171,6 +181,25 @@
     "fresnelPower": 3,
     "mainMinSize": 1.8,
     "opaqueEnvMapIntensity": 2
+  },
+  "figure": {
+    "enabled": false,
+    "breathAmplitude": 0.03,
+    "breathRate": 0.22,
+    "headSway": 0.012,
+    "headRate": 0.07,
+    "clothAmplitude": 0.015,
+    "clothScale": 0.8,
+    "clothSpeed": 0.25,
+    "blinkInterval": 4.5,
+    "blinkDuration": 0.3,
+    "blinkAngle": 1,
+    "lookInterval": 8,
+    "lookDuration": 4,
+    "lookDistance": 30,
+    "lookMaxAngle": 0.6,
+    "lookEyeAngle": 0.35,
+    "lookSpeed": 2
   },
   "bubble": {
     "centerOpacity": 0.75,

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "models": "node scripts/optimize-models.mjs",
+    "character": "node scripts/build-character.mjs",
     "assets": "node scripts/optimize-assets.mjs",
     "terrain": "node scripts/build-terrain.mjs",
     "ground": "node scripts/build-ground-textures.mjs",

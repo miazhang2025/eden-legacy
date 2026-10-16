@@ -59,7 +59,11 @@ const RULES = {
     paintRes: 2048,
     paintFade: 1.5,
     repaint: { 55: { mesh: '8', at: [0.3, 0.72] } },
-    water: { blueOverGreen: [12, 28], redOverGreen: 6, darkCut: 0.09, darkReach: 0.8, band: 0.6, close: 0.4, bedDepth: 0.55, shore: 0.2, bank: 0.9, smooth: 0.6, surfaceTol: 0.08, drop: 0.03 },
+    water: {
+      blueOverGreen: [12, 28], redOverGreen: 6, darkCut: 0.09, darkReach: 0.8, band: 0.6, close: 0.4, bedDepth: 0.55, shore: 0.2, bank: 0.9, smooth: 0.6, surfaceTol: 0.08, drop: 0.03,
+      // 强制旱地 [x, z, 半径]（模型局部，米）：中池西北角小半岛里被误判成水的小坑和小点
+      dry: [[0.55, -11.2, 0.95], [-1.24, -11.29, 0.35]],
+    },
     far: {
       blend: 12, rise: 4, riseStart: 20, riseEnd: 110, hills: 2.5,
       mounds: { seed: 7, count: 0, near: 12, far: 75, radius: [9, 20], height: [1.5, 6.5] },
@@ -347,6 +351,20 @@ for (let k = 0; k < PW * PH; k++) {
 const closeSigma = R.water.close / pix / 2
 const dilated = await raw(wetRaw).blur(closeSigma).threshold(64).extractChannel(0).raw().toBuffer()
 const closed = await raw(dilated).blur(closeSigma).threshold(192).extractChannel(0).raw().toBuffer()
+// 强制旱地：贴图里颜色像水、实际不该有水的地方
+for (const [dx, dz, dr] of R.water.dry ?? []) {
+  const i0 = Math.max(0, Math.floor((dx - dr - box.x0) / pix))
+  const i1 = Math.min(PW - 1, Math.ceil((dx + dr - box.x0) / pix))
+  const j0 = Math.max(0, Math.floor(((dz - dr - box.z0) / bh) * PH))
+  const j1 = Math.min(PH - 1, Math.ceil(((dz + dr - box.z0) / bh) * PH))
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const x = box.x0 + (i + 0.5) * pix
+      const z = box.z0 + ((j + 0.5) / PH) * bh
+      if ((x - dx) ** 2 + (z - dz) ** 2 < dr * dr) closed[j * PW + i] = 0
+    }
+  }
+}
 // 再轻微模糊，得到平滑的岸线
 const wetBlur = await raw(closed).blur(Math.max(0.3, R.water.shore / pix / 2)).extractChannel(0).raw().toBuffer()
 const wet = new Float32Array(PW * PH)

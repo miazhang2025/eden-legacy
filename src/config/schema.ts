@@ -10,6 +10,13 @@ export type QualityTier = 'low' | 'mid' | 'high'
 
 export type Vec2 = [number, number]
 export type Vec3 = [number, number, number]
+
+/** 叠加模型变换（env.extrasTransform） */
+export interface ExtrasTransform {
+  position: Vec3
+  rotationY: number
+  scale: number
+}
 export type Vec4 = [number, number, number, number]
 
 export interface SceneConfig {
@@ -45,6 +52,13 @@ export interface SceneConfig {
     collider: string
     /** 叠加模型（逗号分隔），与主模型同一套变换一起加载，不进碰撞体，如海洋的 /models/env/bubble.glb */
     extras: string
+    /** 叠加碰撞体（逗号分隔），与主碰撞体（或生成地形的碰撞体）同时生效，如花园人物 /models/colliders/garden.character.glb */
+    extraColliders: string
+    /**
+     * 叠加模型（及其碰撞体）在自身轴心上的偏移 / 旋转 / 缩放，叠加在美术摆好的位置之上（全 0 / 1 = 原位）。
+     * 轴心是 glb 的顶层节点：build-character 把它烘在人物脚底中心；没烘轴心的叠加模型（如气泡）绕自身节点原点转。
+     */
+    extrasTransform: ExtrasTransform
     scale: number
     position: Vec3
     rotationY: number
@@ -96,6 +110,8 @@ export interface SceneConfig {
   crystal: CrystalConfig
   /** 泡泡（材质角色 bubble，ocean 的气泡） */
   bubble: BubbleConfig
+  /** 场景人物（env.extras 里 npm run character 生成的模型）的 idle 动画：顶点着色器，无物理模拟 */
+  figure: FigureConfig
   water: WaterConfig
   /** 生成地形（npm run terrain）：替换美术地形 + 无边界远景裙边 + 可玩区软边界 */
   terrain: TerrainConfig
@@ -321,6 +337,42 @@ export interface CrystalConfig {
   mainMinSize: number
   /** 不透明降级时的 envMapIntensity（伪装成透明感） */
   opaqueEnvMapIntensity: number
+}
+
+export interface FigureConfig {
+  enabled: boolean
+  /** 呼吸：胸腔沿法线起伏的幅度（模型单位） */
+  breathAmplitude: number
+  /** 呼吸频率（次 / 秒） */
+  breathRate: number
+  /** 头部绕颈部摆动的角度（弧度） */
+  headSway: number
+  /** 头部摆动频率（次 / 秒） */
+  headRate: number
+  /** 布料波动幅度（模型单位，沿法线） */
+  clothAmplitude: number
+  /** 布料波纹密度（越大波纹越细碎） */
+  clothScale: number
+  /** 布料波动速度 */
+  clothSpeed: number
+  /** 平均眨眼间隔（秒），0 = 不眨眼；每次在间隔里随机位置 */
+  blinkInterval: number
+  /** 一次眨眼的时长（秒） */
+  blinkDuration: number
+  /** 闭眼时上眼皮绕眼球转的角度（弧度），不够闭合就调大 */
+  blinkAngle: number
+  /** 平均多久转头看一次观众（秒），0 = 不看；每次在 0.5–1.5 倍之间随机 */
+  lookInterval: number
+  /** 每次看多久（秒），期间观众走动会一直跟着看 */
+  lookDuration: number
+  /** 观众离她多远以内才会看（米） */
+  lookDistance: number
+  /** 头最多转多少（弧度），观众在更偏的位置就只转到这里 */
+  lookMaxAngle: number
+  /** 眼球最多再转多少（弧度） */
+  lookEyeAngle: number
+  /** 转头快慢（越大越快） */
+  lookSpeed: number
 }
 
 export interface BubbleConfig {
@@ -1125,9 +1177,16 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     model: { t: 'text' },
     collider: { t: 'text' },
     extras: { t: 'text', label: 'extras（叠加模型）', hint: '逗号分隔' },
+    extraColliders: { t: 'text', label: 'extras 碰撞体', hint: '逗号分隔；与主碰撞体同时生效' },
     scale: num(0.1, 50, 0.01, 'scale', '模型缩放。碰撞体同步，但资产/出生点/采集区坐标不会跟着缩放'),
     position: vec(0.1),
     rotationY: num(-Math.PI, Math.PI, 0.01),
+    extrasTransform: {
+      _label: '叠加模型变换（人物）',
+      position: vec(0.05, 'position（偏移）'),
+      rotationY: num(-Math.PI, Math.PI, 0.01, 'rotationY', '绕人物脚底中心旋转'),
+      scale: num(0.1, 5, 0.01, 'scale', '以人物脚底中心缩放；碰撞体同步'),
+    },
   },
   character: {
     _label: '角色',
@@ -1272,6 +1331,26 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     fresnelPower: num(0.5, 10, 0.1),
     mainMinSize: num(0, 20, 0.1, 'mainMinSize', '包围盒最长边 ≥ 此值算主体；mid 档只有主体透射'),
     opaqueEnvMapIntensity: intensity(5),
+  },
+  figure: {
+    _label: '场景人物 idle',
+    enabled: bool(),
+    breathAmplitude: num(0, 0.2, 0.001, 'breathAmplitude', '胸腔起伏幅度'),
+    breathRate: num(0.05, 1, 0.01, 'breathRate', '呼吸频率（次/秒）'),
+    headSway: num(0, 0.1, 0.001, 'headSway', '头部摆动角度（弧度），头发 / 头饰跟着动'),
+    headRate: num(0.01, 0.5, 0.01, 'headRate', '头部摆动频率'),
+    clothAmplitude: num(0, 0.1, 0.001, 'clothAmplitude', '布料波动幅度'),
+    clothScale: num(0.1, 5, 0.01, 'clothScale', '波纹密度'),
+    clothSpeed: num(0, 2, 0.01, 'clothSpeed', '波动速度'),
+    blinkInterval: num(0, 15, 0.1, 'blinkInterval', '平均眨眼间隔（秒），0 = 不眨眼'),
+    blinkDuration: num(0.05, 1.5, 0.01, 'blinkDuration', '一次眨眼的时长（秒）'),
+    blinkAngle: num(0, 1.8, 0.01, 'blinkAngle', '闭眼时眼皮转动角度（弧度），眼睛闭不严就调大'),
+    lookInterval: num(0, 30, 0.5, 'lookInterval', '平均多久看一次观众（秒），0 = 不看'),
+    lookDuration: num(0.5, 15, 0.1, 'lookDuration', '每次看多久（秒）'),
+    lookDistance: num(1, 100, 0.5, 'lookDistance', '观众多近才会看（米）'),
+    lookMaxAngle: num(0, 1.2, 0.01, 'lookMaxAngle', '头最多转多少（弧度）'),
+    lookEyeAngle: num(0, 0.8, 0.01, 'lookEyeAngle', '眼球最多再转多少（弧度）'),
+    lookSpeed: num(0.2, 10, 0.1, 'lookSpeed', '转头快慢'),
   },
   bubble: {
     _label: '泡泡 bubble',
