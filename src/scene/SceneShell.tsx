@@ -158,7 +158,8 @@ export function SceneShell({ sceneId }: { sceneId: SceneId }) {
       <Canvas
         dpr={[1, pixelRatioMax]}
         camera={{ fov }}
-        gl={{ antialias: true }}
+        // 场景都开后处理，抗锯齿在 EffectComposer 的离屏 RT 上做（PostFX 按档位设 MSAA），canvas 自带的多重采样白占显存
+        gl={{ antialias: false }}
         shadows
         onCreated={({ camera }) => {
           // 主相机看得到植被层与粒子层（实时反射相机默认只看地形层）

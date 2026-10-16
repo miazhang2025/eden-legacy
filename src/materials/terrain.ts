@@ -30,6 +30,8 @@ export const terrainUniforms = {
   uTerrainMode: { value: 0 },
   uTerrainPaint: { value: null as Texture | null },
   uTerrainPaintGain: { value: 1 },
+  /** painted 时近处法线 / ORM 的梯度放大倍数（2^模糊级数） */
+  uTerrainPaintBlur: { value: 1 },
   uNearAlbedo: near.albedo,
   uNearNormal: near.normal,
   uNearOrm: near.orm,
@@ -81,6 +83,7 @@ export function updateTerrainUniforms(cfg: SceneConfig) {
   const u = terrainUniforms
   u.uTerrainMode.value = t.material === 'painted' ? 1 : 0
   u.uTerrainPaintGain.value = t.paintBrightness
+  u.uTerrainPaintBlur.value = t.material === 'painted' ? 2 ** t.paintNormalBlur : 1
   updateLayer(near, t.near)
   updateLayer(far, t.far)
   u.uTerrainBreakup.value = t.breakup
@@ -96,6 +99,7 @@ const header = /* glsl */ `
 uniform float uTerrainMode;
 uniform sampler2D uTerrainPaint;
 uniform float uTerrainPaintGain;
+uniform float uTerrainPaintBlur;
 uniform sampler2D uNearAlbedo;
 uniform sampler2D uNearNormal;
 uniform sampler2D uNearOrm;
@@ -131,12 +135,13 @@ float edenGroundAOStrength = 0.0;
 struct EdenGround { vec3 albedo; vec3 normal; vec3 orm; };
 
 // 贴图采样都在按像素分支里，梯度必须在分支外算好（textureGrad），否则分支交界处 mip 会乱
-EdenGround edenSampleGround(sampler2D A, sampler2D N, sampler2D O, vec2 uv, vec2 dx, vec2 dy, vec2 uvB, vec2 dxB, vec2 dyB) {
+// blur：法线 / ORM 的梯度放大倍数（> 1 = 取更模糊的 mip）
+EdenGround edenSampleGround(sampler2D A, sampler2D N, sampler2D O, vec2 uv, vec2 dx, vec2 dy, vec2 uvB, vec2 dxB, vec2 dyB, float blur) {
   EdenGround g;
   g.albedo = textureGrad(A, uv, dx, dy).rgb;
   if (uTerrainBreakup > 0.001) g.albedo = mix(g.albedo, textureGrad(A, uvB, dxB, dyB).rgb, uTerrainBreakup * 0.5);
-  g.normal = textureGrad(N, uv, dx, dy).xyz * 2.0 - 1.0;
-  g.orm = textureGrad(O, uv, dx, dy).rgb;
+  g.normal = textureGrad(N, uv, dx * blur, dy * blur).xyz * 2.0 - 1.0;
+  g.orm = textureGrad(O, uv, dx * blur, dy * blur).rgb;
   return g;
 }
 `
@@ -195,7 +200,7 @@ export function patchTerrain(material: Material) {
           g.albedo = vec3(0.0); g.normal = vec3(0.0); g.orm = vec3(0.0);
           float aoS = 0.0, roughS = 0.0, nS = 0.0;
           if (w > 0.001) {
-            EdenGround n = edenSampleGround(uNearAlbedo, uNearNormal, uNearOrm, uvN, dxN, dyN, uvNB, dxNB, dyNB);
+            EdenGround n = edenSampleGround(uNearAlbedo, uNearNormal, uNearOrm, uvN, dxN, dyN, uvNB, dxNB, dyNB, uTerrainPaintBlur);
             n.albedo *= uNearTint;
             // painted：颜色换成原地形手绘贴图
             if (uTerrainMode > 0.5) n.albedo = textureGrad(uTerrainPaint, vEdenTerrainUv, dxP, dyP).rgb * uNearTint * uTerrainPaintGain;
@@ -203,7 +208,7 @@ export function patchTerrain(material: Material) {
             aoS += uNearAO * w; roughS += uNearRough * w; nS += uNearNormalStrength * w;
           }
           if (w < 0.999) {
-            EdenGround f = edenSampleGround(uFarAlbedo, uFarNormal, uFarOrm, uvF, dxF, dyF, uvFB, dxFB, dyFB);
+            EdenGround f = edenSampleGround(uFarAlbedo, uFarNormal, uFarOrm, uvF, dxF, dyF, uvFB, dxFB, dyFB, 1.0);
             float fw = 1.0 - w;
             g.albedo += f.albedo * uFarTint * fw; g.normal += f.normal * fw; g.orm += f.orm * fw;
             aoS += uFarAO * fw; roughS += uFarRough * fw; nS += uFarNormalStrength * fw;
@@ -248,7 +253,7 @@ export function patchTerrain(material: Material) {
       )
   }
   const prevKey = m.customProgramCacheKey?.bind(m)
-  m.customProgramCacheKey = () => `${prevKey?.() ?? ''}|eden-terrain-v2`
+  m.customProgramCacheKey = () => `${prevKey?.() ?? ''}|eden-terrain-v3`
   m.needsUpdate = true
 }
 

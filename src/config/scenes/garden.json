@@ -235,15 +235,16 @@
     "replaces": "SC08_land,SC09_land,SC55_land",
     "ownsWater": true,
     "material": "painted",
-    "paintBrightness": 1.3,
+    "paintBrightness": 1.56,
+    "paintNormalBlur": 1,
     "near": {
       "albedo": "textures/ground/pjvxx_albedo.ktx2",
       "normal": "textures/ground/pjvxx_normal.ktx2",
       "orm": "textures/ground/pjvxx_orm.ktx2",
       "tileSize": 0.85,
       "tint": "#fbffec",
-      "normalStrength": 1,
-      "aoStrength": 0.8,
+      "normalStrength": 0.15,
+      "aoStrength": 0,
       "roughness": 1
     },
     "far": {
@@ -257,7 +258,7 @@
       "roughness": 1
     },
     "breakup": 0.45,
-    "macroStrength": 0.25,
+    "macroStrength": 0.21000000000000002,
     "macroScale": 18,
     "bedColor": "#95887e",
     "bedTint": 0.4,
@@ -304,12 +305,12 @@
     "swellSpeed": 0.25
   },
   "detail": {
-    "enabled": true,
+    "enabled": false,
     "map": "textures/detail/grass_detail_512.png",
     "normalMap": "textures/detail/grass_detail_normal_512.png",
-    "scale": 0.6,
+    "scale": 0.6900000000000001,
     "strength": 0.3,
-    "normalStrength": 0.5,
+    "normalStrength": 1.57,
     "fadeStart": 8,
     "fadeEnd": 35,
     "slopeFade": 0.6,

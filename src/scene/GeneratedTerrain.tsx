@@ -8,7 +8,7 @@ import { useConfigStore, useSceneCfg } from '../state/useConfigStore'
 import { useTier } from '../state/useQualityStore'
 import { loadBoundaryField, setBoundaryField } from './boundary'
 import { useEnvMaterials } from './envMaterials'
-import { DRACO_PATH, SharedKTX2Loader, url, useDisposeOnUnmount, useEnvTransform, useKTX2Extension } from './EnvModel'
+import { DRACO_PATH, SharedKTX2Loader, url, useAnisotropy, useDisposeOnUnmount, useEnvTransform, useKTX2Extension } from './EnvModel'
 
 // 生成地形（scripts/build-terrain.mjs）：terrain_play 为可玩区，terrain_far 为远景裙边。
 // 与环境模型共用 env 变换；裙边只接收阴影（阴影相机也照不到那么远）。
@@ -116,6 +116,7 @@ export function Scatter({ path }: { path: string }) {
     register: false,
     castShadow: (m) => `${m.name}|${m.parent?.name ?? ''}`.includes('_inner'),
   })
+  useAnisotropy(scene)
 
   useEffect(() => {
     const k = Math.max(0, Math.min(1, density * tier.scatter))

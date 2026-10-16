@@ -261,6 +261,7 @@
     "ownsWater": false,
     "material": "textured",
     "paintBrightness": 1,
+    "paintNormalBlur": 0,
     "near": {
       "albedo": "",
       "normal": "",

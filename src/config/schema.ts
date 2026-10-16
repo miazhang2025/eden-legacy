@@ -421,6 +421,8 @@ export interface TerrainConfig {
   material: 'textured' | 'painted'
   /** painted：手绘贴图的亮度倍数（颜色再乘 near.tint），用来和草、花的颜色对齐 */
   paintBrightness: number
+  /** painted：近处层法线 / AO 模糊几级 mip（写实扫描贴图的细碎起伏叠在手绘草地上是满地暗斑点，模糊后只留大块起伏） */
+  paintNormalBlur: number
   /** 原地形范围（中心）的贴图 */
   near: GroundLayer
   /** 远景裙边的贴图 */
@@ -855,6 +857,10 @@ export interface TierSettings {
   detail: 'off' | 'basic' | 'full'
   /** basic = bloom + 调色，mid = + vignette + grain，full = 全开（含 DOF） */
   post: 'basic' | 'mid' | 'full'
+  /** 后处理离屏渲染的 MSAA 采样数（0 = 关）。开着后处理时 canvas 自带的 antialias 不生效，几何抗锯齿全靠这个 */
+  msaa: number
+  /** 模型贴图的各向异性过滤级数（1 = 关）：斜看的远处表面不糊、不闪 */
+  anisotropy: number
 }
 
 export interface GlobalConfig {
@@ -1330,6 +1336,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     ownsWater: bool('ownsWater', '关掉生成地形时同时关掉 water 水面'),
     material: select('textured', 'painted'),
     paintBrightness: num(0.3, 2, 0.01, 'paintBrightness', 'painted：手绘贴图亮度（颜色再乘 near 的 tint）'),
+    paintNormalBlur: num(0, 6, 0.1, 'paintNormalBlur', 'painted：近处法线 / AO 模糊几级（去掉细碎的暗斑点）'),
     near: { _label: 'near（中心贴图）', ...groundLayer },
     far: { _label: 'far（远景贴图）', ...groundLayer },
     breakup: num(0, 1, 0.01, 'breakup（打散平铺）'),
@@ -1718,6 +1725,8 @@ const tierSchema = (label: string) => ({
   scatter: num(0, 1, 0.05),
   detail: { t: 'select', options: ['off', 'basic', 'full'] } as SelectLeaf<TierSettings['detail']>,
   post: { t: 'select', options: ['basic', 'mid', 'full'] } as SelectLeaf<TierSettings['post']>,
+  msaa: num(0, 8, 2),
+  anisotropy: num(1, 16, 1),
 })
 
 export const GLOBAL_SCHEMA: SchemaFor<GlobalConfig> = {

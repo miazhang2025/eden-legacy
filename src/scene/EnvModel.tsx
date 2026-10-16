@@ -4,6 +4,7 @@ import { useThree } from '@react-three/fiber'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { Mesh, type Group, type Material, type Object3D, type Texture } from 'three'
 import { useConfigStore, useSceneCfg } from '../state/useConfigStore'
+import { useTier } from '../state/useQualityStore'
 import { isTerrainName } from '../materials/detail'
 import { registerCollider, registerWaterBed } from './collision'
 import { useEnvMaterials } from './envMaterials'
@@ -56,6 +57,29 @@ export function useDisposeOnUnmount(path: string, root: Object3D) {
   )
 }
 
+/**
+ * 模型贴图的各向异性过滤（GLTFLoader 默认 1，斜看的远处表面会糊、会闪）。级数按档位，不超过 GPU 上限。
+ * 首帧前（贴图还没上传）设好不额外开销；之后换档才需要重新上传。
+ */
+export function useAnisotropy(root: Object3D) {
+  const gl = useThree((s) => s.gl)
+  const level = Math.max(1, Math.min(useTier().anisotropy, gl.capabilities.getMaxAnisotropy()))
+  useLayoutEffect(() => {
+    root.traverse((o) => {
+      if (!(o instanceof Mesh)) return
+      const mats: Material[] = Array.isArray(o.material) ? o.material : [o.material]
+      for (const m of mats) {
+        for (const v of Object.values(m)) {
+          const tex = v as Texture | null
+          if (!tex?.isTexture || tex.anisotropy === level) continue
+          tex.anisotropy = level
+          tex.needsUpdate = true
+        }
+      }
+    })
+  }, [root, level])
+}
+
 export function useEnvTransform() {
   const scale = useSceneCfg((c) => c.env.scale)
   const position = useSceneCfg((c) => c.env.position)
@@ -93,6 +117,7 @@ export function EnvModel({ path, extras = [] }: { path: string; extras?: string[
   useDisposeOnUnmount(path, scene)
   useEffect(() => () => extras.forEach((p) => useGLTF.clear(url(p))), [extras.join(',')])
   useEnvMaterials(sceneId, scene, { castShadow: (mesh) => !extraMeshes.has(mesh) })
+  useAnisotropy(scene)
   // 地形 mesh 登记为水底（烘水深图用）；变换改变时重新登记，保证 matrixWorld 是最新的
   useLayoutEffect(
     () =>

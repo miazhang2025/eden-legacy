@@ -61,6 +61,17 @@ class ClampNegativeEffect extends Effect {
   }
 }
 
+/**
+ * 输出 alpha 置 1。alpha-to-coverage 的植被（如蕨类）边缘会把 alpha < 1 写进 RT，
+ * 一路传到 canvas（three 的 context 总是带 alpha），页面底色会从叶子边缘透出来。放在最后，合并进同一个 pass，几乎没开销。
+ */
+class OpaqueEffect extends Effect {
+  constructor() {
+    super('OpaqueEffect', 'void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) { outputColor = vec4(inputColor.rgb, 1.0); }')
+    this.inputColorSpace = null as unknown as ColorSpace
+  }
+}
+
 /** post 不传时用当前场景的配置（ending 页传自己的） */
 export function PostFX({ post }: { post?: PostConfig }) {
   const scenePost = useSceneCfg((c) => c.post)
@@ -69,6 +80,8 @@ export function PostFX({ post }: { post?: PostConfig }) {
   const gl = useThree((s) => s.gl)
   const clamps = useMemo(() => [new ClampNegativeEffect(), new ClampNegativeEffect()], [])
   useEffect(() => () => clamps.forEach((c) => c.dispose()), [clamps])
+  const opaque = useMemo(() => new OpaqueEffect(), [])
+  useEffect(() => () => opaque.dispose(), [opaque])
 
   // 不走后处理时由渲染器做色调映射；走后处理时由 ToneMapping effect 在最后做（渲染到 RT 时 three 不做色调映射）
   useEffect(() => {
@@ -122,6 +135,8 @@ export function PostFX({ post }: { post?: PostConfig }) {
   if (mid && p.noise.enabled) {
     fx.push(<Noise key="noise" premultiply blendFunction={BlendFunction.SCREEN} opacity={p.noise.opacity} />)
   }
+  if (tier.msaa > 0) fx.push(<primitive key="opaque" object={opaque} />)
 
-  return <EffectComposer multisampling={0}>{fx}</EffectComposer>
+  // 场景渲染到离屏 RT，canvas 的 antialias 管不到；几何抗锯齿靠 RT 的 MSAA（按档位，远处细小物体的锯齿主要来自这里）
+  return <EffectComposer multisampling={tier.msaa}>{fx}</EffectComposer>
 }

@@ -6,7 +6,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import type { CollectableAssetDef } from '../data/assets'
 import { patchSpecimenLook, updateSpecimenUniforms } from '../materials/specimenLook'
 import { getGlobalCfg } from '../state/useConfigStore'
-import { DRACO_PATH, url, useKTX2Extension } from './EnvModel'
+import { DRACO_PATH, url, useAnisotropy, useKTX2Extension } from './EnvModel'
 
 const NO_CLIPS: AnimationClip[] = []
 
@@ -121,6 +121,7 @@ export function AssetModel({
     onMaterials(materials)
     return () => materials.forEach((m) => m.dispose())
   }, [materials, onMaterials])
+  useAnisotropy(object)
 
   // 影棚光参数是全局共享的 uniform，每帧同步（曝光随场景配置变化，look dev 面板可调）
   useFrame(({ gl }) => updateSpecimenUniforms(getGlobalCfg().specimenLook, gl.toneMappingExposure))

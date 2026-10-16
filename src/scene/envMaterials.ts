@@ -240,6 +240,13 @@ export function useEnvMaterials(
     for (const e of Object.values(entries)) {
       applyValues(e.active, { ...e.original, ...roleBase(e, cfg, tier), ...overrides[e.name], role: e.role })
       if (e.role === 'bubble') for (const m of e.active) applyBubbleValues(m, cfg.bubble)
+      // alpha 裁切（如蕨类）：有 MSAA 时用 alpha-to-coverage，远处镂空边缘不闪
+      for (const m of e.active) {
+        const a2c = tier.msaa > 0 && m.alphaTest > 0 && !m.transparent
+        if (m.alphaToCoverage === a2c) continue
+        m.alphaToCoverage = a2c
+        m.needsUpdate = true
+      }
     }
   }, [entries, overrides, cfg, tier])
 }

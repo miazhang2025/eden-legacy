@@ -22,7 +22,9 @@
         "grass": 0.2,
         "scatter": 0.3,
         "detail": "off",
-        "post": "basic"
+        "post": "basic",
+        "msaa": 0,
+        "anisotropy": 2
       },
       "mid": {
         "pixelRatioMax": 1.5,
@@ -36,7 +38,9 @@
         "grass": 0.5,
         "scatter": 0.6,
         "detail": "basic",
-        "post": "mid"
+        "post": "mid",
+        "msaa": 0,
+        "anisotropy": 4
       },
       "high": {
         "pixelRatioMax": 2,
@@ -50,7 +54,9 @@
         "grass": 1,
         "scatter": 1,
         "detail": "full",
-        "post": "full"
+        "post": "full",
+        "msaa": 4,
+        "anisotropy": 8
       }
     },
     "frameGuard": {
