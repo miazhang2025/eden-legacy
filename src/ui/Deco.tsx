@@ -1,6 +1,6 @@
 import { useId, type CSSProperties, type ReactNode } from 'react'
 
-// 装饰小物件（Y2K 粉色复古界面）：发光四角星、光泽爱心、播放器图标、卷草花饰框。纯装饰，全部 aria-hidden。
+// 装饰小物件（Y2K 粉色复古界面）：发光四角星、光泽爱心、相机图标、卷草花饰框。纯装饰，全部 aria-hidden。
 
 /** 四角星（闪光） */
 export function SparkleIcon({ className }: { className?: string }) {
@@ -34,27 +34,6 @@ export function GlossyHeart({ className }: { className?: string }) {
   )
 }
 
-export function PlayIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M4 2.5L13 8L4 13.5Z" fill="currentColor" />
-    </svg>
-  )
-}
-export function PrevIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M3 3H5V13H3ZM13 3V13L5.5 8Z" fill="currentColor" />
-    </svg>
-  )
-}
-export function NextIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" aria-hidden="true">
-      <path d="M11 3H13V13H11ZM3 3V13L10.5 8Z" fill="currentColor" />
-    </svg>
-  )
-}
 export function CameraIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 16 16" aria-hidden="true">

@@ -201,6 +201,8 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
     u.uFoamWidth.value = c.foamWidth
     u.uFoamColor.value.set(c.foamColor)
     u.uShoreFade.value = hasDepth ? c.shoreFade : 0
+    u.uDistanceFade.value.set(...(c.distanceFade ?? [0, 0]))
+    u.uFadeCenter.value.set(c.center[0], c.center[2])
     u.uOpacity.value = c.opacity
     u.uUseVertexDepth.value = vertexDepth ? 1 : 0
     u.uUseDepthColor.value = quality !== 'low' && hasDepth ? 1 : 0

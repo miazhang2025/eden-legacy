@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { Quaternion, Vector3, type Material, type Object3D } from 'three'
+import { Color, Quaternion, Vector3, type Material, type Object3D } from 'three'
 import type { SceneConfig } from '../config/schema'
 import { getSceneCfg } from '../state/useConfigStore'
 import { shared } from './uniforms'
@@ -8,16 +8,18 @@ import { shared } from './uniforms'
 // 数据来自 scripts/build-character.mjs：
 //   _idle 顶点属性 = (呼吸权重, 头部权重, 布料权重, 眨眼权重)，前两项取自原骨骼的蒙皮权重；眨眼权重 + 上眼皮 / - 下眼皮
 //   轴心节点 userData：idleNeck / idleNodAxis = 颈部位置 / 点头轴，idleEyeLeft / idleEyeRight / idleBlinkAxis = 眼球中心 / 眨眼转轴，
-//   idleHeadForward = 脸朝向，idleGazeLeft / idleGazeRight = 两只眼的视线方向
+//   idleHeadForward = 脸朝向
 //   （都在轴心节点的局部空间，也就是 mesh 的局部空间）
 // 顺序（都在静止姿势下算，最后才绕颈部转）：
 //   眨眼：眼皮绕最近的眼球中心转；间隔带随机抖动，闭快睁慢
-//   眼神：眼球材质（char_Eyes_Eye*）绕各自中心转，对准观众
 //   呼吸：胸腔沿法线起伏
 //   头部：绕颈部轻微转头 + 点头，再叠加「看观众」的转动（头发、头饰蒙在头骨上，一起动；颈部权重 0.5，只转一半）
 //   布料：两组斜向正弦叠出的缓慢波纹
 // 旋转同时作用在法线上（不然转头后脸上的明暗还是原来的）。
-// 「看观众」：useFigureLook() 每帧在 JS 里算头 / 眼要转多少（限制在最大角度内、平滑过渡），通过 uniform 传给着色器。
+// 「看观众」：useFigureLook() 每帧在 JS 里算头要转多少（限制在最大角度内、平滑过渡），通过 uniform 传给着色器。
+//   眼球不单独转（试过对准观众，眼神很吓人），跟着头一起动。
+// 皮肤（char_Head / Body / Arms / Legs / Toenails）：片元里在贴图之后调亮度 / 饱和度 / 色调，
+//   各场景光照不同（花园偏粉、海洋偏冷暗），人物肤色按场景单独调，不动场景光照。
 // 只认 char_ 前缀的材质（build-character 统一改的名）。场景里假定只有一个人物。
 
 export const figureUniforms = {
@@ -37,18 +39,18 @@ export const figureUniforms = {
   uFigureBlinkInterval: { value: 0 },
   uFigureBlinkDuration: { value: 0.3 },
   uFigureBlinkAngle: { value: 0 },
-  // 看观众：头（绕颈部）/ 左右眼（绕各自中心）的轴角
+  // 看观众：头绕颈部转的轴角
   uFigureLookAxis: { value: new Vector3(0, 1, 0) },
   uFigureLookAngle: { value: 0 },
-  uFigureEyeLookAxisLeft: { value: new Vector3(0, 1, 0) },
-  uFigureEyeLookAngleLeft: { value: 0 },
-  uFigureEyeLookAxisRight: { value: new Vector3(0, 1, 0) },
-  uFigureEyeLookAngleRight: { value: 0 },
+  // 皮肤
+  uFigureSkinBrightness: { value: 1 },
+  uFigureSkinSaturation: { value: 1 },
+  uFigureSkinTint: { value: new Color('#ffffff') },
 }
 
 export const isFigureMaterial = (name: string) => name.startsWith('char_')
-/** 眼球材质：只有它跟着眼神转（眼皮、睫毛不转） */
-const isFigureEye = (name: string) => /^char_Eyes_Eye/i.test(name)
+/** 皮肤材质（Daz 角色的 Victoria 9 HD 皮肤，build-character 改名后） */
+const isFigureSkin = (name: string) => /^char_(Head|Body|Arms|Legs|Toenails)$/.test(name)
 
 export function updateFigureUniforms(cfg: SceneConfig) {
   const f = cfg.figure
@@ -65,6 +67,9 @@ export function updateFigureUniforms(cfg: SceneConfig) {
   u.uFigureBlinkInterval.value = f.blinkInterval
   u.uFigureBlinkDuration.value = f.blinkDuration
   u.uFigureBlinkAngle.value = f.blinkAngle
+  u.uFigureSkinBrightness.value = f.skinBrightness ?? 1
+  u.uFigureSkinSaturation.value = f.skinSaturation ?? 1
+  u.uFigureSkinTint.value.set(f.skinTint ?? '#ffffff')
 }
 
 // ---------------------------------------------------------------------------
@@ -73,8 +78,8 @@ export function updateFigureUniforms(cfg: SceneConfig) {
 const rig = {
   node: null as Object3D | null,
   forward: new Vector3(0, 0, 1),
-  gazeLeft: new Vector3(0, 0, 1),
-  gazeRight: new Vector3(0, 0, 1),
+  /** 有没有单独的眼球（洞穴人物是合成一个网格的，没有）：没有就不眨眼，看观众时以颈部为头的位置 */
+  hasEyes: false,
 }
 
 type RigData = Partial<
@@ -84,9 +89,7 @@ type RigData = Partial<
     | 'idleEyeLeft'
     | 'idleEyeRight'
     | 'idleBlinkAxis'
-    | 'idleHeadForward'
-    | 'idleGazeLeft'
-    | 'idleGazeRight',
+    | 'idleHeadForward',
     number[]
   >
 >
@@ -94,6 +97,8 @@ type RigData = Partial<
 /** 读人物的骨架数据；返回注销函数（模型卸载后不再看观众） */
 export function registerFigureRig(root: Object3D) {
   let found: Object3D | null = null
+  // 场景里只有一个人物：先清掉上一个人物留下的眼睛数据
+  rig.hasEyes = false
   root.traverse((o) => {
     const d = o.userData as RigData
     const u = figureUniforms
@@ -101,11 +106,10 @@ export function registerFigureRig(root: Object3D) {
     if (d.idleNodAxis) u.uFigureNodAxis.value.fromArray(d.idleNodAxis)
     if (d.idleEyeLeft) u.uFigureEyeLeft.value.fromArray(d.idleEyeLeft)
     if (d.idleEyeRight) u.uFigureEyeRight.value.fromArray(d.idleEyeRight)
+    if (d.idleEyeLeft && d.idleEyeRight) rig.hasEyes = true
     if (d.idleBlinkAxis) u.uFigureBlinkAxis.value.fromArray(d.idleBlinkAxis)
-    if (d.idleHeadForward && d.idleGazeLeft && d.idleGazeRight) {
+    if (d.idleHeadForward) {
       rig.forward.fromArray(d.idleHeadForward)
-      rig.gazeLeft.fromArray(d.idleGazeLeft)
-      rig.gazeRight.fromArray(d.idleGazeRight)
       found = o
     }
   })
@@ -123,17 +127,12 @@ const look = {
   active: false,
   timer: 3,
   head: new Quaternion(),
-  eyeLeft: new Quaternion(),
-  eyeRight: new Quaternion(),
 }
 const camLocal = new Vector3()
 const origin = new Vector3()
 const originWorld = new Vector3()
 const toCam = new Vector3()
-const camRest = new Vector3()
-const dir = new Vector3()
 const target = new Quaternion()
-const inverse = new Quaternion()
 const full = new Quaternion()
 
 /** from → to 的旋转，转角超过 max 时按比例截到 max */
@@ -166,18 +165,15 @@ export function useFigureLook() {
       look.active = false
       look.timer = 1
       look.head.identity()
-      look.eyeLeft.identity()
-      look.eyeRight.identity()
       u.uFigureLookAngle.value = 0
-      u.uFigureEyeLookAngleLeft.value = 0
-      u.uFigureEyeLookAngleRight.value = 0
       return
     }
 
-    // 观众（相机）换到人物的局部空间；以两眼中点为头的位置
+    // 观众（相机）换到人物的局部空间；以两眼中点为头的位置（没有眼球就用颈部）
     camLocal.copy(camera.position)
     node.worldToLocal(camLocal)
-    origin.addVectors(u.uFigureEyeLeft.value, u.uFigureEyeRight.value).multiplyScalar(0.5)
+    if (rig.hasEyes) origin.addVectors(u.uFigureEyeLeft.value, u.uFigureEyeRight.value).multiplyScalar(0.5)
+    else origin.copy(u.uFigureNeck.value)
     originWorld.copy(origin)
     node.localToWorld(originWorld)
     toCam.subVectors(camLocal, origin).normalize()
@@ -202,20 +198,6 @@ export function useFigureLook() {
     else target.identity()
     look.head.slerp(target, 1 - Math.exp(-f.lookSpeed * dt))
     writeAxisAngle(look.head, u.uFigureLookAxis, u.uFigureLookAngle)
-
-    // 眼：在静止姿势下算（先把观众按头的转动反向转回来），眼球比头转得快
-    const neck = u.uFigureNeck.value
-    camRest.copy(camLocal).sub(neck).applyQuaternion(inverse.copy(look.head).invert()).add(neck)
-    const k = 1 - Math.exp(-f.lookSpeed * 2.5 * dt)
-    for (const [center, gaze, q, axis, angle] of [
-      [u.uFigureEyeLeft.value, rig.gazeLeft, look.eyeLeft, u.uFigureEyeLookAxisLeft, u.uFigureEyeLookAngleLeft],
-      [u.uFigureEyeRight.value, rig.gazeRight, look.eyeRight, u.uFigureEyeLookAxisRight, u.uFigureEyeLookAngleRight],
-    ] as const) {
-      if (look.active) clampedRotation(gaze, dir.subVectors(camRest, center).normalize(), f.lookEyeAngle, target)
-      else target.identity()
-      q.slerp(target, k)
-      writeAxisAngle(q, axis, angle)
-    }
   })
 }
 
@@ -243,10 +225,6 @@ uniform float uFigureBlinkDuration;
 uniform float uFigureBlinkAngle;
 uniform vec3 uFigureLookAxis;
 uniform float uFigureLookAngle;
-uniform vec3 uFigureEyeLookAxisLeft;
-uniform float uFigureEyeLookAngleLeft;
-uniform vec3 uFigureEyeLookAxisRight;
-uniform float uFigureEyeLookAngleRight;
 // 绕单位轴 axis 旋转 angle（Rodrigues）
 vec3 edenRotate(vec3 v, vec3 axis, float angle) {
   float c = cos(angle), s = sin(angle);
@@ -268,10 +246,9 @@ const vertexDeform = /* glsl */ `
 vec3 edenPos = position;
 if (uFigureEnabled > 0.5) {
   vec3 restNormal = objectNormal;
-  bool leftEye = distance(position, uFigureEyeLeft) < distance(position, uFigureEyeRight);
-  vec3 eye = leftEye ? uFigureEyeLeft : uFigureEyeRight;
   // 眨眼：眼皮绕最近的眼球中心转
   if (_idle.w != 0.0) {
+    vec3 eye = distance(position, uFigureEyeLeft) < distance(position, uFigureEyeRight) ? uFigureEyeLeft : uFigureEyeRight;
     float blink = edenBlink(uTime);
     if (blink > 0.0) {
       float a = uFigureBlinkAngle * _idle.w * blink;
@@ -279,15 +256,6 @@ if (uFigureEnabled > 0.5) {
       objectNormal = edenRotate(objectNormal, uFigureBlinkAxis, a);
     }
   }
-#ifdef EDEN_FIGURE_EYE
-  // 眼神：眼球绕自己的中心转向观众
-  {
-    vec3 axis = leftEye ? uFigureEyeLookAxisLeft : uFigureEyeLookAxisRight;
-    float a = leftEye ? uFigureEyeLookAngleLeft : uFigureEyeLookAngleRight;
-    edenPos = eye + edenRotate(edenPos - eye, axis, a);
-    objectNormal = edenRotate(objectNormal, axis, a);
-  }
-#endif
   // 呼吸：吸气慢、呼气略快（sin 抬到 0..1 再开方，峰值处停留更久）
   float breath = sqrt(0.5 + 0.5 * sin(uTime * 6.2831853 * uFigureBreathRate));
   edenPos += restNormal * (_idle.x * uFigureBreathAmplitude * breath);
@@ -316,13 +284,26 @@ if (uFigureEnabled > 0.5) {
 }
 `
 
+// 皮肤：贴图采样之后（diffuseColor 在线性空间），先按亮度去饱和，再乘亮度和色调
+const fragmentSkinHead = /* glsl */ `
+uniform float uFigureSkinBrightness;
+uniform float uFigureSkinSaturation;
+uniform vec3 uFigureSkinTint;
+`
+const fragmentSkin = /* glsl */ `
+{
+  float l = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  diffuseColor.rgb = mix(vec3(l), diffuseColor.rgb, uFigureSkinSaturation) * uFigureSkinBrightness * uFigureSkinTint;
+}
+`
+
 const PATCHED = Symbol('eden-figure')
 
 export function patchFigure(material: Material) {
   const m = material as Material & { [PATCHED]?: true }
   if (m[PATCHED]) return
   m[PATCHED] = true
-  const eye = isFigureEye(m.name)
+  const skin = isFigureSkin(m.name)
   const prev = m.onBeforeCompile
   m.onBeforeCompile = (shader, renderer) => {
     prev?.call(m, shader, renderer)
@@ -330,12 +311,17 @@ export function patchFigure(material: Material) {
     // 其它补丁（焦散）也会声明 uTime：只在还没声明时补上
     const head = shader.vertexShader.includes('uniform float uTime;') ? vertexHead.replace('uniform float uTime;\n', '') : vertexHead
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${eye ? '#define EDEN_FIGURE_EYE\n' : ''}${head}`)
+      .replace('#include <common>', `#include <common>\n${head}`)
       .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>\n${vertexDeform}`)
       .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed = edenPos;')
+    if (skin) {
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\n${fragmentSkinHead}`)
+        .replace('#include <map_fragment>', `#include <map_fragment>\n${fragmentSkin}`)
+    }
   }
   const prevKey = m.customProgramCacheKey?.bind(m)
-  m.customProgramCacheKey = () => `${prevKey?.() ?? ''}|eden-figure${eye ? '-eye' : ''}`
+  m.customProgramCacheKey = () => `${prevKey?.() ?? ''}|eden-figure${skin ? '-skin' : ''}`
   m.needsUpdate = true
 }
 

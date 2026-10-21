@@ -5,8 +5,7 @@ import { ScenePreloader } from '../scene/Preloader'
 import { useLangStore, type Lang } from '../state/useLangStore'
 import { SCENE_ORDER, useRunStore } from '../state/useRunStore'
 import { useRevealOnMount, useTransition } from '../ui/Transition'
-import { DecoField, GlossyHeart, NextIcon, PlayIcon, PrevIcon, SparkleIcon, type DecoItem } from '../ui/Deco'
-import { Win } from '../ui/Win'
+import { DecoField, OrnateFrame, SparkleIcon, type DecoItem } from '../ui/Deco'
 
 /** Landing 上可能出现的 3D 物件，设计待定，本期不实现 */
 function LandingArtifactSlot() {
@@ -22,19 +21,17 @@ const LANGS: { id: Lang; label: string }[] = [
   { id: 'zh', label: '中' },
 ]
 
-// 背景里闪烁 / 漂浮的装饰（placeholder）：[类型, left%, top%, 尺寸px, 动画延迟s]
+// 黑底上的粉色闪光（与结尾同款，只放在四周）：[类型, left%, top%, 尺寸px, 动画延迟s]
 const DECO: DecoItem[] = [
-  ['sparkle', 9, 14, 26, 0],
-  ['heart', 88, 12, 34, 0.8],
-  ['sparkle', 93, 38, 18, 0.6],
-  ['note', 13, 46, 22, 1.4],
-  ['sparkle', 56, 6, 14, 2.1],
-  ['heart', 8, 74, 26, 1.6],
-  ['sparkle', 30, 30, 12, 0.3],
-  ['star', 72, 26, 16, 1.9],
-  ['note', 84, 70, 20, 0.9],
-  ['sparkle', 95, 86, 22, 2.6],
-  ['sparkle', 22, 88, 16, 1.1],
+  ['sparkle', 7, 12, 20, 0],
+  ['sparkle', 26, 22, 12, 1.3],
+  ['sparkle', 74, 10, 16, 0.6],
+  ['sparkle', 92, 24, 22, 2.1],
+  ['star', 88, 62, 14, 1.7],
+  ['sparkle', 22, 86, 16, 0.9],
+  ['sparkle', 78, 88, 12, 2.4],
+  ['sparkle', 5, 60, 14, 1.1],
+  ['star', 12, 36, 12, 0.4],
 ]
 
 /** 把步骤句子里的 {name} 换成高亮的场景名 */
@@ -73,23 +70,10 @@ export default function Landing() {
     useTransition.getState().go('/cave')
   }
 
-  // 底部滚动横幅：标语和副标题循环（两份，接缝无缝）
-  const marquee = `${copy('landing.tagline')}  ♡  ${copy('landing.eyebrow')}  ✧  `
-
   return (
     <main className={`page landing landing--${lang}`}>
-      {/* 背景图占位：美术到位后放 public/2d/landing.* */}
       <div className="landing__bg" />
       <DecoField items={DECO} className="landing__deco" />
-      {/* 左侧糖果条纹丝带 + 上下两枚徽章 */}
-      <aside className="landing__ribbon" aria-hidden="true">
-        <span className="landing__badge landing__badge--top">
-          <SparkleIcon />
-        </span>
-        <span className="landing__badge landing__badge--bottom">
-          <GlossyHeart />
-        </span>
-      </aside>
       <div className="landing__artifact">
         <LandingArtifactSlot />
       </div>
@@ -107,84 +91,55 @@ export default function Landing() {
         ))}
       </div>
       <div className="landing__content">
+        {/* 与结尾同款的卷草花框，里面只放标签 / 标题 / 标语，简介在框外 */}
         <header className="landing__hero">
-          <p className="landing__banner">
-            <span className="landing__banner-badge" aria-hidden="true">
-              <SparkleIcon />
-            </span>
-            <span className="landing__eyebrow">{copy('landing.eyebrow')}</span>
-          </p>
-          <h1 className="landing__title">
-            <SparkleIcon className="landing__title-spark landing__title-spark--a" />
-            {copy('landing.title')}
-            <SparkleIcon className="landing__title-spark landing__title-spark--b" />
-          </h1>
-          <p className="landing__tagline">{copy('landing.tagline')}</p>
-          <div className="landing__cta">
-            <button
-              className={`btn btn--primary landing__enter ${ready ? '' : 'is-loading'}`}
-              onClick={enter}
-              disabled={!ready}
-              aria-busy={!ready}
-            >
-              <PlayIcon className="btn__icon" />
-              {ready ? copy('landing.button.enter') : `${copy('landing.button.loading')} ${percent}%`}
-            </button>
-          </div>
+          <OrnateFrame className="landing__plate">
+            <p className="landing__label">
+              <SparkleIcon className="landing__label-spark" />
+              {copy('landing.eyebrow')}
+              <SparkleIcon className="landing__label-spark" />
+            </p>
+            <h1 className="landing__title">{copy('landing.title')}</h1>
+            <p className="landing__tagline">{copy('landing.tagline')}</p>
+          </OrnateFrame>
         </header>
-        <div className="landing__panels">
-          <Win className="landing__about" title={copy('landing.about')}>
-            <p className="landing__lede">{copy('landing.lede.1')}</p>
-            <p className="landing__lede">{copy('landing.lede.2')}</p>
-            <p className="landing__lede">{copy('landing.lede.3')}</p>
-            <div className="landing__rating" aria-hidden="true">
-              <span>★★★★★</span>
-              <GlossyHeart className="landing__rating-heart" />
-            </div>
-          </Win>
-          <section className="landing__journey" aria-label={copy('landing.howto')}>
-            {/* 玩法做成播放列表：三个场景是三首曲目，底下一条播放器 */}
-            <Win className="landing__howto" title={copy('landing.howto')}>
-              <ol className="landing__steps">
-                {SCENE_ORDER.map((scene, i) => (
-                  <li key={scene} className={`landing__step landing__step--${scene}`}>
-                    <span className="landing__step-num">{String(i + 1).padStart(2, '0')}</span>
-                    <StepText scene={scene} />
-                  </li>
-                ))}
-              </ol>
-              <div className="landing__journey-end">
-                <div className="landing__player" aria-hidden="true">
-                  <span className="landing__player-btn">
-                    <PrevIcon />
-                  </span>
-                  <span className="landing__player-btn landing__player-btn--play">
-                    <PlayIcon />
-                  </span>
-                  <span className="landing__player-btn">
-                    <NextIcon />
-                  </span>
-                  {/* 进度条：真实的预加载进度 */}
-                  <div className={`landing__loading ${ready ? 'is-done' : ''}`}>
-                    <i style={{ width: `${Math.max(6, percent)}%` }} />
-                  </div>
-                </div>
-                <p>{copy('landing.howto.end')}</p>
-              </div>
-            </Win>
-          </section>
+        <div className="landing__lede">
+          <p>{copy('landing.lede.1')}</p>
+          <p>{copy('landing.lede.2')}</p>
+          <p>{copy('landing.lede.3')}</p>
+        </div>
+        <section className="landing__journey" aria-labelledby="landing-howto">
+          <p id="landing-howto" className="landing__label">
+            <SparkleIcon className="landing__label-spark" />
+            {copy('landing.howto')}
+            <SparkleIcon className="landing__label-spark" />
+          </p>
+          <ol className="landing__steps">
+            {SCENE_ORDER.map((scene, i) => (
+              <li key={scene} className={`landing__step landing__step--${scene}`}>
+                <span className="landing__step-num">{String(i + 1).padStart(2, '0')}</span>
+                <StepText scene={scene} />
+              </li>
+            ))}
+          </ol>
+          <p className="landing__journey-end">{copy('landing.howto.end')}</p>
+        </section>
+        <div className="landing__cta">
+          <button
+            className={`btn btn--primary landing__enter ${ready ? '' : 'is-loading'}`}
+            onClick={enter}
+            disabled={!ready}
+            aria-busy={!ready}
+          >
+            {ready ? copy('landing.button.enter') : `${copy('landing.button.loading')} ${percent}%`}
+          </button>
+          {/* 预加载进度：一条细线 */}
+          <div className={`landing__loading ${ready ? 'is-done' : ''}`} aria-hidden="true">
+            <i style={{ width: `${Math.max(2, percent)}%` }} />
+          </div>
         </div>
       </div>
       <ScenePreloader onProgress={(done, total) => setProgress({ done, total })} />
-      <div className="landing__marquee" aria-hidden="true">
-        <span className="landing__marquee-badge">
-          <GlossyHeart />
-        </span>
-        <div className="landing__marquee-track">
-          <span>{marquee.repeat(3)}</span>
-          <span>{marquee.repeat(3)}</span>
-        </div>
-      </div>
     </main>
   )
 }

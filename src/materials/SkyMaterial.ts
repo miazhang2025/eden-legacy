@@ -2,7 +2,9 @@ import { BackSide, Color, ShaderMaterial, Vector3 } from 'three'
 import type { SceneConfig } from '../config/schema'
 
 // 程序化天空：四段渐变（天顶 / 中段 / 地平线雾带 / 地面）+ 太阳圆盘与光晕 + 可选月亮（天体）。
-// 同一个材质既画背景天球，也在 <Environment> 里渲染一次作为环境光，保证光照与看到的天空一致。
+// 同一个材质既画背景天球，也在 <Environment> 里渲染一次作为环境光，保证光照与看到的天空一致；
+// environment.lightSky 打开时环境光改用另一套渐变色（如夜空背景 + 明亮的洞内打光）。
+// 背景天球在地平线附近渐变到雾色（sky.fogBlend），远处被雾吞掉的地形与天空自然衔接。
 
 const DEG = Math.PI / 180
 
@@ -19,6 +21,8 @@ export function createSkyMaterial() {
       uBottom: { value: new Color() },
       uMidHeight: { value: 0.3 },
       uHorizonWidth: { value: 0.08 },
+      uFogColor: { value: new Color() },
+      uFogBlend: { value: 0 },
       uSunDir: { value: new Vector3(0, 1, 0) },
       uSunColor: { value: new Color() },
       uSunSize: { value: 0.02 },
@@ -46,6 +50,8 @@ export function createSkyMaterial() {
       uniform vec3 uBottom;
       uniform float uMidHeight;
       uniform float uHorizonWidth;
+      uniform vec3 uFogColor;
+      uniform float uFogBlend;
       uniform vec3 uSunDir;
       uniform vec3 uSunColor;
       uniform float uSunSize;
@@ -72,6 +78,8 @@ export function createSkyMaterial() {
         } else {
           c = mix(uHorizon, uBottom, smoothstep(0.0, max(uHorizonWidth * 3.0, 1e-3), -y));
         }
+        // 地平线附近渐变到雾色（天体画在雾色之上）
+        if (uFogBlend > 0.0) c = mix(c, uFogColor, 1.0 - smoothstep(0.0, uFogBlend, abs(y)));
 
         // 太阳：圆盘 + 光晕
         float sd = max(dot(d, normalize(uSunDir)), 0.0);
@@ -99,14 +107,21 @@ export function createSkyMaterial() {
   })
 }
 
-/** 从 config 写入天空 uniform（主光 position 决定太阳方向） */
-export function updateSkyMaterial(m: ShaderMaterial, cfg: SceneConfig) {
+/**
+ * 从 config 写入天空 uniform（主光 position 决定太阳方向）。
+ * forEnvironment：渲染环境光用——lightSky 打开时换成打光渐变色，且不混雾色（雾只影响看到的天空）
+ */
+export function updateSkyMaterial(m: ShaderMaterial, cfg: SceneConfig, forEnvironment = false) {
   const s = cfg.sky
   const u = m.uniforms
-  u.uTop.value.set(s.topColor)
-  u.uMid.value.set(s.midColor)
-  u.uHorizon.value.set(s.horizonColor)
-  u.uBottom.value.set(s.bottomColor)
+  const light = cfg.environment.lightSky
+  const colors = forEnvironment && light?.enabled ? light : s
+  u.uTop.value.set(colors.topColor)
+  u.uMid.value.set(colors.midColor)
+  u.uHorizon.value.set(colors.horizonColor)
+  u.uBottom.value.set(colors.bottomColor)
+  u.uFogColor.value.set(cfg.fog.color)
+  u.uFogBlend.value = forEnvironment || cfg.fog.type === 'none' ? 0 : (s.fogBlend ?? 0)
   u.uMidHeight.value = s.midHeight
   u.uHorizonWidth.value = s.horizonWidth
   u.uSunDir.value.set(...cfg.lights.directional.position).normalize()

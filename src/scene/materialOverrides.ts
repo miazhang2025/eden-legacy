@@ -10,6 +10,7 @@ import {
 } from 'three'
 import { create } from 'zustand'
 import type { MaterialOverride, MaterialRole, MaterialSide, SceneId } from '../config/schema'
+import { setShadowLift } from '../materials/shadowLift'
 
 // 材质注册表 + 覆盖应用（spec §9.3 Materials）。
 // 启动时遍历场景收集所有唯一 material name；config.materials 按 name 覆盖字段，未出现的保持模型自带值。
@@ -64,6 +65,8 @@ export function defaultRole(name: string): MaterialRole {
   if (n.startsWith('crystal_')) return 'crystal'
   if (n.startsWith('water_')) return 'water'
   if (n.startsWith('emitter_')) return 'emitter'
+  // 场景人物（build-character 改的 char_ 名）：材质名是美术起的中文名，「水晶」之类会被下面的关键词误判成水面而隐藏
+  if (n.startsWith('char_')) return 'static'
   if (n.includes('水') || /water/i.test(n)) return 'water'
   if (STATIC.test(n)) return 'static'
   if (BUBBLE.test(n)) return 'bubble'
@@ -88,6 +91,10 @@ export function snapshot(m: MeshStandardMaterial, role: MaterialRole): Required<
     alphaTest: m.alphaTest,
     side: sideName(m.side),
     wireframe: m.wireframe,
+    // 投阴影是 mesh 属性，默认值由 envMaterials 按角色决定（透明薄膜不投）
+    castShadow: role !== 'bubble',
+    shadowLift: 0,
+    shadowLiftThreshold: 0.5,
     clearcoat: p?.clearcoat ?? 0,
     transmission: p?.transmission ?? 0,
     ior: p?.ior ?? 1.5,
@@ -96,7 +103,7 @@ export function snapshot(m: MeshStandardMaterial, role: MaterialRole): Required<
   }
 }
 
-/** 把数值写到材质上（role 字段不在这里处理） */
+/** 把数值写到材质上（role / castShadow 不在这里处理） */
 export function applyValues(materials: MeshStandardMaterial[], v: Required<MaterialOverride>) {
   for (const m of materials) {
     const side = SIDE_TO_THREE[v.side]
@@ -113,6 +120,8 @@ export function applyValues(materials: MeshStandardMaterial[], v: Required<Mater
     m.alphaTest = v.alphaTest
     m.side = side
     m.wireframe = v.wireframe
+    // 只有打过补丁的静态材质生效
+    setShadowLift(m, v.shadowLift, v.shadowLiftThreshold)
     if (isPhysical(m)) {
       // transmission 从 0 变为非 0 会切换 shader 分支，需要重新编译
       if ((m.transmission > 0) !== (v.transmission > 0)) needsUpdate = true

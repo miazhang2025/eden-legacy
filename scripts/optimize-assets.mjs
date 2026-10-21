@@ -8,7 +8,7 @@
 // 用法：npm run assets            处理全部
 //       npm run assets -- cave    只处理某个场景（或某个资产 id）
 
-import { statSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { NodeIO } from '@gltf-transform/core'
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
@@ -37,7 +37,18 @@ const ASSETS = {
 /** 平滑着色（重算法线，抹掉美术导出的硬边）的资产 */
 const SMOOTH = new Set(['ocean_fish_01'])
 
+/**
+ * 美术后来单独给的新贴图（art/textures/interactive 下）：资产 id → { 材质名: 贴图文件 }，替换该材质的底色贴图（UV 不变）。
+ * 砗磲与笠螺的贝壳底座用的是同一张贴图，一起换
+ */
+const TEXTURE_REPLACE = {
+  ocean_fish_02: { 材质: 'fish.jpg' },
+  ocean_shell_01: { pbr_material: 'shell.jpg' },
+  ocean_shell_02: { '材质.1': 'shell.jpg' },
+}
+
 const SRC = 'art/interactive'
+const TEX_SRC = 'art/textures/interactive'
 const OUT = 'public/models/assets'
 const MAX_TRIS = 40000
 const MAX_TEX = 2048
@@ -72,6 +83,13 @@ for (const [id, file] of Object.entries(ASSETS)) {
     if (welded > MAX_TRIS) {
       await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio: MAX_TRIS / welded, error: 0.005 }))
     }
+  }
+
+  for (const [name, file] of Object.entries(TEXTURE_REPLACE[id] ?? {})) {
+    const mat = root.listMaterials().find((m) => m.getName() === name)
+    if (!mat) throw new Error(`${id}：没有材质 ${name}，换不了贴图 ${file}`)
+    const mime = /\.png$/i.test(file) ? 'image/png' : 'image/jpeg'
+    mat.setBaseColorTexture(doc.createTexture(file).setImage(readFileSync(join(TEX_SRC, file))).setMimeType(mime))
   }
 
   // 贴图：只缩超过 MAX_TEX 的，保持原比例与原格式

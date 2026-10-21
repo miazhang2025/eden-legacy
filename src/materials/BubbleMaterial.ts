@@ -86,12 +86,10 @@ export function applyBubbleValues(m: Material, c: BubbleConfig) {
 }
 
 /**
- * 每个泡泡一个随机相位（顶点属性 aEdenBubblePhase）：美术把一片泡泡合成了一个 mesh，
- * 按「位置相同的顶点焊在一起 + 三角形连通」分出各个泡泡，按泡泡中心算相位，同一个泡泡整体一起浮动。
+ * 美术把一片泡泡合成了一个 mesh：按「位置相同的顶点焊在一起 + 三角形连通」分出各个泡泡。
+ * 返回每个顶点所属泡泡的编号（0..count-1），以及每个泡泡的中心（几何局部坐标）。
  */
-export function bakeBubblePhase(mesh: Mesh) {
-  const geo = mesh.geometry as BufferGeometry
-  if (geo.getAttribute('aEdenBubblePhase')) return
+export function bubbleComponents(geo: BufferGeometry): { of: Int32Array; centers: [number, number, number][] } {
   const pos = geo.getAttribute('position')
   const n = pos.count
   const parent = new Int32Array(n)
@@ -121,23 +119,40 @@ export function bakeBubblePhase(mesh: Mesh) {
       union(t, t + 2)
     }
   }
-  // 每个泡泡的中心 → 相位
-  const sums = new Map<number, [number, number, number, number]>()
+  const id = new Map<number, number>()
+  const sums: [number, number, number, number][] = []
+  const of = new Int32Array(n)
   for (let i = 0; i < n; i++) {
     const r = find(i)
-    const s = sums.get(r) ?? [0, 0, 0, 0]
+    let c = id.get(r)
+    if (c === undefined) {
+      c = sums.length
+      id.set(r, c)
+      sums.push([0, 0, 0, 0])
+    }
+    of[i] = c
+    const s = sums[c]
     s[0] += pos.getX(i)
     s[1] += pos.getY(i)
     s[2] += pos.getZ(i)
     s[3]++
-    sums.set(r, s)
   }
-  const phase = new Map<number, number>()
-  for (const [r, [x, y, z, c]] of sums) {
-    const h = Math.sin((x / c) * 12.9898 + (y / c) * 78.233 + (z / c) * 37.719) * 43758.5453
-    phase.set(r, h - Math.floor(h))
-  }
-  const out = new Float32Array(n)
-  for (let i = 0; i < n; i++) out[i] = phase.get(find(i))!
+  return { of, centers: sums.map(([x, y, z, c]) => [x / c, y / c, z / c]) }
+}
+
+/** 0–1 的伪随机（与 shader 里的 hash 同一个式子） */
+export function bubbleHash(x: number, y: number, z: number) {
+  const h = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453
+  return h - Math.floor(h)
+}
+
+/** 每个泡泡一个随机相位（顶点属性 aEdenBubblePhase）：按泡泡中心算，同一个泡泡整体一起浮动 */
+export function bakeBubblePhase(mesh: Mesh) {
+  const geo = mesh.geometry as BufferGeometry
+  if (geo.getAttribute('aEdenBubblePhase')) return
+  const { of, centers } = bubbleComponents(geo)
+  const phase = centers.map(([x, y, z]) => bubbleHash(x, y, z))
+  const out = new Float32Array(of.length)
+  for (let i = 0; i < of.length; i++) out[i] = phase[of[i]]
   geo.setAttribute('aEdenBubblePhase', new BufferAttribute(out, 1))
 }

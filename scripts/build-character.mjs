@@ -6,7 +6,13 @@
 // 美术给的是 Daz（Genesis 9）+ Mixamo 骨骼摆好姿势的蒙皮模型，约 70 万面 / 60MB，动画只有一帧（就是这个姿势）。
 // 处理：
 //   1. 把骨骼姿势烘进顶点（蒙皮 → 静态网格）：去掉骨骼 / 蒙皮 / 动画，运行时不用每帧算蒙皮
+//   0. 材质名里的空格换成下划线（不同导出设置下 Daz 材质名有时带空格，后面的规则统一按下划线写）；
+//      按人物的配置（CHARACTERS）向别的模型借贴图（导出时丢了贴图的头发）
+//   1b. 没蒙皮、挂在骨架下的 mesh：把节点的世界变换烘进顶点
 //   2. 删掉看不见又会出错的部件：眼球湿润层、泪腺（alpha 0.05 的透明壳，排序会闪）、口腔（牙齿舌头，嘴是闭着的）
+//   3a. 皮肤（Victoria 9 HD_*）的粗糙度贴图换成常数（取贴图平均值）：基本是均匀的灰，省一张 4K 贴图；
+//      平均值低得离谱的（脸那张实际是嘴唇湿润遮罩，平均 0.01，整张脸会像打了蜡）按正常皮肤取值
+//      睫毛 / 眼球的法线贴图去掉（看不出来）
 //   3. 透明材质：头发 / 睫毛 / 蝴蝶翅膀从 BLEND 改成 alpha 裁切（大量交叠的透明面片排序必乱；有 MSAA 时运行时开 alpha-to-coverage）
 //   4. 材质改名：统一 char_ 前缀（面板里一眼认出来；Pool_Water 会被认成水面而隐藏，改成 char_droplet）
 //   5. 按部件减面（PARTS），同材质的 mesh 合并（省 draw call）
@@ -16,7 +22,7 @@
 //   9. Idle 动画数据（运行时顶点着色器用，见 src/materials/figure.ts，不做物理模拟）：
 //      _IDLE 顶点属性 = (呼吸权重, 头部权重, 布料权重, 眨眼权重)，前两项取自原骨骼的蒙皮权重；
 //      眨眼权重带符号（+ 上眼皮 / 上睫毛，- 下眼皮 / 下睫毛），按到眼球中心的距离和高度从头部 mesh 里挑出来（BLINK）；
-//      颈部位置 / 点头轴 / 两只眼球中心 / 眨眼轴 / 脸朝向 / 两只眼的视线方向写进 pivot 节点的 extras（运行时在 userData 里）
+//      颈部位置 / 点头轴 / 两只眼球中心 / 眨眼轴 / 脸朝向写进 pivot 节点的 extras（运行时在 userData 里）
 //   8. 轴心：顶点移到以人物脚底中心为原点，挂在一个平移到原位置的 pivot 节点下（渲染 / 碰撞体用同一个轴心）。
 //      位置不变；运行时 env.extrasTransform 调这个节点，旋转 / 缩放就绕人物自己转，而不是绕场景原点
 //
@@ -56,14 +62,15 @@ const COLLIDER_TRIANGLES = 4000
 
 /** 整个 mesh 删掉（按 mesh 名匹配） */
 const DROP_MESH = /Genesis9Tear|Genesis9Mouth/i
-/** 删掉的图元（按材质名匹配） */
-const DROP_MATERIAL = /EyeMoisture|Tear/i
+/** 删掉的图元（按规范化后的材质名匹配）：眼球湿润层 / 泪腺（透明壳），口腔里的牙齿舌头。脸上雕刻的泪滴（Sculpted_Tears）保留 */
+const DROP_MATERIAL = /EyeMoisture|^Genesis_9_Tear|^Genesis_9_Mouth_(Mouth|Teeth)/i
 
 /**
  * 按部件：减面比例（ratio）/ 允许的形状误差（error，占 mesh 尺寸的比例）/ 贴图边长上限（texture）。
  * 第一条匹配 mesh 名的生效。人物躺在远处当环境，脸和身体是视觉重点，保留得多一些；
  * Tripo 生成的裙子、花是均匀的高密度网格，减得最多。
  * rebuildNormals：导出时是硬边（每个三角面顶点都单独一份），焊不上就减不动 —— 先丢掉法线焊接，减完再重算平滑法线。
+ * 没有贴图的材质顺带丢掉 UV（用不上，UV 接缝也会挡住焊接）。
  */
 const PARTS = [
   { match: /Hair/i, ratio: 0.35, error: 0.004, texture: 1024 },
@@ -75,17 +82,79 @@ const PARTS = [
   { match: /球体/, ratio: 0.15, error: 0.05, texture: 256, rebuildNormals: true },
   { match: /.*/, ratio: 1, error: 0, texture: 1024 },
 ]
-/** 头部贴图（脸）单独保留 2048，其余身体贴图 1024 */
+/**
+ * 按人物（文件名）的额外配置：
+ *   parts：排在 PARTS 前面的部件规则（各人物的 Tripo 部件编号不一样，哪个是主裙要单独指定）。
+ *          规则可以写 material（按改名后的 char_ 材质名匹配图元）代替 match（按 mesh 名）：整个人物合成一个网格时按材质分
+ *   borrow：导出时贴图丢了 / 坏了的材质，从另一个模型里同名（去掉 .002 后缀）的材质借底色贴图和参数（替换掉自己的）
+ *   copyTextures：导出时挂错了贴图的材质，从同一模型里另一个材质复制底色 / 粗糙度贴图（材质名按规范化后的写）
+ *   collider：进碰撞体的 mesh（按 mesh 名），默认 COLLIDER
+ *   cloth：做布料波动的 mesh（按 mesh 名），默认 CLOTH；null = 不做
+ *   clothMaterials：做布料波动的图元（按材质名，规范化后的原名），和 cloth 叠加
+ *   opaque：改成不透明的材质（按规范化后的原名）：贴图的 alpha 其实是 Blender 里叠珠饰用的遮罩，导出器当成了透明度
+ *   tweaks：改面板调不到的材质参数（按规范化后的原名）：sheenColor（灰度）/ sheenRoughness / clearcoatRoughness /
+ *           saturation（底色贴图的饱和度倍数，烘进贴图；贴图被几个材质共用时只处理一次）。
+ *           颜色、金属度、清漆强度、环境反射这些面板能调的写在场景 config 的 materials 里
+ */
+const CHARACTERS = {
+  garden: {
+    // 头上的蝴蝶翅膀（材质 78 / 80）太艳。花园的紫色环境光 + 后期调色会把饱和度推回去，所以贴图要降得多一些
+    tweaks: [{ match: /^(78|80)(\.\d+)?$/, saturation: 0.25 }],
+  },
+  ocean: {
+    // 主裙：原贴图 8K，保留 2048。头发比花园那版多 2 万面、海洋还要多画一遍水面反射，减得更狠一些
+    parts: [
+      { match: /^tripo_part_0/i, ratio: 0.25, error: 0.01, texture: 2048 },
+      { match: /Hair/i, ratio: 0.22, error: 0.006, texture: 1024 },
+    ],
+    // 头发在 Blender 里是程序化头发材质，导不出来（白色金属片）；睫毛贴图导出成了纯白不透明（透明度在另一张图里，丢了）。
+    // 与花园人物是同一套 Daz 资产，借它的贴图
+    borrow: { from: 'art/character/garden.glb', materials: /Hair|Eyelashes/i },
+    // 脸和口腔的贴图挂反了：脸上是嘴唇妆容遮罩（整张黑，只有嘴唇亮），正常的脸部底色 / 粗糙度在口腔材质上
+    copyTextures: [{ to: /HD_Head/i, from: /HD_Mouth_Cavity/i }],
+  },
+  cave: {
+    // 整个人物是一个网格（49 个图元，60 万面），按材质分：头发是雕刻出来的实体发束（19 万面），礼服 4 块 21 万面，珍珠发带 8 万面
+    parts: [
+      { material: /sculpted_strands/i, ratio: 0.2, error: 0.012, texture: 1024, rebuildNormals: true },
+      { material: /Hair/i, ratio: 0.4, error: 0.004, texture: 1024 },
+      { material: /珍珠/, ratio: 0.2, error: 0.01, texture: 512 },
+      { material: /礼服|袖饰/, ratio: 0.3, error: 0.005, texture: 1024 },
+      { material: /发带/, ratio: 0.5, error: 0.01, texture: 512 },
+      { material: /Sculpted_Tears/i, ratio: 0.3, error: 0.01, texture: 256 },
+      { material: /Eyes|Eyelashes/i, ratio: 1, error: 0, texture: 512 },
+      // 皮肤贴图尺寸由 TEXTURE_BY_MATERIAL 定
+      { material: /.*/, ratio: 1, error: 0, texture: 1024 },
+    ],
+    collider: /MixamoFullCharacter/i,
+    cloth: null,
+    clothMaterials: /礼服|袖饰/,
+    // 礼服贴图是完整的布料 + 珠饰，alpha 只有珠串（Blender 里叠珠饰的遮罩）：当透明度用的话上身只剩珠串、几乎全透明
+    opaque: /礼服|袖饰/,
+    // 礼服导出时是白色满强度天鹅绒光泽 + 近乎镜面的清漆层，在洞穴里整件发白：光泽压到 35%、清漆磨砂一些
+    tweaks: [{ match: /礼服|袖饰｜(垂坠透明纱|水晶薄纱)/, sheenColor: 0.35, sheenRoughness: 0.5, clearcoatRoughness: 0.35 }],
+    // 同花园 / 海洋人物的 Daz 资产：睫毛贴图导出成纯白不透明，借花园的；脸和口腔的贴图挂反了
+    borrow: { from: 'art/character/garden.glb', materials: /Eyelashes/i },
+    copyTextures: [{ to: /HD_Head/i, from: /HD_Mouth_Cavity/i }],
+  },
+}
+
+/** 皮肤粗糙度贴图换常数；平均值低于 min 视为错误贴图，取 fallback */
+const SKIN = { match: /HD_/i, min: 0.2, fallback: 0.58 }
+/** 去掉法线贴图的材质 */
+const DROP_NORMAL = /Eyelashes|Eyes_Eye/i
+
+/** 皮肤贴图按材质（改名后的 char_ 名）：脸 / 身体 2048，脚趾甲、口腔 1024 */
 const TEXTURE_BY_MATERIAL = [
-  { match: /HD_Head/i, texture: 2048 },
-  { match: /HD_(Body|Arms|Legs|Toenails|Mouth)/i, texture: 1024 },
+  { match: /^char_(Head|Body|Arms|Legs)$/i, texture: 2048 },
+  { match: /^char_(Toenails|Mouth_Cavity)$/i, texture: 1024 },
 ]
 
 /** Idle 权重：骨骼名 → 系数（Mixamo 骨骼）。呼吸 = 胸腔起伏；头部 = 绕颈部轻微摆动（头发 / 头饰蒙在头骨上，跟着动） */
 const BREATH_JOINTS = { 'mixamorig:Spine': 0.3, 'mixamorig:Spine1': 0.7, 'mixamorig:Spine2': 1 }
 const HEAD_JOINTS = { 'mixamorig:Neck': 0.5, 'mixamorig:Head': 1, 'mixamorig:HeadTop_End': 1 }
 /** 布料（按 mesh 名）：顶点着色器里做低频波动 */
-const CLOTH = /tripo_part|衣服/i
+const CLOTH = /tripo_part|衣服|裙/i
 
 /**
  * 眨眼（Genesis 9 没导出表情变形，Mixamo 骨骼也没有眼皮骨骼）：眼皮顶点绕眼球中心、沿左右轴转（真实眼皮也是贴着眼球滑下来）。
@@ -136,12 +205,12 @@ function mul(a, b) {
  * 蒙皮烘焙：顶点 = Σ 权重 × (骨骼世界矩阵 × 逆绑定矩阵) × 绑定姿势顶点，结果直接是世界坐标。
  * （glTF 规定蒙皮 mesh 忽略自身节点变换，所以烘完把节点挂到场景根、变换归零即可）
  */
-function bakeSkin(doc, node) {
+function bakeSkin(doc, node, clothMatch) {
   const skin = node.getSkin()
   const joints = skin.listJoints()
   const breathOf = joints.map((j) => BREATH_JOINTS[j.getName()] ?? 0)
   const headOf = joints.map((j) => HEAD_JOINTS[j.getName()] ?? 0)
-  const cloth = CLOTH.test(node.getMesh().getName()) ? 1 : 0
+  const cloth = clothMatch?.test(node.getMesh().getName()) ? 1 : 0
   const idleOf = new Map()
   const ibm = skin.getInverseBindMatrices()
   const mats = joints.map((j, i) => {
@@ -200,18 +269,101 @@ function bakeSkin(doc, node) {
   }
 }
 
+/** 去掉 Blender 的重名后缀（.002 之类） */
+const baseName = (name) => name.replace(/\.\d{3}$/, '')
+
+/** 从 from 模型里同名材质借底色贴图 + 透明 / 粗糙度参数（替换掉自己的） */
+async function borrowTextures(doc, { from, materials }) {
+  const donor = await io.read(from)
+  const donorMats = new Map(donor.getRoot().listMaterials().map((m) => [baseName(m.getName()).replace(/ /g, '_'), m]))
+  const copies = new Map()
+  let n = 0
+  for (const mat of doc.getRoot().listMaterials()) {
+    if (!materials.test(mat.getName())) continue
+    const src = donorMats.get(baseName(mat.getName()))
+    const tex = src?.getBaseColorTexture()
+    if (!tex) continue
+    if (!copies.has(tex)) {
+      copies.set(tex, doc.createTexture(tex.getName()).setImage(tex.getImage()).setMimeType(tex.getMimeType()))
+    }
+    mat
+      .setBaseColorTexture(copies.get(tex))
+      .setBaseColorFactor(src.getBaseColorFactor())
+      .setAlphaMode(src.getAlphaMode())
+      .setAlphaCutoff(src.getAlphaCutoff())
+      .setMetallicFactor(src.getMetallicFactor())
+      .setRoughnessFactor(src.getRoughnessFactor())
+      .setMetallicRoughnessTexture(null)
+      .setNormalTexture(null)
+    n++
+  }
+  console.log(`  借贴图   → ${n} 个材质（${from}）`)
+}
+
+/** 皮肤粗糙度贴图 → 常数（G 通道平均值） */
+async function flattenSkinRoughness(doc) {
+  for (const mat of doc.getRoot().listMaterials()) {
+    const tex = mat.getMetallicRoughnessTexture()
+    if (!SKIN.match.test(mat.getName()) || !tex) continue
+    const { channels } = await sharp(tex.getImage()).stats()
+    const mean = (channels[1] ?? channels[0]).mean / 255
+    mat.setRoughnessFactor(mat.getRoughnessFactor() * (mean < SKIN.min ? SKIN.fallback : mean)).setMetallicRoughnessTexture(null)
+  }
+}
+
 async function build(src, name) {
   const doc = await io.read(src)
   const root = doc.getRoot()
   const scene = root.getDefaultScene() ?? root.listScenes()[0]
+  const character = CHARACTERS[name] ?? {}
+  const clothMatch = character.cloth === undefined ? CLOTH : character.cloth
+
+  // 0. 材质名规范化；WebP 贴图转 PNG（KTX2 压缩不认 WebP）；借贴图
+  for (const mat of root.listMaterials()) mat.setName(mat.getName().replace(/ /g, '_'))
+  for (const tex of root.listTextures()) {
+    if (tex.getMimeType() !== 'image/webp') continue
+    tex.setImage(await sharp(tex.getImage()).png().toBuffer()).setMimeType('image/png')
+  }
+  if (character.borrow) await borrowTextures(doc, character.borrow)
+  for (const { to, from } of character.copyTextures ?? []) {
+    const mats = root.listMaterials()
+    const src = mats.find((m) => from.test(m.getName()))
+    const dst = mats.find((m) => to.test(m.getName()))
+    if (!src || !dst) throw new Error(`copyTextures：找不到材质 ${from} / ${to}`)
+    dst.setBaseColorTexture(src.getBaseColorTexture()).setMetallicRoughnessTexture(src.getMetallicRoughnessTexture())
+  }
+
+  // 1b. 没蒙皮的 mesh：世界变换烘进顶点（transformMesh 会处理法线和负缩放的绕序），补上 _IDLE（只有布料权重）。
+  const skinned = root.listNodes().filter((n) => n.getMesh() && n.getSkin())
+  const rigid = root.listNodes().filter((n) => n.getMesh() && !n.getSkin() && n.listParents().some((p) => p.propertyType === 'Node'))
+  for (const node of rigid) {
+    const mesh = node.getMesh()
+    transformMesh(mesh, node.getWorldMatrix())
+    const cloth = clothMatch?.test(mesh.getName()) ? 1 : 0
+    for (const prim of mesh.listPrimitives()) {
+      const n = prim.getAttribute('POSITION').getCount()
+      const I = new Float32Array(n * 4)
+      for (let i = 0; i < n; i++) I[i * 4 + 2] = cloth
+      prim.setAttribute('_IDLE', doc.createAccessor().setType('VEC4').setBuffer(prim.getAttribute('POSITION').getBuffer()).setArray(I))
+    }
+  }
+  if (rigid.length) console.log(`  无蒙皮   → ${rigid.length} 个 mesh 烘入世界变换`)
+  for (const node of rigid) {
+    for (const parent of node.listParents()) if (parent.propertyType === 'Node') parent.removeChild(node)
+    node.setTranslation([0, 0, 0]).setRotation([0, 0, 0, 1]).setScale([1, 1, 1])
+    scene.addChild(node)
+  }
 
   // 1. 烘焙蒙皮：先全部算完（骨骼矩阵要用原始层级），再把 mesh 挪到场景根
-  const skinned = root.listNodes().filter((n) => n.getMesh() && n.getSkin())
-  for (const node of skinned) bakeSkin(doc, node)
+  for (const node of skinned) bakeSkin(doc, node, clothMatch)
   const idle = idleRig(root)
   const eyes = bakeBlink(root)
   if (eyes && idle) Object.assign(idle, eyes)
-  else console.warn('  ⚠ 没找到眼球 / 头部骨骼，不做眨眼')
+  else if (idle) {
+    // 没有单独的眼球（整个人物合成了一个网格）：不眨眼；脸朝向用头骨的朝向
+    idle.headForward = headForward(root)
+    console.warn('  ⚠ 没找到眼球，不做眨眼（脸朝向取头骨方向）')
+  }
   for (const node of skinned) {
     node.setSkin(null)
     for (const parent of node.listParents()) if (parent.propertyType === 'Node') parent.removeChild(node)
@@ -233,39 +385,73 @@ async function build(src, name) {
     if (!mesh.listPrimitives().length) node.dispose()
   }
 
+  // 布料（按材质）：只标记这些图元用到的顶点
+  if (character.clothMaterials) {
+    for (const prim of root.listMeshes().flatMap((m) => m.listPrimitives())) {
+      if (!character.clothMaterials.test(prim.getMaterial()?.getName() ?? '')) continue
+      const idle = prim.getAttribute('_IDLE')
+      const e = []
+      for (const i of primVertices(prim)) {
+        idle.getElement(i, e)
+        e[2] = 1
+        idle.setElement(i, e)
+      }
+    }
+  }
+
   // 3–4. 材质
+  await flattenSkinRoughness(doc)
+  const desaturated = new Set()
   for (const mat of root.listMaterials()) {
     const old = mat.getName()
-    if (mat.getAlphaMode() === 'BLEND') {
+    if (DROP_NORMAL.test(old)) mat.setNormalTexture(null)
+    for (const t of character.tweaks ?? []) {
+      if (!t.match.test(old)) continue
+      const base = mat.getBaseColorTexture()
+      if (base && t.saturation !== undefined && !desaturated.has(base)) {
+        desaturated.add(base)
+        const png = base.getMimeType() === 'image/png'
+        base.setImage(await sharp(base.getImage()).modulate({ saturation: t.saturation }).toFormat(png ? 'png' : 'jpeg', { quality: 95 }).toBuffer())
+      }
+      const sheen = mat.getExtension('KHR_materials_sheen')
+      if (sheen && t.sheenColor !== undefined) sheen.setSheenColorFactor([t.sheenColor, t.sheenColor, t.sheenColor])
+      if (sheen && t.sheenRoughness !== undefined) sheen.setSheenRoughnessFactor(t.sheenRoughness)
+      const clearcoat = mat.getExtension('KHR_materials_clearcoat')
+      if (clearcoat && t.clearcoatRoughness !== undefined) clearcoat.setClearcoatRoughnessFactor(t.clearcoatRoughness)
+    }
+    if (character.opaque?.test(old)) mat.setAlphaMode('OPAQUE')
+    else if (mat.getAlphaMode() === 'BLEND') {
       mat.setAlphaMode('MASK').setAlphaCutoff(CUTOUT.find((c) => c.match.test(old)).cutoff)
     }
     // 去掉 Blender 的重名后缀（.002 之类）：每次重新导出后缀都会变，材质名要稳定，面板里的覆盖才对得上
-    const short = old
-      .replace(/\.\d{3}$/, '')
+    const short = baseName(old)
       .replace(/^aprilyshElathlaenHair_\d+_/, 'hair_')
       .replace(/^Victoria_9_HD_/, '')
       .replace(/^Genesis_9_/, '')
     mat.setName(/Pool_Water/i.test(old) ? 'char_droplet' : `char_${short}`)
   }
 
+  if (desaturated.size) console.log(`  饱和度   → ${desaturated.size} 张贴图`)
   await doc.transform(prune(), dedup())
 
   // 5. 减面（逐 mesh 按部件规则）
   const before = countTriangles(doc)
-  const partOf = (mesh) => PARTS.find((p) => p.match.test(mesh.getName()))
-  for (const mesh of root.listMeshes()) {
-    if (partOf(mesh).rebuildNormals) for (const prim of mesh.listPrimitives()) prim.setAttribute('NORMAL', null)
-  }
+  const rules = [...(character.parts ?? []), ...PARTS]
+  const partOf = (mesh, prim) =>
+    rules.find((p) => (p.material ? p.material.test(prim.getMaterial()?.getName() ?? '') : p.match.test(mesh.getName())))
+  const eachPrim = (fn) => root.listMeshes().forEach((mesh) => mesh.listPrimitives().forEach((prim) => fn(mesh, prim)))
+  const textured = (mat) => !!mat && materialHasTextures(mat)
+  eachPrim((mesh, prim) => {
+    if (!textured(prim.getMaterial())) for (const sem of prim.listSemantics()) if (sem.startsWith('TEXCOORD')) prim.setAttribute(sem, null)
+    if (partOf(mesh, prim).rebuildNormals) prim.setAttribute('NORMAL', null)
+  })
   await doc.transform(weld())
   await MeshoptSimplifier.ready
-  for (const mesh of root.listMeshes()) {
-    const rule = partOf(mesh)
-    if (rule.ratio >= 1) continue
-    for (const prim of mesh.listPrimitives()) {
-      simplifyPrimitive(prim, { simplifier: MeshoptSimplifier, ratio: rule.ratio, error: rule.error })
-    }
-  }
-  smoothNormals(doc, (mesh) => !!partOf(mesh).rebuildNormals)
+  eachPrim((mesh, prim) => {
+    const rule = partOf(mesh, prim)
+    if (rule.ratio < 1) simplifyPrimitive(prim, { simplifier: MeshoptSimplifier, ratio: rule.ratio, error: rule.error })
+  })
+  smoothNormals(doc, (mesh, prim) => !!partOf(mesh, prim).rebuildNormals)
   // 同材质的 mesh 合并成一个 draw call（22 颗水珠、9 只蝴蝶原本各自一个；烘焙后都在世界坐标，可以直接合并）
   await doc.transform(prune(), flatten(), joinMeshes({ keepNamed: false }), prune())
   console.log(`  减面     ${Math.round(before)} → ${Math.round(countTriangles(doc))} 三角面`)
@@ -273,20 +459,17 @@ async function build(src, name) {
   // 轴心 = 包围盒底面中心（此时所有 mesh 都已烘到世界坐标、挂在场景根）
   const { min, max } = getBounds(root.getDefaultScene() ?? root.listScenes()[0])
   const pivot = [(min[0] + max[0]) / 2, min[1], (min[2] + max[2]) / 2]
-  const collider = await buildCollider(await io.readBinary(await io.writeBinary(doc)), name, pivot)
+  const collider = await buildCollider(await io.readBinary(await io.writeBinary(doc)), name, pivot, character.collider)
   setPivot(doc, pivot, idle)
 
   // 6. 贴图尺寸：每个材质的上限 = 用到它的部件里最大的；每张贴图的上限 = 用到它的材质里最大的
   const matLimit = new Map()
-  for (const mesh of root.listMeshes()) {
-    const rule = partOf(mesh)
-    for (const prim of mesh.listPrimitives()) {
-      const mat = prim.getMaterial()
-      if (!mat) continue
-      const byMat = TEXTURE_BY_MATERIAL.find((t) => t.match.test(mat.getName()))
-      matLimit.set(mat, Math.max(matLimit.get(mat) ?? 0, byMat?.texture ?? rule.texture))
-    }
-  }
+  eachPrim((mesh, prim) => {
+    const mat = prim.getMaterial()
+    if (!mat) return
+    const byMat = TEXTURE_BY_MATERIAL.find((t) => t.match.test(mat.getName()))
+    matLimit.set(mat, Math.max(matLimit.get(mat) ?? 0, byMat?.texture ?? partOf(mesh, prim).texture))
+  })
   const limit = new Map()
   for (const tex of root.listTextures()) {
     const sizes = [...materialsOf(tex)].map((m) => matLimit.get(m) ?? 0)
@@ -320,6 +503,11 @@ async function build(src, name) {
   return { out, triangles: countTriangles(doc), collider }
 }
 
+/** 材质有没有用任何贴图（核心槽位或扩展里的） */
+function materialHasTextures(mat) {
+  return mat.getGraph().listChildren(mat).some((c) => c.propertyType === 'Texture' || mat.getGraph().listChildren(c).some((cc) => cc.propertyType === 'Texture'))
+}
+
 /** 用到这张贴图的材质（核心槽位直接挂在材质上；specular 之类挂在材质的扩展属性上，再往上找一层） */
 function materialsOf(tex) {
   const out = new Set()
@@ -328,6 +516,20 @@ function materialsOf(tex) {
     else if (p.propertyType !== 'Root') for (const pp of p.listParents()) if (pp.propertyType === 'Material') out.add(pp)
   }
   return out
+}
+
+/**
+ * 脸朝向（没有眼球时的退路）：Mixamo 角色绑定姿势面朝 +Z，用头骨的蒙皮矩阵（世界矩阵 × 逆绑定矩阵）把 +Z 转到当前姿势
+ */
+function headForward(root) {
+  for (const skin of root.listSkins()) {
+    const joints = skin.listJoints()
+    const i = joints.findIndex((j) => j.getName() === 'mixamorig:Head')
+    if (i < 0) continue
+    const m = mul(joints[i].getWorldMatrix(), skin.getInverseBindMatrices().getElement(i, []))
+    return normalize([m[8], m[9], m[10]])
+  }
+  return [0, 0, 1]
 }
 
 /** 颈部位置（世界坐标）与点头轴：头部摆动的旋转中心 / 轴 */
@@ -381,11 +583,7 @@ function bakeBlink(root) {
     const verts = [...primVertices(prim)].map((i) => pos.getElement(i, []))
     const c = verts.reduce((a, v) => [a[0] + v[0], a[1] + v[1], a[2] + v[2]], [0, 0, 0]).map((v) => v / verts.length)
     const r = verts.reduce((a, v) => a + Math.hypot(...sub(v, c)), 0) / verts.length
-    // 视线方向：角膜是眼球上唯一凸出来的地方，取离中心最远的 2% 顶点的平均方向
-    const far = verts.map((v) => [Math.hypot(...sub(v, c)), v]).sort((a, b) => b[0] - a[0])
-    const top = far.slice(0, Math.max(1, Math.round(far.length * 0.02)))
-    const gaze = normalize(top.reduce((a, [, v]) => a.map((x, i) => x + v[i] - c[i]), [0, 0, 0]))
-    return { c, r, gaze }
+    return { c, r }
   }
   const L = eye(BLINK.eyeLeft)
   const R = eye(BLINK.eyeRight)
@@ -434,7 +632,7 @@ function bakeBlink(root) {
     }
   }
   console.log(`  眨眼     → ${lids} 个眼皮 / 睫毛顶点，眼球半径 ${L.r.toFixed(3)}`)
-  return { eyeLeft: L.c, eyeRight: R.c, blinkAxis: axis, headForward: forward, gazeLeft: L.gaze, gazeRight: R.gaze }
+  return { eyeLeft: L.c, eyeRight: R.c, blinkAxis: axis, headForward: forward }
 }
 
 /** 顶点平移 -pivot，所有 mesh 节点挂到一个位于 pivot 的节点下（整体位置不变） */
@@ -452,10 +650,8 @@ function setPivot(doc, pivot, idle = null) {
         idleEyeLeft: local(idle.eyeLeft),
         idleEyeRight: local(idle.eyeRight),
         idleBlinkAxis: idle.blinkAxis,
-        idleHeadForward: idle.headForward,
-        idleGazeLeft: idle.gazeLeft,
-        idleGazeRight: idle.gazeRight,
       }),
+      ...(idle.headForward && { idleHeadForward: idle.headForward }),
     })
   }
   const offset = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -pivot[0], -pivot[1], -pivot[2], 1]
@@ -467,9 +663,9 @@ function setPivot(doc, pivot, idle = null) {
   scene.addChild(holder)
 }
 
-async function buildCollider(doc, name, pivot) {
+async function buildCollider(doc, name, pivot, include = COLLIDER) {
   const root = doc.getRoot()
-  for (const node of root.listNodes()) if (node.getMesh() && !COLLIDER.test(node.getMesh().getName())) node.dispose()
+  for (const node of root.listNodes()) if (node.getMesh() && !include.test(node.getMesh().getName())) node.dispose()
   for (const mesh of root.listMeshes()) {
     for (const prim of mesh.listPrimitives()) {
       prim.setMaterial(null)

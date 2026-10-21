@@ -190,6 +190,7 @@ function buildMaterials(parent: Container, path: Path, ctx: BuildContext) {
     ctx.materialFolders.set(e.name, sub)
     for (const field of MATERIAL_FIELDS) {
       if (field.physical && !e.physical) continue
+      if (field.staticOnly && e.role !== 'static') continue
       const key = field.key
       bindLeaf(
         sub,

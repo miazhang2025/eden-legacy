@@ -53,7 +53,7 @@ const SEEDS: Seed[] = [
   { id: 'ocean_shell_01', scene: 'ocean', category: 'shell', glowColor: '#ffd1e8', placeholderColor: '#e8d6c8', specimenScale: 1, heroWeight: 0 },
   { id: 'ocean_shell_02', scene: 'ocean', category: 'shell', glowColor: '#b3f0ff', placeholderColor: '#c8d6e8', specimenScale: 1, heroWeight: 3 },
   { id: 'ocean_fish_01', scene: 'ocean', category: 'fish', glowColor: '#6bd8ff', placeholderColor: '#4a8ab8', specimenScale: 1, heroWeight: 4, specimenGrade: { saturation: 0.35, brightness: 1.15 } },
-  { id: 'ocean_fish_02', scene: 'ocean', category: 'fish', glowColor: '#ffa36b', placeholderColor: '#d88a4a', specimenScale: 1, heroWeight: 7, specimenGrade: { hue: 150, hueCenter: 180, hueWidth: 55, saturation: 0.9, brightness: 0.95 } },
+  { id: 'ocean_fish_02', scene: 'ocean', category: 'fish', glowColor: '#ffa36b', placeholderColor: '#d88a4a', specimenScale: 1, heroWeight: 7, specimenGrade: { saturation: 0.9, brightness: 0.95 } },
 
   { id: 'garden_flower_01', scene: 'garden', category: 'flower', glowColor: '#ff8ac8', placeholderColor: '#e86aa8', specimenScale: 1, heroWeight: 8, specimenGrade: { saturation: 0.75, brightness: 0.9 } },
   { id: 'garden_flower_02', scene: 'garden', category: 'flower', glowColor: '#fff08a', placeholderColor: '#e8d84a', specimenScale: 1, heroWeight: 9, specimenGrade: { hue: 165, saturation: 0.6, brightness: 1.15 } },

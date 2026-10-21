@@ -12,6 +12,7 @@
 //   地形顶点色（COLOR_0，运行时当遮罩读，不当颜色乘）：
 //     r = 手绘贴图权重（原地形覆盖范围内为 1，边缘向内渐变到 0，外面是程序化材质）
 //     g = 水域（池底：挖低 + 着色）
+//     b = 离原地形边缘的距离 ÷ FAR_DIST（裙边从岛边的颜色渐变到远处的深色；岛内为 0）
 //
 //   坐标一律是模型局部空间，运行时套 config 的 env 变换（与草地密度图一致）。
 //
@@ -60,9 +61,11 @@ const RULES = {
     paintFade: 1.5,
     repaint: { 55: { mesh: '8', at: [0.3, 0.72] } },
     water: {
-      blueOverGreen: [12, 28], redOverGreen: 6, darkCut: 0.09, darkReach: 0.8, band: 0.6, close: 0.4, bedDepth: 0.55, shore: 0.2, bank: 0.9, smooth: 0.6, surfaceTol: 0.08, drop: 0.03,
-      // 强制旱地 [x, z, 半径]（模型局部，米）：中池西北角小半岛里被误判成水的小坑和小点
-      dry: [[0.55, -11.2, 0.95], [-1.24, -11.29, 0.35]],
+      blueOverGreen: [12, 28], redOverGreen: 6, darkCut: 0.09, darkReach: 0.8, band: 0.6, close: 0.4, bedDepth: 0.55, shore: 0.2, bank: 1.4, smooth: 0.6, surfaceTol: 0.08, drop: 0.03,
+      // 池面外漫：见「原池面是平的」
+      flood: { lum: 0.27, step: 0.006, reach: 3 },
+      // 强制旱地 [x, z, 半径]（模型局部，米）：中池西北角小半岛里的小坑和小点；中池东南角外的浅水坑；小池北端石头旁溢出的浅水
+      dry: [[0.55, -11.2, 0.95], [-1.24, -11.29, 0.35], [3.21, -3.96, 0.55], [3.21, -2.87, 0.55], [3.47, -2.5, 0.25], [2.95, -0.3, 0.38]],
     },
     far: {
       blend: 12, rise: 4, riseStart: 20, riseEnd: 110, hills: 2.5,
@@ -347,6 +350,36 @@ for (let k = 0; k < PW * PH; k++) {
   const dark = 1 - smoothstep(R.water.darkCut, R.water.darkCut * 1.6, lum)
   wetRaw[k] = Math.max(wetRaw[k], Math.round(dark * 255))
 }
+// 原池面是平的：从已识别的水域沿平面往外漫（相邻像素高差 < step、不高于水位 + surfaceTol、颜色偏暗），
+// 把池面边上画成暗灰绿的一圈也收进水里，否则它比水面高一点露在外面，成了黑边。最远漫出 reach 米
+if (R.water.flood) {
+  const F = R.water.flood
+  const maxSteps = Math.round(F.reach / pix)
+  const dist = new Int32Array(PW * PH).fill(-1)
+  let queue = []
+  for (let k = 0; k < PW * PH; k++) if (wetRaw[k] >= 128) {
+    dist[k] = 0
+    queue.push(k)
+  }
+  const lumAt = (k) => (0.3 * paint[k * 3] + 0.59 * paint[k * 3 + 1] + 0.11 * paint[k * 3 + 2]) / 255
+  let flooded = 0
+  for (let s = 1; s <= maxSteps && queue.length; s++) {
+    const next = []
+    for (const k of queue) {
+      const i = k % PW
+      for (const n of [i > 0 ? k - 1 : -1, i < PW - 1 ? k + 1 : -1, k - PW, k + PW]) {
+        if (n < 0 || n >= PW * PH || dist[n] >= 0 || !cover[n]) continue
+        if (Math.abs(height[n] - height[k]) > F.step || height[n] > level + R.water.surfaceTol || lumAt(n) > F.lum) continue
+        dist[n] = s
+        wetRaw[n] = 255
+        flooded++
+        next.push(n)
+      }
+    }
+    queue = next
+  }
+  log(`池面外漫 ${flooded} 像素（${(flooded * pix * pix).toFixed(1)} m²）`)
+}
 // 闭运算（先膨胀再腐蚀）：补上剩下的小洞，岸线不变
 const closeSigma = R.water.close / pix / 2
 const dilated = await raw(wetRaw).blur(closeSigma).threshold(64).extractChannel(0).raw().toBuffer()
@@ -474,6 +507,8 @@ const wetDen = gaussBlur(surfaceW, CW, CH, R.water.smooth / cellSize)
 /** 水面高度（模型局部 y）；附近没有水返回 null */
 function waterAt(x, z) {
   if (!inBox(x, z)) return null
+  // 强制旱地里没有水面：原地形在这里有低洼时，旁边池塘平滑出来的水面会漫进来（浅水全是泡沫，一片白）
+  if ((R.water.dry ?? []).some(([dx, dz, dr]) => (x - dx) ** 2 + (z - dz) ** 2 < dr * dr)) return null
   const px = ((x - box.x0) / bw) * CW
   const pz = ((z - box.z0) / bh) * CH
   const den = sampleGrid(wetDen, CW, CH, px, pz)
@@ -583,12 +618,14 @@ function terrainAt(x, z) {
     const w = sampleGrid(wet, PW, PH, px, pz)
     const b = sampleGrid(bank, PW, PH, px, pz)
     const water = waterAt(x, z)
-    // 只挖原来就是池面的地方：高出水面的（横跨池塘的石脊）不动
-    const carve = water !== null && b > 0.02 && y0 <= water + R.water.surfaceTol ? smoothstep(0.35, 0.85, b) : 0
+    // 只挖原来就是池面的地方：高出水面的（横跨池塘的石脊）不动。
+    // 按高出水面多少柔和衰减（surfaceTol × 0.5 → 2.5），不是一刀切：水域贴着岸坡脚时，相邻顶点一挖一不挖会切出网格状的小悬崖
+    const tol = R.water.surfaceTol
+    const carve = water !== null && b > 0.02 ? smoothstep(0.35, 0.85, b) * (1 - smoothstep(tol * 0.5, tol * 2.5, y0 - water)) : 0
     const y = mix(y0, Math.min(y0, (water ?? y0) - R.water.bedDepth), carve)
     // 碰撞按水面走：和原来一样能走过池塘（原池面本来就是平的，玩家一直是踩着它走的）
     const collide = carve > 0 ? Math.max(y, water) : y
-    return { y, collide, water, carve, paint: smoothstep(0, R.paintFade, d), wet: w }
+    return { y, collide, water, carve, paint: smoothstep(0, R.paintFade, d), wet: w, edge: 0 }
   }
   // 裙边：从边界高度过渡到远处起伏的地貌
   // 边界高度不能只取最近的一个点（相邻顶点取到不同的点会出现台阶），按「比最近距离远多少」加权平均一片
@@ -608,8 +645,11 @@ function terrainAt(x, z) {
   const bumps = fbm(x * 0.18, z * 0.18, 3) * 0.25 * smoothstep(0, 6, d)
   const far = edgeMean + R.far.rise * smoothstep(R.far.riseStart, R.far.riseEnd, d) + hills
   const y = mix(edgeY, far, t) + bumps + moundAt(x, z)
-  return { y, collide: y, water: null, carve: 0, paint: 0, wet: 0 }
+  return { y, collide: y, water: null, carve: 0, paint: 0, wet: 0, edge: d }
 }
+
+/** 顶点色 b 的量程（米），与 materials/terrain.ts 的 FAR_DIST 一致 */
+const FAR_DIST = 128
 
 // ---------- 6. 网格：可玩区等间距，外面逐圈放大 ----------
 function axis(a0, a1) {
@@ -649,7 +689,7 @@ for (let j = 0; j < NZ; j++) {
     pos.set([x, v.y, z], k * 3)
     posCollide.set([x, v.collide, z], k * 3)
     uv.set([(x - box.x0) / bw, (z - box.z0) / bh], k * 2)
-    mask.set([Math.round(v.paint * 255), Math.round(v.wet * 255), 0, 255], k * 4)
+    mask.set([Math.round(v.paint * 255), Math.round(v.wet * 255), Math.round(clamp(v.edge / FAR_DIST, 0, 1) * 255), 255], k * 4)
     if (v.water !== null) waterY[k] = v.water
     carveW[k] = v.carve
   }
@@ -725,7 +765,8 @@ const water = (() => {
     if (remap[k] < 0) {
       remap[k] = P.length / 3
       P.push(pos[k * 3], waterY[k], pos[k * 3 + 2])
-      D.push(Math.max(0, waterY[k] - pos[k * 3 + 1]))
+      // 带符号：岸上的顶点是负水深。截到 0 的话，插值出来的岸边泡沫会沿着网格三角形走出锯齿
+      D.push(waterY[k] - pos[k * 3 + 1])
     }
     return remap[k]
   }

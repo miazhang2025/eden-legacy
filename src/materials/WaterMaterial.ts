@@ -51,6 +51,9 @@ export function createWaterUniforms() {
     uFoamColor: { value: new Color() },
     uUseFoam: { value: 0 },
     uShoreFade: { value: 0 },
+    /** 远处淡出：x = 开始距离，y = 完全透明距离（米，离 uFadeCenter 的水平距离）；y <= x 时关闭 */
+    uDistanceFade: { value: new Vector2(0, 0) },
+    uFadeCenter: { value: new Vector2(0, 0) },
     uOpacity: { value: 0.85 },
     uDepthMap: { value: null as Texture | null },
     /** 高度图覆盖范围：xy = 最小 x/z，zw = 边长 */
@@ -143,6 +146,8 @@ const fragmentShader = /* glsl */ `
   uniform vec3 uFoamColor;
   uniform float uUseFoam;
   uniform float uShoreFade;
+  uniform vec2 uDistanceFade;
+  uniform vec2 uFadeCenter;
   uniform float uOpacity;
   uniform sampler2D uDepthMap;
   uniform vec4 uDepthBounds;
@@ -198,6 +203,9 @@ const fragmentShader = /* glsl */ `
     // 岸边渐隐：越浅越透明，岸线由水深决定（模糊过的水深图是连续的），不再是地形多边形与水平面硬切出的锯齿
     // 各档位都开（只多一次水深采样）；没有水深数据时 uShoreFade = 0
     float shore = uShoreFade > 0.0 ? smoothstep(0.0, uShoreFade, shoreDepth) : 1.0;
+    // 远处淡出：离水面中心越远越透明，开阔水面在地平线前消失，露出后面已混好雾色的天空，水天交界不再是一条硬线
+    // 以水面中心而不是相机为基准：近处的水池始终完整，走动时淡出边界也不会跟着移动
+    if (uDistanceFade.y > uDistanceFade.x) shore *= 1.0 - smoothstep(uDistanceFade.x, uDistanceFade.y, distance(vEdenWaterWorld.xz, uFadeCenter));
     csm_DiffuseColor = vec4(col, mix(uOpacity, 1.0, foam) * shore);
 
     vec3 V = normalize(cameraPosition - vEdenWaterWorld);

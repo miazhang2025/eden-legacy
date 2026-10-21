@@ -34,7 +34,7 @@ export function EnvironmentSky() {
   const cfg = useSceneCfg((c) => c)
   const material = useMemo(createSkyMaterial, [])
   useEffect(() => () => material.dispose(), [material])
-  updateSkyMaterial(material, cfg)
+  updateSkyMaterial(material, cfg, true)
   return (
     <mesh material={material} scale={100}>
       <sphereGeometry args={[1, 32, 16]} />

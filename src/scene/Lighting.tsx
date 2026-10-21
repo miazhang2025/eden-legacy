@@ -45,7 +45,7 @@ function SceneEnvironment() {
     )
   }
   // 程序化：用天空盒渲染一次环境贴图；天空 / 主光变化时重新渲染（frames=1，平时零开销）
-  const key = JSON.stringify([sky, env.sunIntensity, sunColor, sunPos])
+  const key = JSON.stringify([sky, env.lightSky, env.sunIntensity, sunColor, sunPos])
   const len = Math.hypot(...sunPos) || 1
   const dir = sunPos.map((v) => (v / len) * 50) as [number, number, number]
   return (

@@ -22,8 +22,8 @@
   "env": {
     "model": "/models/env/ocean.glb",
     "collider": "/models/colliders/ocean.glb",
-    "extras": "/models/env/bubble.glb",
-    "extraColliders": "",
+    "extras": "/models/env/bubble.glb,/models/env/ocean.character.glb",
+    "extraColliders": "/models/colliders/ocean.character.glb",
     "extrasTransform": {
       "position": [
         0,
@@ -107,6 +107,7 @@
     "bottomColor": "#95fbf3",
     "midHeight": 0.22999999999999998,
     "horizonWidth": 0.045,
+    "fogBlend": 0,
     "sunColor": "#fffcf9",
     "sunSize": 0,
     "sunIntensity": 0,
@@ -130,7 +131,14 @@
     "background": false,
     "hdriBackground": "hdri/ocean_bg.hdr",
     "backgroundIntensity": 0.7099999999999997,
-    "sunIntensity": 2.17
+    "sunIntensity": 2.17,
+    "lightSky": {
+      "enabled": false,
+      "topColor": "#a9b6e5",
+      "midColor": "#ac99d2",
+      "horizonColor": "#ffd3f4",
+      "bottomColor": "#95fbf3"
+    }
   },
   "shadows": {
     "enabled": true,
@@ -183,12 +191,12 @@
     "opaqueEnvMapIntensity": 2
   },
   "figure": {
-    "enabled": false,
-    "breathAmplitude": 0.03,
+    "enabled": true,
+    "breathAmplitude": 0.06,
     "breathRate": 0.22,
-    "headSway": 0.012,
-    "headRate": 0.07,
-    "clothAmplitude": 0.015,
+    "headSway": 0.05,
+    "headRate": 0.09,
+    "clothAmplitude": 0,
     "clothScale": 0.8,
     "clothSpeed": 0.25,
     "blinkInterval": 4.5,
@@ -198,8 +206,10 @@
     "lookDuration": 4,
     "lookDistance": 30,
     "lookMaxAngle": 0.6,
-    "lookEyeAngle": 0.35,
-    "lookSpeed": 2
+    "lookSpeed": 2,
+    "skinBrightness": 1.55,
+    "skinSaturation": 0.55,
+    "skinTint": "#fff8f6"
   },
   "bubble": {
     "centerOpacity": 0.75,
@@ -245,10 +255,14 @@
     "foamWidth": 0.35,
     "foamColor": "#f4fbff",
     "shoreFade": 0,
+    "distanceFade": [
+      0,
+      0
+    ],
     "causticsIntensity": 0.5,
     "causticsScale": 0.35,
     "causticsSpeed": 0.6,
-    "opacity": 0.77,
+    "opacity": 0.92,
     "blockDepth": 1.05,
     "walkable": true,
     "segments": 96,
@@ -291,6 +305,16 @@
     "macroScale": 18,
     "bedColor": "#2b2440",
     "bedTint": 0.5,
+    "farMatch": {
+      "enabled": false,
+      "edgeColor": "#446935",
+      "deepColor": "#2e4526",
+      "start": 2,
+      "end": 45,
+      "detail": 0.8,
+      "paintMip": 5,
+      "paintReach": 3
+    },
     "peaks": {
       "topColor": "#9d8fb6",
       "baseColor": "#e6d8f0",
@@ -307,6 +331,93 @@
       "inset": 0.6,
       "softWidth": 1.5,
       "pushBack": 2
+    }
+  },
+  "playArea": {
+    "enabled": true,
+    "outline": [
+      [
+        -14.76,
+        -0.32
+      ],
+      [
+        -11.36,
+        -20.51
+      ],
+      [
+        -10.44,
+        -22.99
+      ],
+      [
+        -9.91,
+        -23.53
+      ],
+      [
+        -8.09,
+        -24.43
+      ],
+      [
+        -7.34,
+        -24.66
+      ],
+      [
+        -6.65,
+        -24.76
+      ],
+      [
+        3.47,
+        -24.64
+      ],
+      [
+        6.1,
+        -24.12
+      ],
+      [
+        17.53,
+        -15.24
+      ],
+      [
+        18.81,
+        -12.19
+      ],
+      [
+        18.79,
+        -11.56
+      ],
+      [
+        18.6,
+        -10.54
+      ],
+      [
+        3.56,
+        12.5
+      ],
+      [
+        2.09,
+        13.93
+      ],
+      [
+        0.4,
+        14.9
+      ],
+      [
+        -0.01,
+        15
+      ],
+      [
+        -1.08,
+        14.9
+      ]
+    ],
+    "margin": 10,
+    "inset": 1,
+    "softWidth": 2,
+    "pushBack": 3,
+    "bubbles": {
+      "enabled": true,
+      "spacing": 4.5,
+      "jitter": 0.8,
+      "offset": 0
     }
   },
   "pond": {
@@ -942,7 +1053,13 @@
       "color": "#c5c5c5"
     },
     "SC18_Pearl": {
-      "emissive": "#ffffff"
+      "emissive": "#d6b2c0",
+      "transmission": 0.25,
+      "thickness": 4.78,
+      "attenuationColor": "#6900ff",
+      "color": "#9da3ff",
+      "envMapIntensity": 0.87,
+      "emissiveIntensity": 0.87
     },
     "SC12_bubble": {
       "transparent": true,
@@ -960,20 +1077,6 @@
     "SC09_bubble": {
       "transparent": true,
       "transmission": 1
-    },
-    "SC01_landscape": {
-      "envMapIntensity": 0,
-      "emissiveIntensity": 0
-    },
-    "SC02_landscape": {
-      "envMapIntensity": 0
-    },
-    "SC03_landscape": {
-      "envMapIntensity": 0
-    },
-    "SC04_landscape": {
-      "envMapIntensity": 0,
-      "normalScale": 0
     }
   },
   "audio": {
@@ -1028,7 +1131,7 @@
         0,
         0
       ],
-      "scale": 1
+      "scale": 0.85
     },
     {
       "id": "ocean_fish_01",
@@ -1056,7 +1159,7 @@
         0,
         0
       ],
-      "scale": 1
+      "scale": 2.71
     }
   ],
   "flow": {
@@ -1072,12 +1175,13 @@
     "fadeDuration": 1.2,
     "resolveDelay": 0.6,
     "idleEmissive": 0,
-    "activeEmissive": 0.6,
-    "inspectEmissive": 1.4,
+    "activeEmissive": 1,
+    "foundEmissive": 2,
+    "inspectEmissive": 2.6,
     "selectedEmissive": 4,
     "assetSize": 1,
-    "assetSelfGlow": 0.35,
-    "assetGlowGain": 0.35,
+    "assetSelfGlow": 0.1,
+    "assetGlowGain": 0.25,
     "breatheSpeed": 1.6,
     "floatAmplitude": 0.12,
     "floatSpeed": 1.1,

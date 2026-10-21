@@ -29,9 +29,9 @@ const COPY: Record<string, string> = {
   'landing.howto.end': '完成探索后，生成属于你的 Living Archive / 生命档案。',
 
   // ---------- 场景提示语 ----------
-  'scene.cave.prompt': '岩层替时间藏住了许多东西。选一份，让它跟你离开。',
-  'scene.ocean.prompt': '潮水会带走大多数相遇。留下一个，不让它消失。',
-  'scene.garden.prompt': '花园从不停止更替。挑一种，让它在别处继续存在。',
+  'scene.cave.prompt': '岩层替时间藏住了许多东西。\n四处走走，找到发光的它们。',
+  'scene.ocean.prompt': '潮水会带走大多数相遇。\n趁它们还在，去找到发光的生命。',
+  'scene.garden.prompt': '花园从不停止更替。\n去寻找那些发光的、仍在生长的生命。',
   'card.button.collect': '收集',
   'card.title': '标本档案',
   'card.button.locked': '先去看看其他 {n} 件',
@@ -132,7 +132,7 @@ const COPY_EN: Record<string, string> = {
 
   // ---------- Landing ----------
   'landing.eyebrow': 'A Living Archive of Future Nature',
-  'landing.title': 'RELICS OF EDEN',
+  'landing.title': 'Relics of Eden',
   'landing.about': 'ABOUT PROJECT',
   'landing.lede.1':
     'What is preserved here is not a collection of lifeless specimens, but a living system that continues to grow, respond, and change.',
@@ -152,9 +152,9 @@ const COPY_EN: Record<string, string> = {
   'landing.howto.end': 'Complete your journey to reveal your own Living Archive.',
 
   // ---------- 场景提示语 ----------
-  'scene.cave.prompt': 'The rock strata have hidden many things for time. Choose one, and let it leave with you.',
-  'scene.ocean.prompt': 'The tide carries most encounters away. Leave one behind, and do not let it disappear.',
-  'scene.garden.prompt': 'The garden never stops changing. Choose one, and let it continue somewhere else.',
+  'scene.cave.prompt': 'The rock strata have hidden many things for time.\nWander, and find the ones that glow.',
+  'scene.ocean.prompt': 'The tide carries most encounters away.\nFind the glowing lives before they drift off.',
+  'scene.garden.prompt': 'The garden never stops changing.\nSeek out the glowing lives that are still growing.',
   'card.button.collect': 'Collect',
   'card.title': 'Specimen File',
   'card.button.locked': 'See {n} more first',

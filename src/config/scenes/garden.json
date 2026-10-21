@@ -17,7 +17,7 @@
     "minGroundClearance": 0.4,
     "occlusionPadding": 0.35000000000000003,
     "minDistance": 0.5,
-    "initialPitch": 0.25
+    "initialPitch": -0.029999999999999995
   },
   "env": {
     "model": "/models/env/garden.glb",
@@ -107,6 +107,7 @@
     "bottomColor": "#8f86a8",
     "midHeight": 0.17999999999999997,
     "horizonWidth": 0.07,
+    "fogBlend": 0,
     "sunColor": "#fff0e8",
     "sunSize": 0,
     "sunIntensity": 0.65,
@@ -130,7 +131,14 @@
     "background": true,
     "hdriBackground": "hdri/garden_bg.hdr",
     "backgroundIntensity": 0.7599999999999999,
-    "sunIntensity": 0
+    "sunIntensity": 0,
+    "lightSky": {
+      "enabled": false,
+      "topColor": "#eae1f8",
+      "midColor": "#fbd7ed",
+      "horizonColor": "#b6a3d4",
+      "bottomColor": "#8f86a8"
+    }
   },
   "shadows": {
     "enabled": false,
@@ -188,7 +196,7 @@
     "breathRate": 0.22,
     "headSway": 0.05,
     "headRate": 0.09,
-    "clothAmplitude": 0.03,
+    "clothAmplitude": 0,
     "clothScale": 0.8,
     "clothSpeed": 0.25,
     "blinkInterval": 4.5,
@@ -198,8 +206,10 @@
     "lookDuration": 4,
     "lookDistance": 30,
     "lookMaxAngle": 0.6,
-    "lookEyeAngle": 0.35,
-    "lookSpeed": 2
+    "lookSpeed": 2,
+    "skinBrightness": 1.22,
+    "skinSaturation": 0.55,
+    "skinTint": "#f6f8ff"
   },
   "bubble": {
     "centerOpacity": 0.08,
@@ -245,6 +255,10 @@
     "foamWidth": 0.35,
     "foamColor": "#f4fbff",
     "shoreFade": 0,
+    "distanceFade": [
+      0,
+      0
+    ],
     "causticsIntensity": 0.5,
     "causticsScale": 0.35,
     "causticsSpeed": 0.6,
@@ -291,6 +305,16 @@
     "macroScale": 18,
     "bedColor": "#95887e",
     "bedTint": 0.4,
+    "farMatch": {
+      "enabled": true,
+      "edgeColor": "#446935",
+      "deepColor": "#2e4526",
+      "start": 2,
+      "end": 45,
+      "detail": 0.8,
+      "paintMip": 5,
+      "paintReach": 3
+    },
     "peaks": {
       "topColor": "#9d8fb6",
       "baseColor": "#cdbfdf",
@@ -307,6 +331,20 @@
       "inset": 0.6,
       "softWidth": 1.5,
       "pushBack": 2
+    }
+  },
+  "playArea": {
+    "enabled": false,
+    "outline": [],
+    "margin": 4,
+    "inset": 1,
+    "softWidth": 2,
+    "pushBack": 3,
+    "bubbles": {
+      "enabled": false,
+      "spacing": 2.2,
+      "jitter": 0.8,
+      "offset": 0
     }
   },
   "pond": {
@@ -879,8 +917,9 @@
     "fadeDuration": 1.2,
     "resolveDelay": 0.6,
     "idleEmissive": 0,
-    "activeEmissive": 0.6,
-    "inspectEmissive": 1.4,
+    "activeEmissive": 1,
+    "foundEmissive": 2,
+    "inspectEmissive": 2.6,
     "selectedEmissive": 4,
     "assetSize": 1,
     "assetSelfGlow": 0.35,
@@ -904,4 +943,3 @@
     "lookSensitivity": 1.6
   }
 }
-·

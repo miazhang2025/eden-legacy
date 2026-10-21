@@ -11,6 +11,7 @@ import { patchCaustics } from '../materials/caustics'
 import { isFigureMaterial, patchFigure } from '../materials/figure'
 import { isTerrainName, patchDetail } from '../materials/detail'
 import { patchPond } from '../materials/pond'
+import { patchShadowLift } from '../materials/shadowLift'
 import { useSceneCfg } from '../state/useConfigStore'
 import { useTier } from '../state/useQualityStore'
 import {
@@ -108,6 +109,8 @@ export function useEnvMaterials(
   const register = options.register ?? true
   const castShadowRef = useRef(options.castShadow)
   castShadowRef.current = options.castShadow
+  /** 每个 mesh 不看覆盖时的投阴影默认值（覆盖被删掉时恢复用） */
+  const defaultCast = useRef(new WeakMap<Mesh, boolean>())
   const collected = useMemo(() => collect(root), [root])
   const overrides = useSceneCfg((c) => c.materials)
   const cfg = useSceneCfg((c) => c)
@@ -187,6 +190,8 @@ export function useEnvMaterials(
           if (c.name === pondMaterial) patchPond(s)
           // 场景人物：idle 动画（呼吸 / 头部摆动 / 布料波动，开关由 uniform 控制）
           if (isFigureMaterial(c.name)) patchFigure(s)
+          // 暗部提亮：必须最后注册（要读到 pond 的 edenPondMask），数值为 0 时不生效
+          patchShadowLift(s)
         }
         const visible = !hidden.has(c.name)
         c.meshes.forEach((mesh, i) => assign.push({ mesh, material: c.originals[i], layer: 0, visible }))
@@ -218,6 +223,7 @@ export function useEnvMaterials(
       a.mesh.layers.set(a.layer)
       a.mesh.visible = a.visible
       a.mesh.castShadow = a.castShadow ?? castShadowRef.current?.(a.mesh) ?? true
+      defaultCast.current.set(a.mesh, a.mesh.castShadow)
       a.mesh.receiveShadow = true
     }
     if (register) {
@@ -242,6 +248,8 @@ export function useEnvMaterials(
   useEffect(() => {
     for (const e of Object.values(entries)) {
       applyValues(e.active, { ...e.original, ...roleBase(e, cfg, tier), ...overrides[e.name], role: e.role })
+      const cast = overrides[e.name]?.castShadow
+      for (const mesh of e.meshes) mesh.castShadow = cast ?? defaultCast.current.get(mesh) ?? true
       if (e.role === 'bubble') for (const m of e.active) applyBubbleValues(m, cfg.bubble)
       // alpha 裁切（如蕨类）：有 MSAA 时用 alpha-to-coverage，远处镂空边缘不闪
       for (const m of e.active) {

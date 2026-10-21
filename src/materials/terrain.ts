@@ -6,8 +6,10 @@ import { terrainGlobals } from './terrainGlobals'
 // 生成地形的表面（scripts/build-terrain.mjs）。顶点色不当颜色乘，而是当遮罩读：
 //   r = 原地形范围（1 = 中心，边缘向外渐变到 0 = 远景裙边）
 //   g = 水域（池底着色）
+//   b = 离原地形边缘的距离 ÷ FAR_DIST（裙边用）
 // textured：中心用 near 一套、裙边用 far 一套（Megascans 平铺：颜色 / 法线 / ORM），按 r 混合；
 // painted ：中心颜色换成原地形的手绘贴图 × near.tint × paintBrightness（法线、粗糙度仍用 near）。
+// farMatch（painted）：裙边颜色从岛边的手绘贴图（模糊 mip）按距离渐变到 deepColor，far 贴图只提供明暗细节，岛边接缝看不出来。
 // 平铺 uv = 世界 XZ ÷ tileSize；颜色再混一套旋转缩小的 uv、叠大尺度明暗，远看不出平铺周期。
 
 const layerUniforms = () => ({
@@ -53,6 +55,14 @@ export const terrainUniforms = {
   uTerrainMacroScale: { value: 1 / 18 },
   uTerrainBed: { value: new Color() },
   uTerrainBedTint: { value: 0.5 },
+  uFarMatch: { value: 0 },
+  uFarEdge: { value: new Color() },
+  uFarDeep: { value: new Color() },
+  uFarStart: { value: 0 },
+  uFarEnd: { value: 40 },
+  uFarDetail: { value: 1 },
+  uFarPaintMip: { value: 5 },
+  uFarPaintReach: { value: 4 },
 }
 
 /** 贴图由 GeneratedTerrain 加载后塞进来 */
@@ -91,7 +101,21 @@ export function updateTerrainUniforms(cfg: SceneConfig) {
   u.uTerrainMacroScale.value = 1 / Math.max(0.1, t.macroScale)
   u.uTerrainBed.value.set(t.bedColor)
   u.uTerrainBedTint.value = t.bedTint
+  const fm = t.farMatch
+  u.uFarMatch.value = t.material === 'painted' && fm?.enabled ? 1 : 0
+  if (fm) {
+    u.uFarEdge.value.set(fm.edgeColor)
+    u.uFarDeep.value.set(fm.deepColor)
+    u.uFarStart.value = fm.start
+    u.uFarEnd.value = Math.max(fm.start + 0.1, fm.end)
+    u.uFarDetail.value = fm.detail
+    u.uFarPaintMip.value = fm.paintMip
+    u.uFarPaintReach.value = Math.max(0.1, fm.paintReach)
+  }
 }
+
+/** 顶点色 b 的量程（米），与 scripts/build-terrain.mjs 的 FAR_DIST 一致 */
+const FAR_DIST = 128
 
 const PATCHED = Symbol('eden-terrain')
 
@@ -121,6 +145,14 @@ uniform float uTerrainMacro;
 uniform float uTerrainMacroScale;
 uniform vec3 uTerrainBed;
 uniform float uTerrainBedTint;
+uniform float uFarMatch;
+uniform vec3 uFarEdge;
+uniform vec3 uFarDeep;
+uniform float uFarStart;
+uniform float uFarEnd;
+uniform float uFarDetail;
+uniform float uFarPaintMip;
+uniform float uFarPaintReach;
 varying vec4 vEdenTerrainMask;
 varying vec3 vEdenTerrainPos;
 varying vec3 vEdenTerrainNormal;
@@ -210,7 +242,22 @@ export function patchTerrain(material: Material) {
           if (w < 0.999) {
             EdenGround f = edenSampleGround(uFarAlbedo, uFarNormal, uFarOrm, uvF, dxF, dyF, uvFB, dxFB, dyFB, 1.0);
             float fw = 1.0 - w;
-            g.albedo += f.albedo * uFarTint * fw; g.normal += f.normal * fw; g.orm += f.orm * fw;
+            vec3 fAlbedo = f.albedo * uFarTint;
+            if (uFarMatch > 0.5) {
+              // 岛边颜色：紧贴岛边取手绘贴图的模糊 mip（覆盖区外是 push-pull 往外延的边缘色），离岛 paintReach 米内渐变到 edgeColor；
+              // 按离岛距离渐变（跟着岛的轮廓），贴图范围外的夹边 uv 也一并淡掉，不会拉出条纹、方块
+              float dist = vEdenTerrainMask.b * ${FAR_DIST.toFixed(1)};
+              vec2 uvOut = max(max(-vEdenTerrainUv, vEdenTerrainUv - 1.0), 0.0);
+              float paintW = (1.0 - smoothstep(0.0, uFarPaintReach, dist)) * (1.0 - smoothstep(0.0, 0.05, max(uvOut.x, uvOut.y)));
+              vec3 paintBlur = textureLod(uTerrainPaint, clamp(vEdenTerrainUv, vec2(0.001), vec2(0.999)), uFarPaintMip).rgb * uNearTint * uTerrainPaintGain;
+              vec3 edgeCol = mix(uFarEdge, paintBlur, paintW);
+              vec3 base = mix(edgeCol, uFarDeep, smoothstep(uFarStart, uFarEnd, dist));
+              // far 贴图只取明暗：相对整张贴图平均亮度（最小一级 mip）的比例
+              vec3 lumW = vec3(0.2126, 0.7152, 0.0722);
+              float mean = max(dot(textureLod(uFarAlbedo, vec2(0.5), 12.0).rgb, lumW), 1e-3);
+              fAlbedo = base * mix(1.0, dot(f.albedo, lumW) / mean, uFarDetail);
+            }
+            g.albedo += fAlbedo * fw; g.normal += f.normal * fw; g.orm += f.orm * fw;
             aoS += uFarAO * fw; roughS += uFarRough * fw; nS += uFarNormalStrength * fw;
           }
           // 大尺度明暗：两层噪声，远处看不出贴图周期
@@ -253,7 +300,7 @@ export function patchTerrain(material: Material) {
       )
   }
   const prevKey = m.customProgramCacheKey?.bind(m)
-  m.customProgramCacheKey = () => `${prevKey?.() ?? ''}|eden-terrain-v3`
+  m.customProgramCacheKey = () => `${prevKey?.() ?? ''}|eden-terrain-v4`
   m.needsUpdate = true
 }
 

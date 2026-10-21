@@ -1,9 +1,12 @@
 import type { Vector3 } from 'three'
+import type { Vec2 } from '../config/schema'
 import { getSceneCfg } from '../state/useConfigStore'
 
-// 可玩区软边界（scripts/build-terrain.mjs 烘的有符号距离场，正 = 在原地形范围内，单位米）。
+// 可玩区软边界，两种来源（同一时间只用一种，生成地形的优先）：
+//   - terrain.boundary：scripts/build-terrain.mjs 烘的有符号距离场（正 = 在原地形范围内，单位米）
+//   - playArea：岛的轮廓（凸包）向外扩 margin 米（ocean：玩家可以在水面上走，边界是岛外一圈）
 // 靠近边缘时，移动里「往外」的分量按距离逐渐削掉，只留沿边的分量：玩家会贴着边滑走，不会撞上空气墙。
-// 距离场在模型局部坐标，查询时套 config 的 env 变换。
+// 距离场 / 轮廓都在模型局部坐标，查询时套 config 的 env 变换。
 
 interface Field {
   data: Float32Array
@@ -52,10 +55,9 @@ function toLocal(x: number, z: number): [number, number, number] {
   return [dx * c - dz * s, dx * s + dz * c, env.scale]
 }
 
-/** 世界坐标处到可玩区边缘的有符号距离（世界单位）；没有距离场时返回 Infinity */
-export function boundaryDistance(x: number, z: number): number {
-  const f = field
-  if (!f) return Infinity
+/** 距离场在世界坐标处的有符号距离（世界单位） */
+function fieldDistance(x: number, z: number): number {
+  const f = field!
   const [lx, lz, scale] = toLocal(x, z)
   const u = ((lx - f.min[0]) / f.size[0]) * f.w - 0.5
   const v = ((lz - f.min[1]) / f.size[1]) * f.h - 0.5
@@ -71,29 +73,70 @@ export function boundaryDistance(x: number, z: number): number {
   return (a + (b - a) * fv) * scale
 }
 
+/** 点到多边形边的有符号距离（正 = 在里面），模型局部单位 */
+export function outlineDistance(outline: Vec2[], x: number, z: number): number {
+  let d2 = Infinity
+  let inside = false
+  for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
+    const [ax, az] = outline[j]
+    const [bx, bz] = outline[i]
+    const ex = bx - ax
+    const ez = bz - az
+    const t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / (ex * ex + ez * ez || 1)))
+    const px = x - ax - ex * t
+    const pz = z - az - ez * t
+    d2 = Math.min(d2, px * px + pz * pz)
+    if (az > z !== bz > z && x < ((bx - ax) * (z - az)) / (bz - az) + ax) inside = !inside
+  }
+  return inside ? Math.sqrt(d2) : -Math.sqrt(d2)
+}
+
+/** 可玩区在世界坐标处的有符号距离：轮廓外扩 margin 后的边界线 */
+function areaDistance(x: number, z: number): number {
+  const a = getSceneCfg().playArea
+  const [lx, lz, scale] = toLocal(x, z)
+  return (outlineDistance(a.outline, lx, lz) + a.margin) * scale
+}
+
+interface Edge {
+  distance: (x: number, z: number) => number
+  inset: number
+  softWidth: number
+  pushBack: number
+}
+
+function activeEdge(): Edge | null {
+  const cfg = getSceneCfg()
+  const t = cfg.terrain
+  if (field !== null && t.enabled && t.boundary.enabled) return { distance: fieldDistance, ...t.boundary }
+  const a = cfg.playArea
+  if (a?.enabled && a.outline.length >= 3) return { distance: areaDistance, inset: a.inset, softWidth: a.softWidth, pushBack: a.pushBack }
+  return null
+}
+
+/** 世界坐标处到可玩区边缘的有符号距离（世界单位）；没有生效的边界时返回 Infinity */
+export function boundaryDistance(x: number, z: number): number {
+  return activeEdge()?.distance(x, z) ?? Infinity
+}
+
 const EPS = 0.2
 /** 指向可玩区内部的单位方向（距离场梯度） */
-function inward(x: number, z: number): [number, number] {
-  const gx = boundaryDistance(x + EPS, z) - boundaryDistance(x - EPS, z)
-  const gz = boundaryDistance(x, z + EPS) - boundaryDistance(x, z - EPS)
+function inward(e: Edge, x: number, z: number): [number, number] {
+  const gx = e.distance(x + EPS, z) - e.distance(x - EPS, z)
+  const gz = e.distance(x, z + EPS) - e.distance(x, z - EPS)
   const len = Math.hypot(gx, gz)
   return len > 1e-6 ? [gx / len, gz / len] : [0, 0]
 }
 
-const active = () => {
-  const t = getSceneCfg().terrain
-  return field !== null && t.enabled && t.boundary.enabled ? t.boundary : null
-}
-
 /** 修正本帧的水平位移 move（原地修改）：越靠近边缘，往外的分量削得越多 */
 export function constrainMove(pos: Vector3, move: Vector3) {
-  const b = active()
+  const b = activeEdge()
   if (!b) return
   const nx = pos.x + move.x
   const nz = pos.z + move.z
-  const s = boundaryDistance(nx, nz) - b.inset
+  const s = b.distance(nx, nz) - b.inset
   if (s >= b.softWidth) return
-  const [gx, gz] = inward(nx, nz)
+  const [gx, gz] = inward(b, nx, nz)
   const outward = -(move.x * gx + move.z * gz)
   if (outward <= 0) return
   const k = 1 - Math.min(1, Math.max(0, s / b.softWidth))
@@ -103,11 +146,11 @@ export function constrainMove(pos: Vector3, move: Vector3) {
 
 /** 已经在边界外（出生点 / 传送 / 大步长冲出去）时缓慢推回 */
 export function pushInside(pos: Vector3, dt: number) {
-  const b = active()
+  const b = activeEdge()
   if (!b) return
-  const s = boundaryDistance(pos.x, pos.z) - b.inset
+  const s = b.distance(pos.x, pos.z) - b.inset
   if (s >= 0) return
-  const [gx, gz] = inward(pos.x, pos.z)
+  const [gx, gz] = inward(b, pos.x, pos.z)
   const amount = Math.min(-s, b.pushBack * dt)
   pos.x += gx * amount
   pos.z += gz * amount

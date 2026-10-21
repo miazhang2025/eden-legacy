@@ -38,7 +38,7 @@ const REPLACE = {
   // SC29_plants.jpg 虽然编号是 29，画的其实是 33 号（粉色海胆花）的 UV（33 号自带的烘焙图就是它的旧版）；29 号葫芦用自带的紫色烘焙图
   cave: { 1: 'SC01_land.jpg', 33: 'SC29_plants.jpg', 34: 'SC34_PLANTS.jpg', 36: 'SC36_PLANTS.jpg' },
   garden: { 8: 'SC08_land.jpg' },
-  ocean: { 8: 'SC08_land.jpg' },
+  ocean: { 8: 'SC08_landscape.jpg' },
 }
 
 /** 用途以 trans 结尾的是透明遮罩（白 = 留、黑 = 镂空），不当颜色贴图，合进同号材质的 alpha，例如 SC49-54_fern_trans.jpg */
@@ -139,6 +139,79 @@ async function applyMask(doc, material, mask) {
   material.setBaseColorTexture(texture).setAlphaMode('MASK').setAlphaCutoff(0.5)
 }
 
+/** 黑底填充：比这更暗的（RGB 最大分量，0–255）算没画到的黑底 */
+const FILL_DARK = 16
+/** 黑底填充的模糊半径（像素），由近到远；投影式烘焙贴图的黑底常占一半以上，最后一级要足够大 */
+const FILL_SIGMA = [3, 12, 40, 120]
+
+const blackFilled = new WeakSet()
+/**
+ * 投影式烘焙贴图（洞穴模型自带的）只有投影照到的部分有颜色，其余是纯黑底。模型上被遮挡 / 背对投影的面
+ * UV 正好落在黑底上（或超出 0–1 后绕回黑底），渲染成死黑，黑白交界还会被 KTX 压缩出彩色方块边。
+ * 这里把黑底用周围已画区域的颜色由近到远填满（同 applyMask 的外扩），已画的像素不动；
+ * 大半径也够不到的地方用已画区域的平均色兜底。
+ */
+async function fillBlack(texture) {
+  if (!texture || blackFilled.has(texture)) return
+  blackFilled.add(texture)
+  const meta = await sharp(texture.getImage()).metadata()
+  // 带透明通道的 PNG 不动（透明区本来就该是空的）
+  if (meta.hasAlpha) return
+  const w = meta.width
+  const h = meta.height
+  const raw = { raw: { width: w, height: h, channels: 3 } }
+  const rgb = await sharp(texture.getImage()).removeAlpha().raw().toBuffer()
+
+  const filled = new Uint8Array(w * h)
+  const premul = Buffer.alloc(w * h * 3)
+  const solid = Buffer.alloc(w * h * 3)
+  const sum = [0, 0, 0]
+  let painted = 0
+  for (let i = 0; i < w * h; i++) {
+    const dark = Math.max(rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]) <= FILL_DARK
+    if (dark) continue
+    filled[i] = 1
+    painted++
+    solid.fill(255, i * 3, i * 3 + 3)
+    for (let c = 0; c < 3; c++) {
+      premul[i * 3 + c] = rgb[i * 3 + c]
+      sum[c] += rgb[i * 3 + c]
+    }
+  }
+  const holes = w * h - painted
+  // 没有黑底，或整张都是黑的（没东西可借）就不动
+  if (!holes || !painted) return
+
+  const out = Buffer.from(rgb)
+  for (const sigma of FILL_SIGMA) {
+    const c = await sharp(premul, raw).blur(sigma).raw().toBuffer()
+    const a = await sharp(solid, raw).blur(sigma).raw().toBuffer()
+    for (let i = 0; i < w * h; i++) {
+      const cover = a[i * 3]
+      if (filled[i] || cover < 2) continue
+      for (let k = 0; k < 3; k++) out[i * 3 + k] = Math.min(255, Math.round((c[i * 3 + k] * 255) / cover))
+      filled[i] = 2
+    }
+  }
+  const mean = sum.map((v) => Math.round(v / painted))
+  for (let i = 0; i < w * h; i++) if (!filled[i]) for (let k = 0; k < 3; k++) out[i * 3 + k] = mean[k]
+
+  const png = texture.getMimeType() === 'image/png'
+  const img = sharp(out, raw)
+  texture.setImage(new Uint8Array(await (png ? img.png() : img.jpeg({ quality: 92 })).toBuffer()))
+  console.log(`  ${texture.getName() || '(贴图)'} 填充黑底 ${((100 * holes) / (w * h)).toFixed(0)}%`)
+}
+
+/** 场景 config 里开着的贴图池塘材质：池塘靠贴图里的纯黑识别深处，不能填黑底（与运行时 envMaterials 一样按材质名精确匹配） */
+function pondMaterial(scene) {
+  try {
+    const cfg = JSON.parse(readFileSync(join('src/config/scenes', `${scene}.json`), 'utf8'))
+    return cfg.pond?.enabled ? String(cfg.pond.material ?? '') : ''
+  } catch {
+    return ''
+  }
+}
+
 /** 读贴图目录里的文件，按用途缩到上限，转 JPEG */
 async function loadTexture(doc, tex) {
   const size = LARGE.test(tex.label) ? SIZE_LARGE : SIZE_DEFAULT
@@ -161,6 +234,8 @@ export async function assignTextures(doc, scene, texturesRoot) {
   const masks = files.filter((f) => MASK.test(f.label))
   const colors = files.filter((f) => !MASK.test(f.label))
   const waterMeshes = WATER_MESHES[scene] ?? []
+  const pond = pondMaterial(scene)
+  const canFill = (name) => name !== pond
 
   const texCache = new Map()
   const matCache = new Map()
@@ -215,6 +290,7 @@ export async function assignTextures(doc, scene, texturesRoot) {
       if (replacement) baked.setBaseColorTexture(await fileTexture(replacement))
       else await shrinkTexture(baked.getBaseColorTexture(), LARGE.test(name) ? SIZE_LARGE : SIZE_DEFAULT)
       if (mask) await applyMask(doc, baked, mask)
+      else if (canFill(name)) await fillBlack(baked.getBaseColorTexture())
       for (const prim of mesh.listPrimitives()) prim.setMaterial(baked)
       assigned++
       continue
@@ -241,6 +317,7 @@ export async function assignTextures(doc, scene, texturesRoot) {
       matCache.set(tex.stem, mat)
     }
     if (mask) await applyMask(doc, mat, mask)
+    else if (canFill(tex.stem)) await fillBlack(mat.getBaseColorTexture())
     for (const prim of mesh.listPrimitives()) prim.setMaterial(mat)
     assigned++
   }

@@ -12,6 +12,7 @@
     "character": "node scripts/build-character.mjs",
     "assets": "node scripts/optimize-assets.mjs",
     "terrain": "node scripts/build-terrain.mjs",
+    "playarea": "node scripts/build-play-area.mjs",
     "ground": "node scripts/build-ground-textures.mjs",
     "scatter": "node scripts/build-scatter.mjs",
     "decor": "node scripts/build-ending-decor.mjs",

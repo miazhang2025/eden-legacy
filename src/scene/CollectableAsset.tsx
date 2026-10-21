@@ -69,9 +69,11 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     }
     g.position.x = x
     g.position.z = z
-    const { phase, assetId, confirmedAt } = useFlowStore.getState()
+    const { phase, assetId, confirmedAt, discovered } = useFlowStore.getState()
     const t = state.clock.elapsedTime
     const isMe = assetId === def.id
+    // 发现过的资产保持更亮，全部找到后四个都亮着，挑选时不用凭记忆找
+    const found = discovered.includes(def.id)
 
     let targetEmissive = f.idleEmissive
     let opacity = 1
@@ -82,7 +84,7 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
       case 'INSPECTING': {
         floating = true
         const breathe = 1 - f.breatheDepth * (0.5 + 0.5 * Math.sin(t * f.breatheSpeed + phaseOffset))
-        targetEmissive = (isMe ? f.inspectEmissive : f.activeEmissive) * breathe
+        targetEmissive = (isMe ? f.inspectEmissive : found ? f.foundEmissive : f.activeEmissive) * breathe
         break
       }
       case 'CONFIRMED':
@@ -96,10 +98,10 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
           opacity = 1 - fadeT
           // TODO(M5): 采集确认 burst 粒子（§5.3B）
         } else if (f.othersFadeOut) {
-          targetEmissive = f.activeEmissive
+          targetEmissive = f.foundEmissive
           opacity = 1 - fadeT
         } else {
-          targetEmissive = f.activeEmissive
+          targetEmissive = f.foundEmissive
         }
         break
       }

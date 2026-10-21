@@ -22,16 +22,16 @@
   "env": {
     "model": "/models/env/cave.glb",
     "collider": "/models/colliders/cave.glb",
-    "extras": "",
-    "extraColliders": "",
+    "extras": "/models/env/cave.character.glb",
+    "extraColliders": "/models/colliders/cave.character.glb",
     "extrasTransform": {
       "position": [
-        0,
-        0,
-        0
+        -2,
+        -0.5,
+        0.5
       ],
-      "rotationY": 0,
-      "scale": 1
+      "rotationY": -0.41000000000000003,
+      "scale": 1.33
     },
     "scale": 1,
     "position": [
@@ -49,65 +49,89 @@
     "height": 1.7,
     "color": "#e8e0ff",
     "spawn": [
-      3.674,
+      4.208,
       0,
-      -10.215
+      -10.218
     ],
-    "spawnYaw": 2.7814,
+    "spawnYaw": 2.7846,
     "stepHeight": 0.45,
     "maxDrop": 1.2,
     "groundSmoothing": 0.08,
     "visible": true
   },
   "render": {
-    "exposure": 1.9599999999999997,
+    "exposure": 0.9999999999999999,
     "pixelRatioMax": 2
   },
-  "background": "#623ca2",
+  "background": "#1a1640",
   "fog": {
     "type": "linear",
-    "color": "#302a39",
+    "color": "#4b3b7c",
     "density": 0.013000000000000001,
-    "near": 17.5,
-    "far": 77
+    "near": 20,
+    "far": 70
   },
   "lights": {
     "ambient": {
-      "color": "#fffee7",
-      "intensity": 0.15999999999999986
+      "color": "#f6d6e6",
+      "intensity": 0.5
     },
     "directional": {
-      "color": "#faeaff",
+      "color": "#ffe2b4",
       "intensity": 0,
       "position": [
-        25,
-        40,
-        -10
+        -22,
+        34,
+        26
       ]
     },
     "points": [
       {
-        "name": "pink_right",
-        "color": "#ffa8d8",
-        "intensity": 1.629999999999997,
-        "distance": 14,
+        "name": "gold_right",
+        "color": "#ffcf8f",
+        "intensity": 14,
+        "distance": 20,
         "decay": 2,
         "position": [
-          8,
-          3,
+          -6,
+          4,
           6
         ]
       },
       {
-        "name": "lilac_back",
-        "color": "#fcdaff",
-        "intensity": 5.979999999999997,
+        "name": "water_cyan",
+        "color": "#7ff2ff",
+        "intensity": 5,
+        "distance": 10,
+        "decay": 2,
+        "position": [
+          -1,
+          1.2,
+          6.5
+        ]
+      },
+      {
+        "name": "lilac_fill",
+        "color": "#e2c8ff",
+        "intensity": 6,
         "distance": 16,
         "decay": 2,
         "position": [
           -2,
           4,
           -6
+        ]
+      },
+      {
+        "name": "warm_front",
+        "color": "#ffd9b8",
+        "intensity": 8,
+        "distance": 10,
+        "decay": 2,
+        "position": [
+          -3,
+          4,
+          -3
         ]
       }
     ]
@@ -126,16 +150,17 @@
   },
   "sky": {
     "enabled": true,
-    "topColor": "#7b5ec2",
-    "midColor": "#5552a5",
-    "horizonColor": "#383149",
-    "bottomColor": "#000000",
+    "topColor": "#080a24",
+    "midColor": "#1c1850",
+    "horizonColor": "#4b3b7c",
+    "bottomColor": "#2a2052",
     "midHeight": 0.3,
-    "horizonWidth": 0.06,
-    "sunColor": "#ffe2b0",
+    "horizonWidth": 0.12,
+    "fogBlend": 0.2,
+    "sunColor": "#ffe0a8",
     "sunSize": 0,
     "sunIntensity": 1.3,
-    "sunGlow": 0.2,
+    "sunGlow": 0,
     "sunGlowSpread": 8,
     "moon": {
       "enabled": false,
@@ -148,17 +173,24 @@
     }
   },
   "environment": {
-    "mode": "hdri",
+    "mode": "procedural",
     "hdri": "hdri/rogland_clear_night.hdr",
-    "intensity": 0.8200000000000003,
-    "rotationY": -0.2700000000000001,
+    "intensity": 1.05,
+    "rotationY": 0,
     "background": false,
     "hdriBackground": "",
     "backgroundIntensity": 1,
-    "sunIntensity": 1.8
+    "sunIntensity": 3,
+    "lightSky": {
+      "enabled": true,
+      "topColor": "#efcde6",
+      "midColor": "#d0b0dc",
+      "horizonColor": "#ffd9c4",
+      "bottomColor": "#cfa0bf"
+    }
   },
   "shadows": {
-    "enabled": true,
+    "enabled": false,
     "bias": -0.0005,
     "normalBias": 0.03,
     "radius": 3,
@@ -208,12 +240,12 @@
     "opaqueEnvMapIntensity": 1.6300000000000001
   },
   "figure": {
-    "enabled": false,
-    "breathAmplitude": 0.03,
+    "enabled": true,
+    "breathAmplitude": 0.06,
     "breathRate": 0.22,
-    "headSway": 0.012,
-    "headRate": 0.07,
-    "clothAmplitude": 0.015,
+    "headSway": 0.05,
+    "headRate": 0.09,
+    "clothAmplitude": 0,
     "clothScale": 0.8,
     "clothSpeed": 0.25,
     "blinkInterval": 4.5,
@@ -223,8 +255,10 @@
     "lookDuration": 4,
     "lookDistance": 30,
     "lookMaxAngle": 0.6,
-    "lookEyeAngle": 0.35,
-    "lookSpeed": 2
+    "lookSpeed": 2,
+    "skinBrightness": 1.2,
+    "skinSaturation": 0.6,
+    "skinTint": "#fbfaff"
   },
   "bubble": {
     "centerOpacity": 0.08,
@@ -246,34 +280,38 @@
   "water": {
     "enabled": true,
     "quality": "high",
-    "level": -0.7000000000000002,
+    "level": -0.4500000000000002,
     "center": [
       -1,
       0,
       6.5
     ],
-    "size": 80,
+    "size": 240,
     "mesh": "",
-    "shallowColor": "#c2f4f4",
-    "deepColor": "#5ecdd7",
+    "shallowColor": "#2ab5bc",
+    "deepColor": "#2ab5bc",
     "depthFalloff": 5.4399999999999995,
     "normalScale": 0.36000000000000004,
     "normalStrength": 0.39,
     "flowSpeed": 0.33,
     "flowDirectionDeg": -60,
     "fresnelPower": 5.8,
-    "roughness": 0.44999999999999996,
+    "roughness": 0.85,
     "reflectionIntensity": 0.25,
     "reflectionResolution": 1024,
     "reflectionLayers": "terrain+vegetation",
     "refractionStrength": 0,
-    "foamWidth": 0.35,
-    "foamColor": "#f4fbff",
+    "foamWidth": 0.22,
+    "foamColor": "#d8fbff",
     "shoreFade": 0.35,
+    "distanceFade": [
+      14,
+      42
+    ],
     "causticsIntensity": 0.5,
     "causticsScale": 0.35,
     "causticsSpeed": 0.6,
-    "opacity": 0.9500000000000001,
+    "opacity": 0.95,
     "blockDepth": 4.6,
     "walkable": true,
     "segments": 137,
@@ -316,6 +354,16 @@
     "macroScale": 18,
     "bedColor": "#2b2440",
     "bedTint": 0.5,
+    "farMatch": {
+      "enabled": false,
+      "edgeColor": "#446935",
+      "deepColor": "#2e4526",
+      "start": 2,
+      "end": 45,
+      "detail": 0.8,
+      "paintMip": 5,
+      "paintReach": 3
+    },
     "peaks": {
       "topColor": "#9d8fb6",
       "baseColor": "#2a1f4d",
@@ -332,6 +380,20 @@
       "inset": 0.6,
       "softWidth": 1.5,
       "pushBack": 2
+    }
+  },
+  "playArea": {
+    "enabled": false,
+    "outline": [],
+    "margin": 4,
+    "inset": 1,
+    "softWidth": 2,
+    "pushBack": 3,
+    "bubbles": {
+      "enabled": false,
+      "spacing": 2.2,
+      "jitter": 0.8,
+      "offset": 0
     }
   },
   "pond": {
@@ -837,7 +899,7 @@
     "toneMapping": "aces",
     "bloom": {
       "enabled": true,
-      "intensity": 0.9799999999999999,
+      "intensity": 1.1,
       "threshold": 0.72,
       "smoothing": 0.3,
       "radius": 0.51
@@ -864,9 +926,9 @@
     "grade": {
       "enabled": true,
       "hue": 0,
-      "saturation": 0.09,
-      "contrast": 0.02,
-      "brightness": 0.009999999999999993
+      "saturation": 0.02,
+      "contrast": 0,
+      "brightness": -0.010000000000000007
     },
     "ssao": {
       "enabled": false,
@@ -955,9 +1017,14 @@
       "roughness": 0.09
     },
     "SC29_plants": {
-      "emissive": "#363636",
-      "roughness": 0.24,
-      "transparent": true
+      "role": "crystal",
+      "color": "#f7b3d6",
+      "emissive": "#ff8cc6",
+      "emissiveIntensity": 0.25,
+      "roughness": 0.08,
+      "transmission": 0.85,
+      "thickness": 1.2,
+      "attenuationColor": "#ff9fd0"
     },
     "SC33_plants": {
       "role": "static"
@@ -976,6 +1043,134 @@
     },
     "droplet_crystal": {
       "emissive": "#858585"
+    },
+    "SC27_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC20_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC21_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC22_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC23_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC24_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC25_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC10_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC07_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC08_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC09_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC11_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC12_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC13_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC14_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC15_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC16_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC17_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC18_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC19_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC06_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC05_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC04_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC03_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC02_LAND": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "SC01_land": {
+      "shadowLift": 0.8,
+      "shadowLiftThreshold": 0.55
+    },
+    "char_礼服｜同纹包臀银纱": {
+      "color": "#d4d2d8",
+      "metalness": 0,
+      "envMapIntensity": 0.8,
+      "clearcoat": 0.12
+    },
+    "char_礼服｜水晶斜肩上身": {
+      "color": "#d4d2d8",
+      "metalness": 0,
+      "envMapIntensity": 0.8,
+      "clearcoat": 0.12
+    },
+    "char_礼服｜银纱垂饰": {
+      "color": "#d4d2d8",
+      "metalness": 0,
+      "envMapIntensity": 0.8,
+      "clearcoat": 0.12
+    },
+    "char_袖饰｜垂坠透明纱": {
+      "color": "#d4d2d8",
+      "metalness": 0,
+      "envMapIntensity": 0.8,
+      "clearcoat": 0.12
     }
   },
   "audio": {
@@ -1007,7 +1202,7 @@
     {
       "id": "cave_ore_01",
       "position": [
-        -2.595,
+        -1.1950000000000003,
         -0.2,
         5.934
       ],
@@ -1016,7 +1211,7 @@
         0,
         0
       ],
-      "scale": 1.48
+      "scale": 2.23
     },
     {
       "id": "cave_ore_02",
@@ -1030,7 +1225,7 @@
         0,
         0
       ],
-      "scale": 1.86
+      "scale": 2.39
     },
     {
       "id": "cave_mushroom_01",
@@ -1044,7 +1239,7 @@
         0,
         0
       ],
-      "scale": 1.01
+      "scale": 1.48
     },
     {
       "id": "cave_mushroom_02",
@@ -1058,7 +1253,7 @@
         0,
         0
       ],
-      "scale": 0.8999999999999999
+      "scale": 0.8499999999999999
     }
   ],
   "flow": {
@@ -1074,8 +1269,9 @@
     "fadeDuration": 1.2,
     "resolveDelay": 0.6,
     "idleEmissive": 0,
-    "activeEmissive": 0.6,
-    "inspectEmissive": 1.4,
+    "activeEmissive": 1,
+    "foundEmissive": 2,
+    "inspectEmissive": 2.6,
     "selectedEmissive": 4,
     "assetSize": 1,
     "assetSelfGlow": 0.15,

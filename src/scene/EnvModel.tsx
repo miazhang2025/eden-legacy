@@ -9,6 +9,7 @@ import { useTier } from '../state/useQualityStore'
 import { isTerrainName } from '../materials/detail'
 import { registerFigureRig, useFigureLook } from '../materials/figure'
 import { registerCollider, registerWaterBed } from './collision'
+import { useBubbleRing } from './bubbleRing'
 import { useEnvMaterials } from './envMaterials'
 
 /** 自托管 Draco 解码器（public/draco），不走外部 CDN */
@@ -100,14 +101,18 @@ const UP = new Vector3(0, 1, 0)
 const offset = new Vector3()
 const spin = new Quaternion()
 
+/** build-character 生成的人物模型 / 碰撞体的顶层节点名（人物脚底中心的轴心） */
+const FIGURE_PIVOT = 'pivot'
+
 /**
- * 叠加模型 / 叠加碰撞体：在原位之上叠加偏移、绕 Y 旋转、缩放。
- * 作用在 glb 的顶层节点上（build-character 把它烘成人物脚底中心的轴心），所以旋转 / 缩放绕人物自己。
+ * 场景人物（叠加模型 / 叠加碰撞体里的人物）：在原位之上叠加偏移、绕 Y 旋转、缩放。
+ * 只作用在名为 pivot 的顶层节点上（人物脚底中心的轴心），所以旋转 / 缩放绕人物自己，同场景的其它叠加模型（如气泡）不受影响。
  */
 export function applyExtrasTransform(root: Object3D, t: ExtrasTransform) {
   spin.setFromAxisAngle(UP, t.rotationY)
   offset.fromArray(t.position)
   for (const node of root.children) {
+    if (node.name !== FIGURE_PIVOT) continue
     let base = extraBase.get(node)
     if (!base) {
       base = { position: node.position.clone(), quaternion: node.quaternion.clone(), scale: node.scale.clone() }
@@ -155,6 +160,9 @@ export function EnvModel({ path, extras = [] }: { path: string; extras?: string[
     for (const s of extraScenes) applyExtrasTransform(s, xt)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [xt, ...extraScenes])
+
+  // 边界泡泡：叠加模型里的泡泡沿可玩区边界重新排一圈（playArea.bubbles）
+  useBubbleRing(scene, extraScenes)
 
   useDisposeOnUnmount(path, scene)
   useEffect(() => () => extras.forEach((p) => useGLTF.clear(url(p))), [extras.join(',')])

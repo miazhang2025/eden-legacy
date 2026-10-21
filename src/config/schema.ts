@@ -55,8 +55,8 @@ export interface SceneConfig {
     /** 叠加碰撞体（逗号分隔），与主碰撞体（或生成地形的碰撞体）同时生效，如花园人物 /models/colliders/garden.character.glb */
     extraColliders: string
     /**
-     * 叠加模型（及其碰撞体）在自身轴心上的偏移 / 旋转 / 缩放，叠加在美术摆好的位置之上（全 0 / 1 = 原位）。
-     * 轴心是 glb 的顶层节点：build-character 把它烘在人物脚底中心；没烘轴心的叠加模型（如气泡）绕自身节点原点转。
+     * 场景人物（npm run character 生成的叠加模型及其碰撞体）在自身轴心上的偏移 / 旋转 / 缩放，
+     * 叠加在美术摆好的位置之上（全 0 / 1 = 原位）。轴心是人物脚底中心；其它叠加模型（如气泡）不受影响。
      */
     extrasTransform: ExtrasTransform
     scale: number
@@ -115,6 +115,8 @@ export interface SceneConfig {
   water: WaterConfig
   /** 生成地形（npm run terrain）：替换美术地形 + 无边界远景裙边 + 可玩区软边界 */
   terrain: TerrainConfig
+  /** 可玩区（ocean）：岛的轮廓向外扩一圈当边界，软边界同 terrain.boundary；泡泡排在边界线上 */
+  playArea: PlayAreaConfig
   /** 贴图池塘：地形贴图里画出来的水域，用 shader 按颜色遮罩做成水面（garden） */
   pond: PondConfig
   /** 地形细节贴图：近处叠一层平铺草地细节，远处淡出 */
@@ -166,7 +168,10 @@ export interface SceneConfig {
     /** 淡出完成后到跳转前的停顿（秒） */
     resolveDelay: number
     idleEmissive: number
+    /** 探索中、还没发现的资产（让玩家远远就能看出哪些是资产） */
     activeEmissive: number
+    /** 已发现的资产（全部找到后四个都在这一档常亮，供挑选） */
+    foundEmissive: number
     inspectEmissive: number
     selectedEmissive: number
     /** 本场景 4 个资产的整体大小倍数（再乘 assets[].scale） */
@@ -217,6 +222,12 @@ export interface MaterialOverride {
   alphaTest?: number
   side?: MaterialSide
   wireframe?: boolean
+  /** 用该材质的 mesh 是否投阴影（如远景地形关掉，阴影在主光阴影范围边缘不会被硬切） */
+  castShadow?: boolean
+  /** 暗部提亮 0–1（仅 static 角色）：抬起颜色贴图里烘焙的阴影 / AO，亮部不变；0 = 关 */
+  shadowLift?: number
+  /** 暗部提亮的阈值（sRGB 亮度 0–1）：低于它的才被抬起 */
+  shadowLiftThreshold?: number
   // 以下仅 MeshPhysicalMaterial
   clearcoat?: number
   transmission?: number
@@ -236,6 +247,8 @@ export interface SkyConfig {
   midHeight: number
   /** 地平线雾带宽度 */
   horizonWidth: number
+  /** 地平线附近渐变到雾色的高度（0 = 不混合）；只影响看到的天空，让远处雾气与天空衔接 */
+  fogBlend: number
   /** 太阳（方向取主光 position） */
   sunColor: string
   /** 太阳圆盘角半径（弧度），0 = 不画圆盘 */
@@ -273,6 +286,14 @@ export interface EnvironmentConfig {
   backgroundIntensity: number
   /** 环境光里对应主光方向的亮斑强度 */
   sunIntensity: number
+  /** procedural 模式下打光另用一套渐变色（天空可以是夜景，打光仍保持明亮）；关闭时用 sky 的颜色 */
+  lightSky: {
+    enabled: boolean
+    topColor: string
+    midColor: string
+    horizonColor: string
+    bottomColor: string
+  }
 }
 
 export interface ShadowConfig {
@@ -369,10 +390,14 @@ export interface FigureConfig {
   lookDistance: number
   /** 头最多转多少（弧度），观众在更偏的位置就只转到这里 */
   lookMaxAngle: number
-  /** 眼球最多再转多少（弧度） */
-  lookEyeAngle: number
   /** 转头快慢（越大越快） */
   lookSpeed: number
+  /** 皮肤亮度倍数（>1 提亮），只作用于皮肤材质 */
+  skinBrightness: number
+  /** 皮肤饱和度（<1 更白净、不发红） */
+  skinSaturation: number
+  /** 皮肤色调（乘在皮肤颜色上，白色 = 不变） */
+  skinTint: string
 }
 
 export interface BubbleConfig {
@@ -434,6 +459,8 @@ export interface WaterConfig {
   foamColor: string
   /** 岸边渐隐：水深小于该值（米）时水面逐渐透明，岸线不再是地形多边形硬切出来的锯齿；0 = 关 */
   shoreFade: number
+  /** 远处淡出 [开始, 完全透明]（米，到 center 的水平距离）：开阔水面融进天空 / 雾；结束 <= 开始 = 关 */
+  distanceFade: Vec2
   causticsIntensity: number
   causticsScale: number
   causticsSpeed: number
@@ -487,6 +514,11 @@ export interface TerrainConfig {
   /** 池底着色 */
   bedColor: string
   bedTint: number
+  /**
+   * painted：裙边颜色接岛上的手绘贴图——岛边取手绘贴图的模糊色，离岛 paintReach 米内换成 edgeColor），离岛 start → end 米渐变到 deepColor；
+   * far 贴图只提供明暗细节（detail = 强度）；paintMip = 取色的 mip 级数（越大越模糊）
+   */
+  farMatch: { enabled: boolean; edgeColor: string; deepColor: string; start: number; end: number; detail: number; paintMip: number; paintReach: number }
   /** 远景尖峰（不吃雾）：山脚色（接近雾色）→ 峰顶色，shade = 主光明暗强度 */
   peaks: { topColor: string; baseColor: string; shade: number }
   /** 散布花草（npm run scatter）：每种植物一个实例化 draw call；density × 档位 scatter 倍率 = 实际数量比例 */
@@ -502,6 +534,30 @@ export interface TerrainConfig {
     softWidth: number
     /** 已经在边界外时往回推的速度（米/秒） */
     pushBack: number
+  }
+}
+
+export interface PlayAreaConfig {
+  enabled: boolean
+  /** 岛的轮廓：模型局部坐标 x/z 的凸包（npm run playarea 从碰撞体算出来，跟着 env 变换走） */
+  outline: Vec2[]
+  /** 轮廓向外扩多少米 = 边界线 */
+  margin: number
+  /** 离边界线多远停下 */
+  inset: number
+  /** 从 inset + softWidth 开始减速 */
+  softWidth: number
+  /** 已经在边界外时往回推的速度（米/秒） */
+  pushBack: number
+  /** 把叠加模型（env.extras）里的泡泡沿边界线重新排一圈；泡泡不够时循环复用 */
+  bubbles: {
+    enabled: boolean
+    /** 相邻泡泡的间距（米） */
+    spacing: number
+    /** 随机错开（米）：沿边界线和里外方向 */
+    jitter: number
+    /** 整圈相对边界线往外挪（米） */
+    offset: number
   }
 }
 
@@ -669,7 +725,7 @@ export interface PostConfig {
   ssao: { enabled: boolean; intensity: number; radius: number }
 }
 
-/** 音频总线（素材未到位，当前为静音占位，参数先存在） */
+/** 音频总线：ambience 为各场景背景音乐（public/audio/），sfx 素材未到位仍为静音占位 */
 export interface AudioConfig {
   master: { volume: number; mute: boolean }
   ambience: { volume: number; mute: boolean; fadeIn: number; fadeOut: number }
@@ -1025,7 +1081,7 @@ export type SchemaFor<T> = [T] extends [number]
           : [T] extends [Vec4]
             ? Vec4Leaf | HiddenLeaf
             : T extends readonly (infer U)[]
-          ? ArrayLeaf<U>
+          ? ArrayLeaf<U> | HiddenLeaf
           : string extends keyof T
             ? MaterialsLeaf
             : { [K in keyof T]-?: SchemaFor<T[K]> } & FolderMeta
@@ -1057,8 +1113,8 @@ const lightsSchema = {
   directional: { _label: 'directional 主光', color: color(), intensity: intensity(10), position: vec(0.5) },
 }
 
-/** 材质面板里可调的字段（spec §9.3 Materials）；physical 为 true 的只对 MeshPhysicalMaterial 显示 */
-export const MATERIAL_FIELDS: Array<{ key: keyof MaterialOverride; leaf: Leaf; physical?: boolean }> = [
+/** 材质面板里可调的字段（spec §9.3 Materials）；physical 为 true 的只对 MeshPhysicalMaterial 显示，staticOnly 只对 static 角色显示 */
+export const MATERIAL_FIELDS: Array<{ key: keyof MaterialOverride; leaf: Leaf; physical?: boolean; staticOnly?: boolean }> = [
   { key: 'role', leaf: { t: 'select', options: ['static', 'vegetation', 'crystal', 'bubble', 'water', 'emitter'], label: 'role 角色' } },
   { key: 'color', leaf: color() },
   { key: 'roughness', leaf: num(0, 1, 0.01) },
@@ -1072,6 +1128,9 @@ export const MATERIAL_FIELDS: Array<{ key: keyof MaterialOverride; leaf: Leaf; p
   { key: 'alphaTest', leaf: num(0, 1, 0.01) },
   { key: 'side', leaf: { t: 'select', options: ['front', 'back', 'double'] } },
   { key: 'wireframe', leaf: bool('wireframe (debug)') },
+  { key: 'castShadow', leaf: bool('castShadow 投阴影') },
+  { key: 'shadowLift', leaf: num(0, 1, 0.01, 'shadowLift 暗部提亮', '抬起贴图里烘焙的阴影，亮部不变'), staticOnly: true },
+  { key: 'shadowLiftThreshold', leaf: num(0.05, 1, 0.01, 'shadowLift 阈值', '贴图亮度低于它的部分才被抬起'), staticOnly: true },
   { key: 'clearcoat', leaf: num(0, 1, 0.01), physical: true },
   { key: 'transmission', leaf: num(0, 1, 0.01), physical: true },
   { key: 'ior', leaf: num(1, 2.333, 0.01), physical: true },
@@ -1251,6 +1310,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     bottomColor: color(),
     midHeight: num(0.01, 1, 0.01),
     horizonWidth: num(0.005, 0.5, 0.005),
+    fogBlend: num(0, 1, 0.01, 'fogBlend', '地平线附近混入雾色的高度，0 = 不混'),
     sunColor: color(),
     sunSize: num(0, 0.2, 0.001),
     sunIntensity: intensity(20),
@@ -1277,6 +1337,14 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     hdriBackground: { t: 'text', label: '背景 hdri（可留空）', hint: '留空 = 用打光那张当背景' },
     backgroundIntensity: intensity(5),
     sunIntensity: intensity(20),
+    lightSky: {
+      _label: '打光天空（procedural）',
+      enabled: bool(),
+      topColor: color(),
+      midColor: color(),
+      horizonColor: color(),
+      bottomColor: color(),
+    },
   },
   shadows: {
     _label: '阴影（主光）',
@@ -1349,8 +1417,10 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     lookDuration: num(0.5, 15, 0.1, 'lookDuration', '每次看多久（秒）'),
     lookDistance: num(1, 100, 0.5, 'lookDistance', '观众多近才会看（米）'),
     lookMaxAngle: num(0, 1.2, 0.01, 'lookMaxAngle', '头最多转多少（弧度）'),
-    lookEyeAngle: num(0, 0.8, 0.01, 'lookEyeAngle', '眼球最多再转多少（弧度）'),
     lookSpeed: num(0.2, 10, 0.1, 'lookSpeed', '转头快慢'),
+    skinBrightness: num(0.5, 2, 0.01, 'skinBrightness', '皮肤亮度（>1 提亮）'),
+    skinSaturation: num(0, 1.5, 0.01, 'skinSaturation', '皮肤饱和度（<1 更白净）'),
+    skinTint: color('skinTint 皮肤色调'),
   },
   bubble: {
     _label: '泡泡 bubble',
@@ -1399,6 +1469,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     foamWidth: num(0, 3, 0.01),
     foamColor: color(),
     shoreFade: num(0, 2, 0.01, 'shoreFade（岸边渐隐 m）', '水越浅越透明，柔化岸线；0 = 关'),
+    distanceFade: range(0, 300, 1, 'distanceFade（远处淡出 m）'),
     causticsIntensity: num(0, 3, 0.01),
     causticsScale: num(0.01, 2, 0.01),
     causticsSpeed: num(0, 3, 0.01),
@@ -1423,6 +1494,17 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     macroScale: num(1, 100, 0.5, 'macroScale（斑驳尺度 m）'),
     bedColor: color('bedColor（池底）'),
     bedTint: num(0, 1, 0.01),
+    farMatch: {
+      _label: '裙边接色 farMatch（painted）',
+      enabled: bool('enabled', '裙边颜色从岛边的手绘贴图色渐变到 deepColor；关掉 = far 贴图 × far.tint'),
+      edgeColor: color('edgeColor（岛边）'),
+      deepColor: color('deepColor（远处）'),
+      start: num(0, 100, 0.5, 'start（离岛 m，开始变深）'),
+      end: num(1, 160, 0.5, 'end（离岛 m，完全变深）'),
+      detail: num(0, 1.5, 0.01, 'detail（far 贴图明暗）'),
+      paintMip: num(0, 10, 0.1, 'paintMip（岛边取色模糊）'),
+      paintReach: num(0.1, 20, 0.1, 'paintReach（离岛 m，手绘色淡出到 edgeColor）'),
+    },
     peaks: { _label: '远景尖峰 peaks', topColor: color(), baseColor: color('baseColor（山脚，接近雾色）'), shade: num(0, 1, 0.01) },
     scatter: {
       _label: '散布花草 scatter',
@@ -1437,6 +1519,22 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
       inset: num(-2, 5, 0.05, 'inset（离边缘多远停下）'),
       softWidth: num(0.1, 6, 0.05, 'softWidth（减速带宽度）'),
       pushBack: num(0, 10, 0.1, 'pushBack（出界回推 m/s）'),
+    },
+  },
+  playArea: {
+    _label: '可玩区 playArea（岛外一圈）',
+    enabled: bool(),
+    outline: hidden,
+    margin: num(0, 30, 0.1, 'margin（轮廓外扩 m）', '岛的轮廓向外扩多少米作为边界线；轮廓本身用 npm run playarea 重算'),
+    inset: num(-2, 5, 0.05, 'inset（离边界线多远停下）'),
+    softWidth: num(0.1, 6, 0.05, 'softWidth（减速带宽度）'),
+    pushBack: num(0, 10, 0.1, 'pushBack（出界回推 m/s）'),
+    bubbles: {
+      _label: '边界泡泡 bubbles',
+      enabled: bool('enabled（泡泡排在边界线上）'),
+      spacing: num(0.5, 10, 0.05, 'spacing（间距 m）'),
+      jitter: num(0, 3, 0.05, 'jitter（随机错开 m）'),
+      offset: num(-3, 5, 0.05, 'offset（整圈往外挪 m）'),
     },
   },
   pond: {
@@ -1558,7 +1656,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
   post: postSchema,
   materials: { t: 'materials' },
   audio: {
-    _label: '音频（占位）',
+    _label: '音频',
     master: { _label: 'master', volume: num(0, 1, 0.01), mute: bool() },
     ambience: { _label: 'ambience', volume: num(0, 1, 0.01), mute: bool(), fadeIn: seconds(10), fadeOut: seconds(10) },
     sfx: { _label: 'sfx', volume: num(0, 1, 0.01), mute: bool(), collectVolume: num(0, 1, 0.01) },
@@ -1606,6 +1704,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     resolveDelay: seconds(),
     idleEmissive: intensity(10),
     activeEmissive: intensity(10),
+    foundEmissive: intensity(10),
     inspectEmissive: intensity(10),
     selectedEmissive: intensity(20),
     assetSize: num(0.1, 5, 0.01, 'assetSize', '本场景交互资产整体大小（× 资产摆位里各自的 scale）'),
