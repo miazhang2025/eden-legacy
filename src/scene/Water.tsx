@@ -208,6 +208,7 @@ function useWaterSurface(vertexDepth: boolean, reflectionLevel?: (camera: Vector
     u.uUseDepthColor.value = quality !== 'low' && hasDepth ? 1 : 0
     u.uUseFoam.value = quality === 'high' && hasDepth ? 1 : 0
     u.uDepthMap.value = depthMap?.texture ?? null
+    u.uDepthSmooth.value = depthMap?.smooth ?? null
     if (depthMap) u.uDepthBounds.value.set(...depthMap.bounds)
     u.uMaxDepth.value = MAX_DEPTH
     u.uDepthBlur.value = DEPTH_BLUR

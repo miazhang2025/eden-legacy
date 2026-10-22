@@ -16,22 +16,43 @@ const dir = new Vector3()
 const stepDir = new Vector3()
 const probe = new Vector3()
 const lastValid = new Vector3()
+const side = new Vector3()
+
+/** 身体扫掠：膝 / 腰 / 头三个高度 × 左 / 中 / 右三条（间距为身体半径），细石头、拐角、人物都挡得住 */
+const SWEEP_HEIGHTS = [0, 0.5, 1]
+const SWEEP_SIDES = [-0.9, 0, 0.9]
+
+function bodyBlocked(dist: number, c: SceneConfig['character']): boolean {
+  const p = rig.position
+  side.set(-stepDir.z, 0, stepDir.x)
+  const low = c.stepHeight + 0.05
+  const high = Math.max(low, c.height - 0.1)
+  for (const h of SWEEP_HEIGHTS) {
+    const y = p.y + low + (high - low) * h
+    for (const s of SWEEP_SIDES) {
+      probe.set(p.x + side.x * c.radius * s, y, p.z + side.z * c.radius * s)
+      if (isBlocked(probe, stepDir, dist)) return true
+    }
+  }
+  return false
+}
 
 /**
  * 尝试把角色从 rig.position 水平移动 (dx, dz)。合法返回目标地面高度，否则 null。
- *  - 前方膝盖高度的短射线命中碰撞体 → 阻挡（墙、岩石）
+ *  - 身体扫掠射线命中碰撞体 → 阻挡（墙、岩石、人物）
  *  - 目标点向下射线在 [当前+stepHeight, 当前-maxDrop] 内未命中 → 阻挡（陡坡过高 / 悬崖边 / 地形外）
+ *  - 只走水面（water.maxClimb >= 0）：目标地面高出水面太多 → 阻挡（不爬上岩石 / 人物）
  */
 function tryMove(dx: number, dz: number, c: SceneConfig['character'], w: SceneConfig['water'] | null): number | null {
   const len = Math.hypot(dx, dz)
   if (len < 1e-6) return null
   const p = rig.position
   stepDir.set(dx / len, 0, dz / len)
-  probe.set(p.x, p.y + c.stepHeight + 0.05, p.z)
-  if (isBlocked(probe, stepDir, len + c.radius)) return null
+  if (bodyBlocked(len + c.radius, c)) return null
   const g = groundHeight(p.x + dx, p.z + dz, p.y + c.stepHeight, c.stepHeight + c.maxDrop)
   // 水深超过 blockDepth 的区域不可进入（浅水 / 汀步可以走）
   if (g !== null && w && w.blockDepth > 0 && w.level - g > w.blockDepth) return null
+  if (g !== null && w && w.walkable && (w.maxClimb ?? -1) >= 0 && g > w.level + w.maxClimb) return null
   return g
 }
 

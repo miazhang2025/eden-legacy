@@ -478,6 +478,8 @@ export interface WaterConfig {
   blockDepth: number
   /** 水面可以行走（ocean：在浮岛之间「走水」） */
   walkable: boolean
+  /** 只走水面：地面高出水面超过该值（米）就当墙挡住，不能爬上岩石 / 人物；< 0 = 不限制 */
+  maxClimb: number
 }
 
 /** 地面平铺贴图一套（npm run ground 从 Megascans 贴图压成 KTX2） */
@@ -1485,6 +1487,7 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     opacity: num(0, 1, 0.01),
     blockDepth: num(0, 5, 0.05, 'blockDepth', '水深超过该值不可行走；0 = 不限制'),
     walkable: bool('walkable', '水面可以行走（在浮岛之间走水）'),
+    maxClimb: num(-1, 2, 0.05, 'maxClimb（高出水面 m）', '地面高出水面超过该值不可走上去，只在水面上走；-1 = 不限制'),
   },
   terrain: {
     _label: '生成地形 terrain',

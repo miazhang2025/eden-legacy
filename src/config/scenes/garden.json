@@ -265,6 +265,7 @@
     "opacity": 0.9500000000000001,
     "blockDepth": 0,
     "walkable": false,
+    "maxClimb": -1,
     "segments": 64,
     "waveAmplitude": 0.009999999999999993,
     "waveLength": 5,

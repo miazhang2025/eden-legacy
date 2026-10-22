@@ -68,8 +68,8 @@ function GrassBed({ scene, cfg, seed, brightness }: { scene: Object3D; cfg: Deco
     const cdf = (p: number) => p * (1 - b / 2) + (b / 2) * Math.sin(p)
     const total = cdf(half)
     for (let i = 0; i < cfg.count; i++) {
-      // 分层抖动：每丛在累积分布上占一小格、在格内随机，不会扎堆或留空；再反解出角度（二分）
-      const target = (((i + r(i, 0)) / cfg.count) * 2 - 1) * total
+      // 分层抖动：每丛在累积分布上占一小格、在格中心附近随机（只抖半格，稀疏处间距也匀，不会空出一大块）；再反解出角度（二分）
+      const target = (((i + 0.25 + 0.5 * r(i, 0)) / cfg.count) * 2 - 1) * total
       let lo = -half
       let hi = half
       for (let k = 0; k < 24; k++) {

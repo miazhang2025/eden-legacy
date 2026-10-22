@@ -1,7 +1,8 @@
 import type { Material } from 'three'
 
 // 暗部提亮：美术把阴影 / AO 烘进了颜色贴图（cave 的岩壁），实时光照下这些暗部显得过重。
-// 只抬贴图里低于阈值的暗部（在 sRGB 感知空间算，阈值直观），亮部不变，按比例缩放保留色相。
+// 只抬贴图里低于阈值的暗部（按最亮通道在 sRGB 感知空间算，阈值直观），亮部不变，按比例缩放保留色相；
+// 极暗的压缩噪点抬起时去饱和，避免蓝 / 红色块。
 // 数值由材质覆盖 shadowLift / shadowLiftThreshold 控制（uniform，不重新编译）；0 = 无效果。
 
 const PATCHED = Symbol('eden-shadow-lift')
@@ -34,14 +35,19 @@ export function patchShadowLift(material: Material) {
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
         if (uShadowLift > 0.0) {
-          float l = max(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
-          float ls = pow(l, 1.0 / 2.2);
+          // 按最亮通道算倍数（不用亮度）：饱和的蓝 / 红亮度权重很小，按亮度算会被放大十几倍成刺眼的色块
+          float v = max(max(max(diffuseColor.r, diffuseColor.g), diffuseColor.b), 1e-4);
+          float vs = pow(v, 1.0 / 2.2);
           float t = max(uShadowLiftThreshold, 1e-3);
-          float x = max(t - ls, 0.0);
+          float x = max(t - vs, 0.0);
           // 低于阈值的部分沿二次曲线抬起：阈值处平滑衔接，k <= 0.5 保证单调（暗的不会变得比亮的更亮）
           float k = 0.5 * uShadowLift${pond};
-          float lifted = ls + k * x * x / t;
-          diffuseColor.rgb *= pow(lifted / ls, 2.2);
+          float lifted = vs + k * x * x / t;
+          float gain = pow(lifted / vs, 2.2);
+          vec3 c = diffuseColor.rgb * gain;
+          // 极暗像素的颜色多半是贴图压缩在黑底边缘留下的噪点：抬起时越暗越往同亮度的灰靠，不冒出高饱和的蓝 / 红块
+          float noisy = (1.0 - smoothstep(0.04, 0.16, vs)) * clamp(gain - 1.0, 0.0, 1.0);
+          diffuseColor.rgb = mix(c, vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), noisy);
         }`,
       )
   }

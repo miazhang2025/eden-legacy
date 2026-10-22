@@ -7,6 +7,7 @@ import {
   Mesh,
   MeshPhysicalMaterial,
   OrthographicCamera,
+  PlaneGeometry,
   Scene,
   ShaderMaterial,
   Texture,
@@ -56,6 +57,8 @@ export function createWaterUniforms() {
     uFadeCenter: { value: new Vector2(0, 0) },
     uOpacity: { value: 0.85 },
     uDepthMap: { value: null as Texture | null },
+    /** 模糊过的水深图（只给深浅颜色用）：水下浅滩网格的边缘不会把多边形轮廓印在水面颜色上 */
+    uDepthSmooth: { value: null as Texture | null },
     /** 高度图覆盖范围：xy = 最小 x/z，zw = 边长 */
     uDepthBounds: { value: new Vector4(0, 0, 1, 1) },
     uMaxDepth: { value: MAX_DEPTH },
@@ -150,6 +153,7 @@ const fragmentShader = /* glsl */ `
   uniform vec2 uFadeCenter;
   uniform float uOpacity;
   uniform sampler2D uDepthMap;
+  uniform sampler2D uDepthSmooth;
   uniform vec4 uDepthBounds;
   uniform float uMaxDepth;
   uniform float uUseVertexDepth;
@@ -180,11 +184,17 @@ const fragmentShader = /* glsl */ `
     float depth = uMaxDepth;
     // 岸边用的水深：截断到 1 米再模糊（深水 / 虚空按 1 米算），岸线在模糊半径内平滑过渡
     float shoreDepth = 1.0;
+    // 离岸远近（0 = 远离露出水面的地形）；网格水面 / 水深图之外沿用旧行为
+    float landNear = 1.0;
     if (uUseVertexDepth > 0.5) {
       depth = vEdenDepth;
       shoreDepth = min(depth, 1.0);
     } else if (all(greaterThanEqual(duv, vec2(0.0))) && all(lessThanEqual(duv, vec2(1.0)))) {
-      depth = texture2D(uDepthMap, duv).r * uMaxDepth;
+      // 颜色用模糊过的水深（浅滩网格边缘外水深突变，单点采样会把网格的折线轮廓印成一圈马赛克）
+      vec2 smoothDepth = texture2D(uDepthSmooth, duv).rg;
+      depth = smoothDepth.r * uMaxDepth;
+      // G 是露出水面地形的覆盖率（模糊半径 COLOR_BLUR）：岸线处约 0.5，离岸 1 米左右降到 0.25；只留紧贴岸线的一窄条
+      landNear = smoothstep(0.25, 0.45, smoothDepth.g);
       // 5×5 取样（半径 uDepthBlur 米）：岸线由三角面围成，模糊后才是连续的过渡
       vec2 r = uDepthBlur / uDepthBounds.zw * 0.5;
       float sum = 0.0;
@@ -195,18 +205,29 @@ const fragmentShader = /* glsl */ `
     float t = uUseDepthColor > 0.5 ? smoothstep(0.0, uDepthFalloff, depth) : 1.0;
     vec3 col = mix(uShallowColor, uDeepColor, t);
 
+    // 水下浅滩：完全淹没的平板状浅滩网格（投影生成，边缘是一段段台阶）按水深算也是「浅水」，
+    // 岸边渐隐 / 泡沫 / 半透明会把它的折线轮廓透出来（一圈马赛克）。这些效果只在露出水面的地形附近（landNear）生效，
+    // 远离岸的水下浅滩按普通水面处理；附近是深水（dropOff）时同样不透明、不起泡沫
+    float dropOff = uUseVertexDepth > 0.5 ? 0.0 : smoothstep(0.6, 1.5, depth);
+    float openWater = max(dropOff, 1.0 - landNear);
     float foam = 0.0;
     if (uUseFoam > 0.5) {
       foam = (1.0 - smoothstep(0.0, uFoamWidth, shoreDepth)) * (0.55 + 0.45 * edenNoise(vEdenWaterWorld.xz * 3.0 + flow * 4.0));
+      foam *= 1.0 - openWater;
       col = mix(col, uFoamColor, foam);
     }
     // 岸边渐隐：越浅越透明，岸线由水深决定（模糊过的水深图是连续的），不再是地形多边形与水平面硬切出的锯齿
     // 各档位都开（只多一次水深采样）；没有水深数据时 uShoreFade = 0
-    float shore = uShoreFade > 0.0 ? smoothstep(0.0, uShoreFade, shoreDepth) : 1.0;
+    float shore = uShoreFade > 0.0 ? max(smoothstep(0.0, uShoreFade, shoreDepth), openWater) : 1.0;
     // 远处淡出：离水面中心越远越透明，开阔水面在地平线前消失，露出后面已混好雾色的天空，水天交界不再是一条硬线
     // 以水面中心而不是相机为基准：近处的水池始终完整，走动时淡出边界也不会跟着移动
-    if (uDistanceFade.y > uDistanceFade.x) shore *= 1.0 - smoothstep(uDistanceFade.x, uDistanceFade.y, distance(vEdenWaterWorld.xz, uFadeCenter));
-    csm_DiffuseColor = vec4(col, mix(uOpacity, 1.0, foam) * shore);
+    // 只淡出下面没有地形的开阔水面（平滑水深接近截断值 / 水深图之外）：有水底的地方一变透明就会透出水下网格的硬边
+    if (uDistanceFade.y > uDistanceFade.x) {
+      float open = uUseVertexDepth > 0.5 ? 1.0 : smoothstep(5.0, 7.5, depth);
+      shore *= 1.0 - smoothstep(uDistanceFade.x, uDistanceFade.y, distance(vEdenWaterWorld.xz, uFadeCenter)) * open;
+    }
+    // 半透明（uOpacity）也只留在岸边：开阔水面透出去只会看到水下网格的硬边
+    csm_DiffuseColor = vec4(col, mix(uOpacity, 1.0, max(foam, openWater)) * shore);
 
     vec3 V = normalize(cameraPosition - vEdenWaterWorld);
     float fresnel = pow(1.0 - max(dot(nW, V), 0.0), uFresnelPower);
@@ -240,6 +261,8 @@ export const DEPTH_BLUR = 0.5
 
 export interface DepthMap {
   texture: Texture
+  /** 模糊过的水深（1/4 分辨率；R = 截到 COLOR_CLAMP 的水深，G = 离岸远近），给深浅颜色和岸边效果用 */
+  smooth: Texture
   /** 覆盖的世界范围 x0, z0, 宽, 深（给 uDepthBounds） */
   bounds: [number, number, number, number]
   dispose(): void
@@ -274,12 +297,60 @@ const bakeMaterial = new ShaderMaterial({
     uniform float uMaxDepth;
     varying float vY;
     void main() {
-      gl_FragColor = vec4(clamp((uLevel - vY) / uMaxDepth, 0.0, 1.0), 0.0, 0.0, 1.0);
+      // R = 水深；G = 露出水面的地形（岸），模糊后表示「离岸多近」
+      gl_FragColor = vec4(clamp((uLevel - vY) / uMaxDepth, 0.0, 1.0), step(uLevel, vY), 0.0, 1.0);
     }
   `,
 })
 const bakeCamera = new OrthographicCamera()
 const clearColor = new Color()
+
+/** 颜色用水深的模糊半径（米）：要比浅滩网格边缘的台阶（投影生成的网格，约 0.5–1 米一段）大得多，轮廓才会变成柔和的一团 */
+const COLOR_BLUR = 4
+/** 模糊前把水深截到这个值（米）：没有地形的地方记为 MAX_DEPTH，不截的话过渡会被深的一侧吞掉；须大于各场景的 depthFalloff */
+const COLOR_CLAMP = 8
+/** 模糊图相对水深图的缩小倍数（颜色渐变不需要细节） */
+const SMOOTH_DOWNSCALE = 4
+
+// 9 抽头可分离高斯（横 / 竖各一遍），R 采样前截深，G（岸）照常模糊
+const blurMaterial = new ShaderMaterial({
+  depthTest: false,
+  depthWrite: false,
+  uniforms: {
+    uSrc: { value: null as Texture | null },
+    uDir: { value: new Vector2() },
+    uClamp: { value: COLOR_CLAMP / MAX_DEPTH },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D uSrc;
+    uniform vec2 uDir;
+    uniform float uClamp;
+    varying vec2 vUv;
+    vec2 tap(vec2 uv) {
+      vec2 v = texture2D(uSrc, uv).rg;
+      return vec2(min(v.x, uClamp), v.y);
+    }
+    void main() {
+      vec2 s = tap(vUv) * 0.227027;
+      s += (tap(vUv + uDir) + tap(vUv - uDir)) * 0.1945946;
+      s += (tap(vUv + uDir * 2.0) + tap(vUv - uDir * 2.0)) * 0.1216216;
+      s += (tap(vUv + uDir * 3.0) + tap(vUv - uDir * 3.0)) * 0.054054;
+      s += (tap(vUv + uDir * 4.0) + tap(vUv - uDir * 4.0)) * 0.016216;
+      gl_FragColor = vec4(s, 0.0, 1.0);
+    }
+  `,
+})
+const blurScene = new Scene()
+const blurQuad = new Mesh(new PlaneGeometry(2, 2), blurMaterial)
+blurQuad.frustumCulled = false
+blurScene.add(blurQuad)
 
 /**
  * 烘水深图（GPU，一次绘制，几毫秒）：把水底网格（collision.ts 的 waterBedMeshes：渲染模型的地形 mesh，没有时用碰撞体）
@@ -331,9 +402,41 @@ export function bakeDepthMap(
   gl.setClearColor(0xff0000, 1)
   gl.autoClear = true
   gl.render(scene, bakeCamera)
+
+  // 颜色用的平滑水深：缩小后横竖各模糊两遍（ping-pong），一共 4 次全屏绘制
+  const sw = Math.max(2, Math.ceil(resX / SMOOTH_DOWNSCALE))
+  const sh = Math.max(2, Math.ceil(resZ / SMOOTH_DOWNSCALE))
+  const opts = { type: HalfFloatType, minFilter: LinearFilter, magFilter: LinearFilter, depthBuffer: false }
+  const ping = new WebGLRenderTarget(sw, sh, opts)
+  const pong = new WebGLRenderTarget(sw, sh, opts)
+  // 每个抽头的间距：4 个抽头覆盖 COLOR_BLUR 米
+  const stepX = COLOR_BLUR / 4 / w
+  const stepZ = COLOR_BLUR / 4 / h
+  const b = blurMaterial.uniforms
+  const pass = (src: Texture, dst: WebGLRenderTarget, dx: number, dz: number) => {
+    b.uSrc.value = src
+    b.uDir.value.set(dx, dz)
+    gl.setRenderTarget(dst)
+    gl.render(blurScene, bakeCamera)
+  }
+  pass(target.texture, ping, stepX, 0)
+  pass(ping.texture, pong, 0, stepZ)
+  pass(pong.texture, ping, stepX, 0)
+  pass(ping.texture, pong, 0, stepZ)
+  b.uSrc.value = null
+  ping.dispose()
+
   gl.setRenderTarget(prevTarget)
   gl.setClearColor(clearColor, prevAlpha)
   gl.autoClear = prevAutoClear
 
-  return { texture: target.texture, bounds: area, dispose: () => target.dispose() }
+  return {
+    texture: target.texture,
+    smooth: pong.texture,
+    bounds: area,
+    dispose: () => {
+      target.dispose()
+      pong.dispose()
+    },
+  }
 }
