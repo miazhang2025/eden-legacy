@@ -172,15 +172,19 @@ export interface SceneConfig {
     activeEmissive: number
     /** 已发现的资产（全部找到后四个都在这一档常亮，供挑选） */
     foundEmissive: number
-    /** 发现后套在资产上的彩色光柱 + 上飘光点（颜色 = 资产 glowColor） */
+    /** 发现后从资产中心向四周飘散的柔光圆点（颜色 = 资产 glowColor）：飘多远 */
     foundMarkerRadius: number
     foundMarkerOpacity: number
-    /** 亮带每秒往上扫几次 */
-    foundMarkerPulseSpeed: number
-    /** 光柱底部离地高度 */
+    /** 每颗光点每秒飘几轮 */
+    foundMarkerSpeed: number
+    /** 发散中心相对资产中心的高度偏移 */
     foundMarkerHeight: number
-    foundMarkerBeamHeight: number
-    foundMarkerMoteSize: number
+    foundMarkerSize: number
+    /** 资产身后的彩色光晕：直径（米）/ 不透明度 */
+    foundMarkerHaloSize: number
+    foundMarkerHaloOpacity: number
+    /** 光晕颜色的饱和度倍数（1 = 原色）；光点始终用原色 */
+    foundMarkerSaturation: number
     inspectEmissive: number
     selectedEmissive: number
     /** 本场景 4 个资产的整体大小倍数（再乘 assets[].scale） */
@@ -884,7 +888,14 @@ export interface EndingConfig {
     floatSpeed: number
   }
   /** 标本（占位几何体）的材质 */
-  specimen: { emissiveIntensity: number; roughness: number; metalness: number; hoverEmissive: number }
+  specimen: {
+    emissiveIntensity: number
+    roughness: number
+    metalness: number
+    hoverEmissive: number
+    /** 真实模型的自发光 = 该资产在自己场景里「已发现」时的常驻发光（按底色发光）× 这个倍数；1 = 与场景一致 */
+    sceneGlow: number
+  }
   /** 入场：画布淡入 + 标本盒放大 + 三件标本依次落位（自己写，不用 Theatre 时间轴，见 ADR-003） */
   reveal: {
     fadeDuration: number
@@ -1719,12 +1730,14 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     idleEmissive: intensity(10),
     activeEmissive: intensity(10),
     foundEmissive: intensity(10),
-    foundMarkerRadius: num(0.1, 5, 0.05, 'foundMarkerRadius', '发现光柱半径'),
-    foundMarkerOpacity: num(0, 3, 0.01, 'foundMarkerOpacity', '发现光柱 + 光点亮度'),
-    foundMarkerPulseSpeed: num(0, 3, 0.05, 'foundMarkerPulseSpeed', '亮带上扫速度（次/秒）'),
-    foundMarkerHeight: num(-1, 2, 0.01, 'foundMarkerHeight', '光柱底部离地高度'),
-    foundMarkerBeamHeight: num(0, 10, 0.05, 'foundMarkerBeamHeight', '光柱高度（光点也飘到这么高）'),
-    foundMarkerMoteSize: num(0, 200, 1, 'foundMarkerMoteSize', '光点大小'),
+    foundMarkerRadius: num(0.1, 5, 0.05, 'foundMarkerRadius', '发现光点飘散半径'),
+    foundMarkerOpacity: num(0, 1, 0.01, 'foundMarkerOpacity', '发现光点不透明度'),
+    foundMarkerSpeed: num(0, 3, 0.01, 'foundMarkerSpeed', '光点飘散速度（轮/秒）'),
+    foundMarkerHeight: num(-2, 2, 0.01, 'foundMarkerHeight', '发散中心相对资产中心的高度偏移'),
+    foundMarkerSize: num(0, 300, 1, 'foundMarkerSize', '光点大小'),
+    foundMarkerHaloSize: num(0, 6, 0.05, 'foundMarkerHaloSize', '资产身后彩色光晕的直径'),
+    foundMarkerHaloOpacity: num(0, 1, 0.01, 'foundMarkerHaloOpacity', '彩色光晕不透明度'),
+    foundMarkerSaturation: num(0, 3, 0.05, 'foundMarkerSaturation', '光晕颜色饱和度倍数（光点用原色）'),
     inspectEmissive: intensity(10),
     selectedEmissive: intensity(20),
     assetSize: num(0.1, 5, 0.01, 'assetSize', '本场景交互资产整体大小（× 资产摆位里各自的 scale）'),
@@ -1844,6 +1857,7 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     roughness: num(0, 1, 0.01),
     metalness: num(0, 1, 0.01),
     hoverEmissive: intensity(5),
+    sceneGlow: num(0, 3, 0.01, 'sceneGlow', '真实模型自发光 × 场景里的常驻发光（1 = 与场景一致）'),
   },
   reveal: {
     _label: '入场',

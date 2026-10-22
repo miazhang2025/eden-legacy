@@ -6,7 +6,8 @@ import caustics from './chunks/caustics.glsl?raw'
 // 焦散投射（spec §5.2C high 档）：给静态地形材质打补丁，水面以下的片元叠加程序化焦散。
 // 是否生效由共享 uniform uCausticsEnabled 控制（档位 / 水面开关），不需要重新编译。
 
-const PATCHED = Symbol('eden-caustics')
+// Symbol.for：开发时热更新会把本模块再加载一份，全局共享的标记才能防止同一材质被补两遍（重复声明，编译失败）
+const PATCHED = Symbol.for('eden-caustics')
 
 export function patchCaustics(material: Material) {
   const m = material as Material & { [PATCHED]?: true }

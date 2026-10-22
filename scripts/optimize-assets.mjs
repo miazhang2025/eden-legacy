@@ -49,6 +49,15 @@ const TEXTURE_REPLACE = {
 }
 
 /**
+ * 底色贴图暗部提亮：资产 id → { lift 强度 0–1, threshold 明度阈值 0–1 }。
+ * 按 HSL 明度抬起低于阈值的部分（色相、饱和度不变，亮部不动）。
+ * 沉蓝晶脉的母岩在贴图里画成深海军蓝，场景里显得发黑
+ */
+const TEXTURE_LIFT = {
+  cave_ore_01: { lift: 1, threshold: 0.85 },
+}
+
+/**
  * 表面起伏（surface-relief.mjs）：资产 id → { mesh 名, 细分次数, 位移幅度（模型局部单位，亮度 0→1） }。
  * 笠螺的贝壳原模型只有 550 面、表面平整，按贴图的放射纹做出凹凸
  */
@@ -66,6 +75,51 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies(
   'draco3d.decoder': await draco3d.createDecoderModule(),
   'draco3d.encoder': await draco3d.createEncoderModule(),
 })
+
+function rgbToHsl(r, g, b) {
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  if (max === min) return [0, 0, l]
+  const d = max - min
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return [h / 6, s, l]
+}
+function hueToRgb(p, q, t) {
+  if (t < 0) t += 1
+  if (t > 1) t -= 1
+  if (t < 1 / 6) return p + (q - p) * 6 * t
+  if (t < 1 / 2) return q
+  if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+  return p
+}
+function hslToRgb(h, s, l) {
+  if (s === 0) return [l, l, l]
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+  const p = 2 * l - q
+  return [hueToRgb(p, q, h + 1 / 3), hueToRgb(p, q, h), hueToRgb(p, q, h - 1 / 3)]
+}
+
+/**
+ * 暗部提亮（改贴图本身）：HSL 明度低于阈值的部分沿二次曲线抬起，阈值处平滑衔接；k <= 0.5 保证单调。
+ * 按明度而不是按亮度 / 最亮通道算：深海军蓝这类饱和暗色也能抬起来，又不会把蓝色通道放大成荧光色
+ */
+async function liftTexture(tex, { lift, threshold }) {
+  const { data, info } = await sharp(tex.getImage()).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+  const k = 0.5 * lift
+  for (let i = 0; i < data.length; i += 3) {
+    const [h, s, l] = rgbToHsl(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255)
+    const x = Math.max(threshold - l, 0)
+    const [r, g, b] = hslToRgb(h, s, l + (k * x * x) / threshold)
+    data[i] = Math.round(r * 255)
+    data[i + 1] = Math.round(g * 255)
+    data[i + 2] = Math.round(b * 255)
+  }
+  const png = tex.getMimeType() === 'image/png'
+  const img = sharp(data, { raw: info })
+  tex.setImage(new Uint8Array(await (png ? img.png() : img.jpeg({ quality: 95 })).toBuffer()))
+}
 
 const triCount = (doc) =>
   doc
@@ -118,6 +172,18 @@ for (const [id, file] of Object.entries(ASSETS)) {
     const png = tex.getMimeType() === 'image/png'
     const img = sharp(tex.getImage()).resize(MAX_TEX, MAX_TEX, { fit: 'inside' })
     tex.setImage(new Uint8Array(await (png ? img.png() : img.jpeg({ quality: 95 })).toBuffer()))
+  }
+
+  const lift = TEXTURE_LIFT[id]
+  if (lift) {
+    const done = new Set()
+    for (const mat of root.listMaterials()) {
+      const tex = mat.getBaseColorTexture()
+      if (!tex || done.has(tex)) continue
+      done.add(tex)
+      await liftTexture(tex, lift)
+      console.log(`  暗部提亮 ${mat.getName()}：lift ${lift.lift} / threshold ${lift.threshold}`)
+    }
   }
 
   await doc.transform(

@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { AnimationMixer, Box3, Mesh, SkinnedMesh, Vector3, type AnimationClip, type Group, type Material, type Object3D } from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { CollectableAssetDef } from '../data/assets'
-import { patchSpecimenLook, updateSpecimenUniforms } from '../materials/specimenLook'
+import { patchSpecimenLook, updateSpecimenUniforms, type SpecimenGrade } from '../materials/specimenLook'
 import { getGlobalCfg } from '../state/useConfigStore'
 import { DRACO_PATH, url, useAnisotropy, useKTX2Extension } from './EnvModel'
 
@@ -73,15 +73,18 @@ function poseSpread(root: Object3D, clips: AnimationClip[]) {
  * 克隆（带骨骼的用 SkeletonUtils）→ 每个实例一份材质副本（只为淡入淡出时单独改透明度）→
  * 包围盒居中、最长边缩放到 def.size 米（与占位几何体同一尺度）→ 循环播放模型自带的动画。
  * pose = spread：不播动画，停在摊得最开的一帧（标本盒里的蝴蝶展翅）。
+ * grade：调色，默认 def.specimenGrade（标本盒里传合并了 def.box.grade 的）。
  */
 export function AssetModel({
   def,
   onMaterials,
   pose = 'animate',
+  grade = def.specimenGrade,
 }: {
   def: CollectableAssetDef
   onMaterials: (materials: Material[]) => void
   pose?: 'animate' | 'spread'
+  grade?: SpecimenGrade
 }) {
   const { scene, animations } = useGLTF(url(def.model), DRACO_PATH, undefined, useKTX2Extension())
 
@@ -95,7 +98,7 @@ export function AssetModel({
       if (!c) {
         c = m.clone()
         // 标本影棚光：场景里和标本盒里同一套着色，颜色接近效果图
-        patchSpecimenLook(c, def.specimenGrade)
+        patchSpecimenLook(c, grade)
         cache.set(m, c)
         mats.push(c)
       }
@@ -117,7 +120,7 @@ export function AssetModel({
     const s = def.size / (Math.max(size.x, size.y, size.z) || 1)
     const center = box.getCenter(new Vector3()).multiplyScalar(-s)
     return { object: o, materials: mats, fit: { scale: s, position: center.toArray() as [number, number, number] } }
-  }, [scene, def, pose, animations])
+  }, [scene, def, pose, grade, animations])
 
   useEffect(() => {
     onMaterials(materials)

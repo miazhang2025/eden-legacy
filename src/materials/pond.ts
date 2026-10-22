@@ -64,7 +64,8 @@ export function updatePondUniforms(cfg: SceneConfig) {
   u.uPondReflection.value = p.reflection
 }
 
-const PATCHED = Symbol('eden-pond')
+// Symbol.for：开发时热更新会把本模块再加载一份，全局共享的标记才能防止同一材质被补两遍（重复声明，编译失败）
+const PATCHED = Symbol.for('eden-pond')
 
 const header = /* glsl */ `
 uniform float uTime;

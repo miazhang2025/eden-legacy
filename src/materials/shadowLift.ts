@@ -5,7 +5,8 @@ import type { Material } from 'three'
 // 极暗的压缩噪点抬起时去饱和，避免蓝 / 红色块。
 // 数值由材质覆盖 shadowLift / shadowLiftThreshold 控制（uniform，不重新编译）；0 = 无效果。
 
-const PATCHED = Symbol('eden-shadow-lift')
+// Symbol.for：开发时热更新会把本模块再加载一份，全局共享的标记才能防止同一材质被补两遍（重复声明，编译失败）
+const PATCHED = Symbol.for('eden-shadow-lift')
 
 export interface ShadowLiftUniforms {
   uShadowLift: { value: number }

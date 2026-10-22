@@ -167,7 +167,8 @@
     "emissiveIntensity": 0.25,
     "roughness": 0.45,
     "metalness": 0.1,
-    "hoverEmissive": 0.9
+    "hoverEmissive": 0.9,
+    "sceneGlow": 1
   },
   "interaction": {
     "yawLimitDeg": 25,

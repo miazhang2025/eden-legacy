@@ -117,7 +117,8 @@ export function updateTerrainUniforms(cfg: SceneConfig) {
 /** 顶点色 b 的量程（米），与 scripts/build-terrain.mjs 的 FAR_DIST 一致 */
 const FAR_DIST = 128
 
-const PATCHED = Symbol('eden-terrain')
+// Symbol.for：开发时热更新会把本模块再加载一份，全局共享的标记才能防止同一材质被补两遍（重复声明，编译失败）
+const PATCHED = Symbol.for('eden-terrain')
 
 const header = /* glsl */ `
 uniform float uTerrainMode;

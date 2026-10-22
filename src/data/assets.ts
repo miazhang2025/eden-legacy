@@ -37,6 +37,11 @@ export interface CollectableAssetDef {
   selfGlow?: number
   /** 常驻不透明度（场景里和标本盒里都生效）：< 1 = 半透明（如海蝶，能透出里层和心脏）；默认 1 */
   opacity?: number
+  /**
+   * 只在结尾标本盒里生效的修正，让颜色贴近场景里看到的：grade 逐项覆盖 specimenGrade，opacity 覆盖 opacity。
+   * 标本盒背后是深色绒布，半透明的会透出黑底显得更深更饱和；场景里的亮背景、泛光也会让颜色显得更浅
+   */
+  box?: { grade?: SpecimenGrade; opacity?: number }
   /** 看向判定范围的倍数（inspectDistance、inspectAngleDeg 一起放大）：模型特别大、远处就显得很近的资产放宽，默认 1 */
   reach?: number
   /** 资产的代表色（按游戏里实际渲染出的主色取）：发现后的光柱、占位几何体的自发光都用它 */
@@ -55,11 +60,11 @@ const SEEDS: Seed[] = [
   { id: 'cave_ore_01', scene: 'cave', category: 'mineral', glowColor: '#6fd0ff', placeholderColor: '#6a7fa8', specimenScale: 1, heroWeight: 5 },
   { id: 'cave_ore_02', scene: 'cave', category: 'plant', glowColor: '#e2ecff', placeholderColor: '#8a6aa8', specimenScale: 1, heroWeight: 6, specimenPose: 'upright', specimenRotation: [0, -90, 0], specimenGrade: { saturation: 0.6 } },
   { id: 'cave_mushroom_01', scene: 'cave', category: 'plant', glowColor: '#6aa8ff', placeholderColor: '#b89a7a', specimenScale: 1, heroWeight: 6, specimenPose: 'upright', specimenRotation: [0, 180, 0] },
-  { id: 'cave_mushroom_02', scene: 'cave', category: 'plant', glowColor: '#ff8fc4', placeholderColor: '#a87a6a', specimenScale: 1, heroWeight: 4, specimenPose: 'upright', specimenGrade: { hue: 75, saturation: 0.5, brightness: 1.45 }, selfGlow: 0.2 },
+  { id: 'cave_mushroom_02', scene: 'cave', category: 'plant', glowColor: '#ff8fc4', placeholderColor: '#a87a6a', specimenScale: 1, heroWeight: 4, specimenPose: 'upright', specimenGrade: { hue: 75, saturation: 0.5, brightness: 1.45 }, selfGlow: 0.2, box: { grade: { saturation: 0.38 } } },
 
   { id: 'ocean_shell_01', scene: 'ocean', category: 'shell', glowColor: '#4f8dff', placeholderColor: '#e8d6c8', specimenScale: 1, heroWeight: 0 },
   { id: 'ocean_shell_02', scene: 'ocean', category: 'shell', glowColor: '#ffe0ea', placeholderColor: '#c8d6e8', specimenScale: 1, heroWeight: 3 },
-  { id: 'ocean_fish_01', scene: 'ocean', category: 'fish', glowColor: '#4a78ff', placeholderColor: '#4a8ab8', specimenScale: 1, heroWeight: 4, specimenGrade: { saturation: 1.1, tint: '#7a9cff' }, opacity: 0.72 },
+  { id: 'ocean_fish_01', scene: 'ocean', category: 'fish', glowColor: '#4a78ff', placeholderColor: '#4a8ab8', specimenScale: 1, heroWeight: 4, specimenGrade: { saturation: 1.1, tint: '#7a9cff' }, opacity: 0.72, box: { grade: { saturation: 0.6, brightness: 1.35 }, opacity: 0.9 } },
   { id: 'ocean_fish_02', scene: 'ocean', category: 'fish', glowColor: '#9ff0ee', placeholderColor: '#d88a4a', specimenScale: 1, heroWeight: 7, specimenGrade: { saturation: 1.5, brightness: 0.95, hueCenter: 55, hueWidth: 35, hueSaturation: 0.42 }, reach: 1.6 },
 
   { id: 'garden_flower_01', scene: 'garden', category: 'flower', glowColor: '#a46bff', placeholderColor: '#e86aa8', specimenScale: 1, heroWeight: 8, specimenGrade: { saturation: 0.75, brightness: 0.9 } },

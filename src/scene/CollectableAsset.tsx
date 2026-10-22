@@ -5,20 +5,12 @@ import type { CollectableAssetDef } from '../data/assets'
 import { assetTransform, useAssetTransform } from '../state/assetPlacement'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
 import { nowSec, useFlowStore } from '../state/useFlowStore'
+import { applyBaseColorGlow } from '../materials/specimenLook'
 import { groundHeightFromSky } from './collision'
 import { AssetModel } from './AssetModel'
 import { FoundMarker } from './FoundMarker'
 import { PlaceholderModel } from './PlaceholderModel'
 import { dampFactor } from './rig'
-
-/**
- * 真实模型的自发光：emissive 设成白色，着色器里再乘上（调色后的）底色 = 按自己的颜色发光（见 materials/specimenLook.ts）。
- * 只改 AssetModel 给的每实例材质副本，不影响结尾标本盒里同一个模型。
- */
-function applyBaseColorGlow(m: Material) {
-  const std = m as MeshStandardMaterial
-  if (std.emissive) std.emissive.set('#ffffff')
-}
 
 export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
   const group = useRef<Group>(null)
@@ -124,13 +116,14 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     }
     g.visible = opacity > 0.001
 
-    // 发现后脚下亮起同色光环（见 FoundMarker），选中淡出时一起淡掉
+    // 发现后从资产中心飘出同色光点（见 FoundMarker），选中淡出时一起淡掉
     const shown = found && phase !== 'EXIT' ? opacity : 0
     markerLevel.current = MathUtils.lerp(markerLevel.current, shown, dampFactor(f.emissiveDamping, dt))
 
     const lift = floating ? Math.sin(t * f.floatSpeed + phaseOffset) * f.floatAmplitude : 0
     g.position.y = ground.current.y + offsetY + f.assetLift + lift
-    marker.current?.position.set(x, ground.current.y + f.foundMarkerHeight, z)
+    // 发现光点从资产中心（不含上下浮动）往外飘
+    marker.current?.position.set(x, ground.current.y + offsetY + f.assetLift + f.foundMarkerHeight, z)
     if (floating) g.rotation.y += dt * f.spinSpeed
   })
 

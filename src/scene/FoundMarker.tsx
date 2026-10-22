@@ -1,66 +1,72 @@
-import { useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from 'react'
+import { useEffect, useMemo, type MutableRefObject, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, BufferAttribute, NormalBlending, BufferGeometry, Color, CylinderGeometry, DoubleSide, ShaderMaterial, type Group, type Mesh } from 'three'
+import { BufferAttribute, BufferGeometry, Color, NormalBlending, PlaneGeometry, ShaderMaterial, type Group } from 'three'
 import { getSceneCfg } from '../state/useConfigStore'
 
-// 已发现资产的标记：套在资产上的一根柔和竖直光柱（半透明彩色，边缘柔和、往上渐隐，有一道往上扫的亮带）+ 几颗上飘的光点，颜色取资产 glowColor。
-// 第三人称机位很低，贴地光环会被压成一条线，所以用竖直的光柱。不打光，不影响周围环境的亮度。
-// 位置由 CollectableAsset 逐帧写到 groupRef 上（贴地，不跟着资产浮动 / 旋转 / 缩放）。
+// 已发现资产的标记，颜色取资产 glowColor（光晕在着色器里再提一点饱和度，浅色资产也看得出颜色；光点用原色）：
+//   光晕：资产身后一团柔和的彩色径向光，往远离镜头的方向推开一点，资产整个在它前面，不会被切开 / 盖住
+//   光点：从资产中心向四周慢慢飘散的柔光圆点（散景光斑），飘远淡出、循环出现
+// 都用普通半透明混合（不叠加发光），亮背景上不会过曝成白色；不打光，不影响周围环境的亮度。
+// 位置由 CollectableAsset 逐帧写到 groupRef 上（资产中心，不跟着浮动 / 旋转 / 缩放）。
 
-const MOTES = 16
+const COUNT = 48
 
-const beamVert = /* glsl */ `
-varying float vH;
-varying float vFacing;
-void main() {
-  vH = uv.y;
-  vec4 wp = modelMatrix * vec4(position, 1.0);
-  vec3 n = normalize(mat3(modelMatrix) * normal);
-  vec3 v = normalize(cameraPosition - wp.xyz);
-  // 水平方向的朝向：柱子正对镜头的中线最亮，两侧边缘淡出（体积感）
-  vFacing = abs(dot(normalize(n.xz), normalize(v.xz + vec2(1e-5))));
-  gl_Position = projectionMatrix * viewMatrix * wp;
+const saturate = /* glsl */ `
+vec3 edenSaturate(vec3 c, float s) {
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  return clamp(mix(vec3(l), c, s), 0.0, 1.0);
 }
 `
 
-const beamFrag = /* glsl */ `
+const haloVert = /* glsl */ `
+uniform float uSize;
+uniform float uPush;
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  // 广告牌：中心在资产中心，沿视线往后推 uPush，四个角在视图空间里展开
+  vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+  mv.xyz += normalize(mv.xyz) * uPush;
+  mv.xy += position.xy * uSize;
+  gl_Position = projectionMatrix * mv;
+}
+`
+
+const haloFrag = /* glsl */ `
 uniform vec3 uColor;
 uniform float uLevel;
+uniform float uSat;
 uniform float uTime;
-uniform float uPulseSpeed;
-varying float vH;
-varying float vFacing;
+varying vec2 vUv;
+${saturate}
 void main() {
-  // 插值可能让 vH 略超出 0–1，pow 负数会出 NaN（经过泛光会把整屏染黑），先钳住
-  float h = clamp(vH, 0.0, 1.0);
-  // 亮度集中在中线和边缘之间，中线（正压在资产上）留一点，资产能看清；最外缘柔和淡出
-  float f = clamp(vFacing, 0.0, 1.0);
-  float body = (0.3 + 0.7 * 4.0 * f * (1.0 - f)) * smoothstep(0.0, 0.4, f);
-  float vertical = smoothstep(0.0, 0.08, h) * pow(1.0 - h, 1.6);
-  // 往上扫的亮带
-  float p = fract(uTime * uPulseSpeed);
-  float d = (h - p) / 0.08;
-  float sweep = exp(-d * d) * (1.0 - p);
-  float a = clamp(body * (vertical * 0.55 + sweep * 0.6) * uLevel, 0.0, 1.0);
-  gl_FragColor = vec4(uColor, a);
+  float d = length(vUv * 2.0 - 1.0);
+  if (d > 1.0) discard;
+  // 高斯式衰减，边缘完全化开；轻微呼吸
+  float a = exp(-d * d * 4.0) * (1.0 - smoothstep(0.8, 1.0, d));
+  a *= 0.85 + 0.15 * sin(uTime * 1.6);
+  gl_FragColor = vec4(edenSaturate(uColor, uSat), clamp(a * uLevel, 0.0, 1.0));
 }
 `
 
 const moteVert = /* glsl */ `
-attribute vec3 aSeed;
+attribute vec4 aSeed;
 uniform float uTime;
 uniform float uRadius;
-uniform float uHeight;
+uniform float uSpeed;
 uniform float uSize;
 varying float vFade;
 void main() {
-  float h = fract(uTime * (0.12 + 0.1 * aSeed.z) + aSeed.z * 7.0);
-  float ang = aSeed.x + h * 1.5;
-  float rad = uRadius * (0.3 + 0.6 * aSeed.y);
-  vec3 p = vec3(cos(ang) * rad, h * uHeight, sin(ang) * rad);
-  vFade = sin(h * 3.14159);
+  // aSeed.xyz：单位球面上的发散方向；aSeed.w：相位 / 速度 / 大小的随机数
+  float t = fract(uTime * uSpeed * (0.75 + 0.5 * aSeed.w) + aSeed.w * 13.0);
+  // 先快后慢地往外飘，带一点上浮
+  float d = 1.0 - (1.0 - t) * (1.0 - t);
+  vec3 p = aSeed.xyz * d * uRadius;
+  p.y += t * t * 0.25 * uRadius;
+  // 刚冒出来和飘到最远时都淡掉
+  vFade = smoothstep(0.0, 0.15, t) * (1.0 - smoothstep(0.55, 1.0, t));
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  gl_PointSize = uSize * (0.6 + 0.6 * aSeed.y) / max(0.1, -mv.z);
+  gl_PointSize = uSize * (0.5 + 0.7 * fract(aSeed.w * 7.0)) * (0.7 + 0.5 * t) / max(0.1, -mv.z);
   gl_Position = projectionMatrix * mv;
 }
 `
@@ -71,24 +77,30 @@ uniform float uLevel;
 varying float vFade;
 void main() {
   float d = length(gl_PointCoord - 0.5) * 2.0;
-  float a = (1.0 - smoothstep(0.0, 1.0, d)) * vFade * uLevel;
-  gl_FragColor = vec4(uColor, a);
+  if (d > 1.0) discard;
+  // 柔和的圆盘：中间实、边缘慢慢化开
+  float a = (1.0 - smoothstep(0.4, 1.0, d)) * 0.8 + (1.0 - d) * (1.0 - d) * 0.2;
+  gl_FragColor = vec4(uColor, clamp(a * vFade * uLevel, 0.0, 1.0));
 }
 `
 
+const shared = { transparent: true, depthWrite: false, blending: NormalBlending }
+
 export function FoundMarker({ color, level, groupRef }: { color: string; level: MutableRefObject<number>; groupRef: RefObject<Group> }) {
-  const beamMesh = useRef<Mesh>(null)
-  const beam = useMemo(
+  const halo = useMemo(
     () =>
       new ShaderMaterial({
-        vertexShader: beamVert,
-        fragmentShader: beamFrag,
-        uniforms: { uColor: { value: new Color() }, uLevel: { value: 0 }, uTime: { value: 0 }, uPulseSpeed: { value: 0.5 } },
-        transparent: true,
-        depthWrite: false,
-        side: DoubleSide,
-        // 普通混合：是一层带颜色的半透明光，不往背景上加亮度（叠加发光在花园这种亮背景上会冲成白色）
-        blending: NormalBlending,
+        vertexShader: haloVert,
+        fragmentShader: haloFrag,
+        uniforms: {
+          uColor: { value: new Color() },
+          uLevel: { value: 0 },
+          uSat: { value: 1.5 },
+          uTime: { value: 0 },
+          uSize: { value: 1 },
+          uPush: { value: 0.5 },
+        },
+        ...shared,
       }),
     [],
   )
@@ -102,64 +114,69 @@ export function FoundMarker({ color, level, groupRef }: { color: string; level: 
           uLevel: { value: 0 },
           uTime: { value: 0 },
           uRadius: { value: 1 },
-          uHeight: { value: 1.5 },
-          uSize: { value: 40 },
+          uSpeed: { value: 0.3 },
+          uSize: { value: 60 },
         },
-        transparent: true,
-        depthWrite: false,
-        blending: AdditiveBlending,
+        ...shared,
       }),
     [],
   )
-  // 单位圆柱（半径 1、高 1、无盖），底面移到原点，按配置缩放
-  const beamGeo = useMemo(() => new CylinderGeometry(1, 1, 1, 32, 1, true).translate(0, 0.5, 0), [])
+  const haloGeo = useMemo(() => new PlaneGeometry(1, 1), [])
   const moteGeo = useMemo(() => {
     const g = new BufferGeometry()
-    const seed = new Float32Array(MOTES * 3)
-    for (let i = 0; i < MOTES; i++) {
-      seed[i * 3] = (i / MOTES) * Math.PI * 2 + Math.random() * 0.4
-      seed[i * 3 + 1] = Math.random()
-      seed[i * 3 + 2] = Math.random()
+    const seed = new Float32Array(COUNT * 4)
+    for (let i = 0; i < COUNT; i++) {
+      // 球面上均匀取方向（斐波那契球 + 一点抖动），粒子不会挤成一团
+      const y = 1 - ((i + 0.5) / COUNT) * 2
+      const r = Math.sqrt(1 - y * y)
+      const a = i * 2.39996 + Math.random() * 0.5
+      seed[i * 4] = Math.cos(a) * r
+      seed[i * 4 + 1] = y
+      seed[i * 4 + 2] = Math.sin(a) * r
+      seed[i * 4 + 3] = Math.random()
     }
     // 位置全在着色器里算，position 只占位
-    g.setAttribute('position', new BufferAttribute(new Float32Array(MOTES * 3), 3))
-    g.setAttribute('aSeed', new BufferAttribute(seed, 3))
+    g.setAttribute('position', new BufferAttribute(new Float32Array(COUNT * 3), 3))
+    g.setAttribute('aSeed', new BufferAttribute(seed, 4))
     return g
   }, [])
   useEffect(
     () => () => {
-      beam.dispose()
-      beamGeo.dispose()
+      halo.dispose()
       motes.dispose()
+      haloGeo.dispose()
       moteGeo.dispose()
     },
-    [beam, beamGeo, motes, moteGeo],
+    [halo, motes, haloGeo, moteGeo],
   )
 
   useEffect(() => {
-    beam.uniforms.uColor.value.set(color)
+    halo.uniforms.uColor.value.set(color)
     motes.uniforms.uColor.value.set(color)
-  }, [color, beam, motes])
+  }, [color, halo, motes])
 
   useFrame((state) => {
     const f = getSceneCfg().flow
+    const l = level.current
     const t = state.clock.elapsedTime
-    const l = level.current * f.foundMarkerOpacity
-    beam.uniforms.uLevel.value = l
-    beam.uniforms.uTime.value = t
-    beam.uniforms.uPulseSpeed.value = f.foundMarkerPulseSpeed
-    motes.uniforms.uLevel.value = l
-    motes.uniforms.uTime.value = t
-    motes.uniforms.uRadius.value = f.foundMarkerRadius
-    motes.uniforms.uHeight.value = f.foundMarkerBeamHeight
-    motes.uniforms.uSize.value = f.foundMarkerMoteSize * state.gl.getPixelRatio()
+    const h = halo.uniforms
+    h.uLevel.value = l * f.foundMarkerHaloOpacity
+    h.uSat.value = f.foundMarkerSaturation
+    h.uTime.value = t
+    h.uSize.value = f.foundMarkerHaloSize
+    h.uPush.value = f.foundMarkerHaloSize * 0.35
+    const m = motes.uniforms
+    m.uLevel.value = l * f.foundMarkerOpacity
+    m.uTime.value = t
+    m.uRadius.value = f.foundMarkerRadius
+    m.uSpeed.value = f.foundMarkerSpeed
+    m.uSize.value = f.foundMarkerSize * state.gl.getPixelRatio()
     if (groupRef.current) groupRef.current.visible = l > 0.001
-    beamMesh.current?.scale.set(f.foundMarkerRadius, f.foundMarkerBeamHeight, f.foundMarkerRadius)
   })
 
   return (
     <group ref={groupRef}>
-      <mesh ref={beamMesh} geometry={beamGeo} material={beam} renderOrder={2} />
+      <mesh geometry={haloGeo} material={halo} frustumCulled={false} renderOrder={2} />
       <points geometry={moteGeo} material={motes} frustumCulled={false} renderOrder={3} />
     </group>
   )

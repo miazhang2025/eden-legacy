@@ -1,5 +1,5 @@
 import { Color, Vector3, type Material, type MeshStandardMaterial } from 'three'
-import type { GlobalConfig } from '../config/schema'
+import type { GlobalConfig, SceneConfig } from '../config/schema'
 
 // 标本影棚光：交互资产（场景里 + 结尾标本盒里）统一用一套固定在镜头空间的中性灯光着色，
 // 颜色接近美术效果图（中性影棚渲染），不随各场景的有色灯光、曝光变化。
@@ -139,7 +139,8 @@ totalEmissiveRadiance *= diffuseColor.rgb;
 #endif
 `
 
-const PATCHED = Symbol('eden-specimen')
+// Symbol.for：开发时热更新会把本模块再加载一份，全局共享的标记才能防止同一材质被补两遍（重复声明，编译失败）
+const PATCHED = Symbol.for('eden-specimen')
 const DEG = Math.PI / 180
 
 export function patchSpecimenLook(material: Material, g: SpecimenGrade = {}) {
@@ -169,4 +170,18 @@ export function patchSpecimenLook(material: Material, g: SpecimenGrade = {}) {
   const prevKey = m.customProgramCacheKey?.bind(m)
   m.customProgramCacheKey = () => `${prevKey?.() ?? ''}|eden-specimen`
   m.needsUpdate = true
+}
+
+/**
+ * 真实模型按（调色后的）底色发光：emissive 设成白色，着色器里再乘底色（见上面的 glow）。
+ * 只改 AssetModel 给的每实例材质副本。
+ */
+export function applyBaseColorGlow(m: Material) {
+  const std = m as MeshStandardMaterial
+  if (std.emissive) std.emissive.set('#ffffff')
+}
+
+/** 资产在自己场景里「已发现」时的常驻自发光强度（呼吸取平均）：结尾标本盒照这个发光，颜色才和场景里一致 */
+export function foundGlow(flow: SceneConfig['flow'], selfGlow = 0) {
+  return flow.assetSelfGlow + selfGlow + flow.foundEmissive * (1 - flow.breatheDepth * 0.5) * flow.assetGlowGain
 }
