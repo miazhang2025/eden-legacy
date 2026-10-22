@@ -1067,14 +1067,7 @@
       "roughness": 0.09
     },
     "SC29_plants": {
-      "role": "crystal",
-      "color": "#f7b3d6",
-      "emissive": "#ff8cc6",
-      "emissiveIntensity": 0.25,
-      "roughness": 0.08,
-      "transmission": 0.85,
-      "thickness": 1.2,
-      "attenuationColor": "#ff9fd0"
+      "role": "static"
     },
     "SC33_plants": {
       "role": "static"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { create } from 'zustand'
 import { useGLTF } from '@react-three/drei'
 import {
   Box3,
@@ -24,6 +25,15 @@ export const frameExtent = { halfW: 0, halfH: 0 }
 
 /** 绒布表面的深度（标本盒单位），标本不能落到它后面；NaN = 没有绒布 */
 export const velvetSurface = { z: NaN }
+
+/** 画框内框（从正前方看到的开口）椭圆，标本盒单位：圆心 cx / cy、半轴 halfW / halfH；null = 没量到（或不是模型画框） */
+export interface FrameInner {
+  cx: number
+  cy: number
+  halfW: number
+  halfH: number
+}
+export const useFrameInner = create<{ inner: FrameInner | null }>()(() => ({ inner: null }))
 
 /** model 模式用哪个画框：modelIndex = -1 时按组合 id 随机（同一组合每次一样） */
 export function pickFrameModel(models: FrameModelConfig[], modelIndex: number, seed: string) {
@@ -168,6 +178,19 @@ export function FrameModel({ cfg }: { cfg: FrameModelConfig }) {
 
   const showVelvet = velvet.enabled && inner !== null
   const velvetZ = inner ? inner.back * fit.scale + fit.position[2] + velvet.offset : NaN
+  // 内框椭圆给装饰花草用（防穿模），画框换了 / 卸载时清掉
+  useEffect(() => {
+    useFrameInner.setState({
+      inner: inner && {
+        cx: cfg.offset[0],
+        cy: cfg.offset[1],
+        halfW: inner.halfW * fit.scale,
+        halfH: inner.halfH * fit.scale,
+      },
+    })
+    return () => useFrameInner.setState({ inner: null })
+  }, [inner, fit.scale, cfg.offset])
+
   useEffect(() => {
     velvetSurface.z = showVelvet ? velvetZ : NaN
     return () => {

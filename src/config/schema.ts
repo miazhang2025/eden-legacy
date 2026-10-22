@@ -859,6 +859,8 @@ export interface EndingConfig {
     /** 颜色乘数：< 1 压暗，免得抢标本 */
     brightness: number
     slots: DecorSlot[]
+    /** 花草离画框内框边缘至少留多少（标本盒单位）：超出内框的会以根部为中心缩小，根部在框外的先往里挪，不和画框穿模 */
+    fitMargin: number
     /** 沿内框铺一圈草（decor.glb 里的 grass_* 草丛，实例化） */
     grass: DecorGrassConfig
   }
@@ -1800,6 +1802,7 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     model: { t: 'text' },
     pieces: { t: 'text', label: 'pieces（逗号分隔）' },
     brightness: num(0, 2, 0.01),
+    fitMargin: num(0, 0.5, 0.005),
     slots: {
       t: 'array',
       label: '落位',

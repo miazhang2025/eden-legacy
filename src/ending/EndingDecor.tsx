@@ -17,6 +17,8 @@ import type { EndingConfig } from '../config/schema'
 import { DRACO_PATH, url, useKTX2Extension } from '../scene/EnvModel'
 import { useEndingCfg } from '../state/useConfigStore'
 import { hash01, isMirrored } from './composition'
+import { relativeMatrix } from './flatten'
+import { useFrameInner, type FrameInner } from './FrameModel'
 
 type DecorCfg = EndingConfig['decor']
 
@@ -35,6 +37,65 @@ const pos = new Vector3()
 const quat = new Quaternion()
 const scl = new Vector3()
 const euler = new Euler(0, 0, 0, 'ZYX')
+const rot = new Euler()
+const rel = new Matrix4()
+const placeMatrix = new Matrix4()
+const vtx = new Vector3()
+
+/** 花草摆好后在标本盒 xy 平面上的投影（每个网格抽样约 400 个顶点）；m = 摆位矩阵 */
+function footprint(o: Object3D, m: Matrix4): [number, number][] {
+  const out: [number, number][] = []
+  o.updateMatrixWorld(true)
+  o.traverse((x) => {
+    if (!(x instanceof Mesh)) return
+    const p = x.geometry.getAttribute('position')
+    if (!p) return
+    relativeMatrix(x, o, rel).premultiply(m)
+    const step = Math.max(1, Math.floor(p.count / 400))
+    for (let i = 0; i < p.count; i += step) {
+      vtx.fromBufferAttribute(p, i).applyMatrix4(rel)
+      out.push([vtx.x, vtx.y])
+    }
+  })
+  return out
+}
+
+/** 往里挪的根部至少保留原尺寸的多少：够了就不再往里挪 */
+const KEEP_SCALE = 0.7
+
+/**
+ * 把一株花草收进内框椭圆（半轴各减 margin）：先把根部 (px, py) 沿径向往里挪（最多挪到原半径的一半），
+ * 挪到以根部为中心缩小后还能保留 KEEP_SCALE 的尺寸为止；都不够就取尺寸最大的那个位置。
+ * 返回新的根部与缩放系数 k（≤ 1），所有投影点都在框内。
+ */
+function fitInside(px: number, py: number, pts: [number, number][], inner: FrameInner, margin: number) {
+  const a = Math.max(inner.halfW - margin, 0.01)
+  const b = Math.max(inner.halfH - margin, 0.01)
+  const e = (x: number, y: number) => ((x - inner.cx) / a) ** 2 + ((y - inner.cy) / b) ** 2
+  // 根部离中心的「椭圆半径」，起点不超过 0.9（贴边或在框外的先挪进来）
+  const er = Math.sqrt(e(px, py)) || 1
+  const start = Math.min(1, 0.9 / er)
+  let best = { x: px, y: py, k: -1 }
+  for (let f = start; f >= start * 0.5 - 1e-6; f -= start * 0.05) {
+    const x = inner.cx + (px - inner.cx) * f
+    const y = inner.cy + (py - inner.cy) * f
+    const inside = (k: number) => pts.every(([vx, vy]) => e(x + k * (vx - px), y + k * (vy - py)) <= 1)
+    let k = 1
+    if (!inside(1)) {
+      let lo = 0
+      let hi = 1
+      for (let i = 0; i < 16; i++) {
+        const mid = (lo + hi) / 2
+        if (inside(mid)) lo = mid
+        else hi = mid
+      }
+      k = lo
+    }
+    if (k > best.k) best = { x, y, k }
+    if (k >= KEEP_SCALE) break
+  }
+  return best
+}
 
 /**
  * 沿内框铺一圈草：两种草丛各一个 InstancedMesh。
@@ -126,6 +187,7 @@ function DecorPieces({ cfg, seed }: { cfg: DecorCfg; seed: string }) {
   const composition = useEndingCfg((c) => c.composition)
   const { scene } = useGLTF(url(cfg.model), DRACO_PATH, undefined, useKTX2Extension())
   const mirror = isMirrored(composition, seed)
+  const inner = useFrameInner((s) => s.inner)
 
   // 材质整体压暗：每种原材质克隆一份，颜色乘 brightness
   const materials = useMemo(() => {
@@ -165,15 +227,20 @@ function DecorPieces({ cfg, seed }: { cfg: DecorCfg; seed: string }) {
       })
       // 几何已在 npm run decor 里挪到底部中心，这里只按高度缩放
       const height = box.setFromObject(o).max.y - box.min.y || 1
-      return {
-        key: `${i}-${names[i % names.length]}`,
-        object: o,
-        position: [sx * slot.anchor[0] * w, slot.anchor[1] * h, slot.anchor[2] * d] as [number, number, number],
-        rotation: [slot.rotation[0], sx * slot.rotation[1], sx * slot.rotation[2]] as [number, number, number],
-        scale: (slot.height * h) / height,
+      const position: [number, number, number] = [sx * slot.anchor[0] * w, slot.anchor[1] * h, slot.anchor[2] * d]
+      const rotation: [number, number, number] = [slot.rotation[0], sx * slot.rotation[1], sx * slot.rotation[2]]
+      let scale = (slot.height * h) / height
+      // 收进画框内框，不和画框穿模（画框模型还没量出内框时先按原样摆）
+      if (inner) {
+        placeMatrix.compose(pos.set(...position), quat.setFromEuler(rot.set(...rotation)), scl.setScalar(scale))
+        const fit = fitInside(position[0], position[1], footprint(o, placeMatrix), inner, cfg.fitMargin)
+        position[0] = fit.x
+        position[1] = fit.y
+        scale *= fit.k
       }
+      return { key: `${i}-${names[i % names.length]}`, object: o, position, rotation, scale }
     })
-  }, [scene, cfg.pieces, cfg.slots, seed, mirror, materials, w, h, d])
+  }, [scene, cfg.pieces, cfg.slots, cfg.fitMargin, seed, mirror, materials, inner, w, h, d])
 
   return (
     <group>

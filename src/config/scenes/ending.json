@@ -264,6 +264,7 @@
     "model": "/models/ending/decor.glb",
     "pieces": "cave_50,cave_55,cave_57,garden_2,garden_5,garden_32,ocean_25,ocean_19",
     "brightness": 0.85,
+    "fitMargin": 0.06,
     "slots": [
       {
         "anchor": [
@@ -349,7 +350,7 @@
       "count": 300,
       "radius": 0.47,
       "inset": 0.06,
-      "arcDeg": 360,
+      "arcDeg": 330,
       "bottomBias": 0.95,
       "size": [
         0.1,
