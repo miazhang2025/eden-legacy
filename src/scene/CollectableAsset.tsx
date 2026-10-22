@@ -7,6 +7,7 @@ import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
 import { nowSec, useFlowStore } from '../state/useFlowStore'
 import { groundHeightFromSky } from './collision'
 import { AssetModel } from './AssetModel'
+import { FoundMarker } from './FoundMarker'
 import { PlaceholderModel } from './PlaceholderModel'
 import { dampFactor } from './rig'
 
@@ -22,6 +23,9 @@ function applyBaseColorGlow(m: Material) {
 export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
   const group = useRef<Group>(null)
   const emissive = useRef(0)
+  const marker = useRef<Group>(null)
+  /** 发现标记当前显示程度 0–1（平滑过渡） */
+  const markerLevel = useRef(0)
   /** 资产贴地：config assets[].position 的 x/z 为世界坐标，y 为相对地面的偏移；x/z 变化时重新求地面高度 */
   const ground = useRef<{ x: number; z: number; y: number } | null>(null)
   const roughness = useSceneCfg((c) => c.placeholder.assetRoughness)
@@ -109,17 +113,24 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
 
     emissive.current = MathUtils.lerp(emissive.current, targetEmissive, dampFactor(f.emissiveDamping, dt))
     const glow = placeholder ? emissive.current : f.assetSelfGlow + (def.selfGlow ?? 0) + emissive.current * f.assetGlowGain
+    // 资产自己的常驻不透明度（def.opacity，如半透明的海蝶）叠在淡入淡出上
+    const alpha = opacity * (placeholder ? 1 : (def.opacity ?? 1))
     for (const m of mats.current) {
       if ('emissiveIntensity' in m) (m as MeshStandardMaterial).emissiveIntensity = glow
-      m.opacity = opacity
-      // 真实模型平时不透明（免得排序出错），淡出时才切透明
-      m.transparent = placeholder || opacity < 0.999
-      m.depthWrite = opacity > 0.99
+      m.opacity = alpha
+      // 真实模型平时不透明（免得排序出错），淡出时 / 本身半透明时才切透明
+      m.transparent = placeholder || alpha < 0.999
+      m.depthWrite = alpha > 0.99
     }
     g.visible = opacity > 0.001
 
+    // 发现后脚下亮起同色光环（见 FoundMarker），选中淡出时一起淡掉
+    const shown = found && phase !== 'EXIT' ? opacity : 0
+    markerLevel.current = MathUtils.lerp(markerLevel.current, shown, dampFactor(f.emissiveDamping, dt))
+
     const lift = floating ? Math.sin(t * f.floatSpeed + phaseOffset) * f.floatAmplitude : 0
     g.position.y = ground.current.y + offsetY + f.assetLift + lift
+    marker.current?.position.set(x, ground.current.y + f.foundMarkerHeight, z)
     if (floating) g.rotation.y += dt * f.spinSpeed
   })
 
@@ -141,22 +152,25 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
   useEffect(() => onOut, [])
 
   return (
-    <group
-      ref={group}
-      // position 逐帧在 useFrame 里设置（贴地 + 浮动）
-      rotation={transform.rotation}
-      scale={transform.scale * assetSize}
-      onClick={onClick}
-      onPointerOver={onOver}
-      onPointerOut={onOut}
-    >
-      {placeholder ? (
-        <PlaceholderModel category={def.category} material={material} />
-      ) : (
-        <Suspense fallback={null}>
-          <AssetModel def={def} onMaterials={onMaterials} />
-        </Suspense>
-      )}
-    </group>
+    <>
+      <FoundMarker color={def.glowColor} level={markerLevel} groupRef={marker} />
+      <group
+        ref={group}
+        // position 逐帧在 useFrame 里设置（贴地 + 浮动）
+        rotation={transform.rotation}
+        scale={transform.scale * assetSize}
+        onClick={onClick}
+        onPointerOver={onOver}
+        onPointerOut={onOut}
+      >
+        {placeholder ? (
+          <PlaceholderModel category={def.category} material={material} />
+        ) : (
+          <Suspense fallback={null}>
+            <AssetModel def={def} onMaterials={onMaterials} />
+          </Suspense>
+        )}
+      </group>
+    </>
   )
 }

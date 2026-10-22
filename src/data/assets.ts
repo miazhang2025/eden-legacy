@@ -29,10 +29,17 @@ export interface CollectableAssetDef {
   heroWeight: number
   /** 标本盒里的姿态：flatten（默认）= 转到投影面积最大的一面正对背板；upright = 保持直立的侧面（蘑菇摊平只剩一个圆顶） */
   specimenPose?: 'flatten' | 'upright'
+  /** upright 时额外的旋转（度，XYZ）：把资产的「正面」（花口、眼睛）转到正对镜头 */
+  specimenRotation?: [number, number, number]
   /** 调色（色相 / 饱和度 / 亮度）对齐美术效果图，场景里和标本盒里都生效 */
   specimenGrade?: SpecimenGrade
   /** 场景里额外的常驻自发光（叠加在 flow.assetSelfGlow 上）：贴图偏暗的资产单独提亮 */
   selfGlow?: number
+  /** 常驻不透明度（场景里和标本盒里都生效）：< 1 = 半透明（如海蝶，能透出里层和心脏）；默认 1 */
+  opacity?: number
+  /** 看向判定范围的倍数（inspectDistance、inspectAngleDeg 一起放大）：模型特别大、远处就显得很近的资产放宽，默认 1 */
+  reach?: number
+  /** 资产的代表色（按游戏里实际渲染出的主色取）：发现后的光柱、占位几何体的自发光都用它 */
   glowColor: string
   /** 占位几何体的底色，接入真实模型后不再使用 */
   placeholderColor: string
@@ -45,21 +52,21 @@ type Seed = Omit<CollectableAssetDef, 'copyKey' | 'model' | 'size'> & { model?: 
 const SEEDS: Seed[] = [
   // 资产 id 沿用最早的占位命名（也是模型文件名），类别以 category 为准
   // heroWeight：蝴蝶 > 花 > 斗鱼 > 洞穴植物 / 矿 > 海蝶 / 菌群 > 笠贝 > 巨贝（花园总有一件蝴蝶或花，实际上主体总是花园那件）
-  { id: 'cave_ore_01', scene: 'cave', category: 'mineral', glowColor: '#7ef9ff', placeholderColor: '#6a7fa8', specimenScale: 1, heroWeight: 5 },
-  { id: 'cave_ore_02', scene: 'cave', category: 'plant', glowColor: '#c78bff', placeholderColor: '#8a6aa8', specimenScale: 1, heroWeight: 6, specimenGrade: { saturation: 0.6 } },
-  { id: 'cave_mushroom_01', scene: 'cave', category: 'plant', glowColor: '#9dff8a', placeholderColor: '#b89a7a', specimenScale: 1, heroWeight: 6 },
-  { id: 'cave_mushroom_02', scene: 'cave', category: 'plant', glowColor: '#ffb86b', placeholderColor: '#a87a6a', specimenScale: 1, heroWeight: 4, specimenPose: 'upright', specimenGrade: { hue: 75, saturation: 0.5, brightness: 1.45 }, selfGlow: 0.2 },
+  { id: 'cave_ore_01', scene: 'cave', category: 'mineral', glowColor: '#6fd0ff', placeholderColor: '#6a7fa8', specimenScale: 1, heroWeight: 5 },
+  { id: 'cave_ore_02', scene: 'cave', category: 'plant', glowColor: '#e2ecff', placeholderColor: '#8a6aa8', specimenScale: 1, heroWeight: 6, specimenPose: 'upright', specimenRotation: [0, -90, 0], specimenGrade: { saturation: 0.6 } },
+  { id: 'cave_mushroom_01', scene: 'cave', category: 'plant', glowColor: '#6aa8ff', placeholderColor: '#b89a7a', specimenScale: 1, heroWeight: 6, specimenPose: 'upright', specimenRotation: [0, 180, 0] },
+  { id: 'cave_mushroom_02', scene: 'cave', category: 'plant', glowColor: '#ff8fc4', placeholderColor: '#a87a6a', specimenScale: 1, heroWeight: 4, specimenPose: 'upright', specimenGrade: { hue: 75, saturation: 0.5, brightness: 1.45 }, selfGlow: 0.2 },
 
-  { id: 'ocean_shell_01', scene: 'ocean', category: 'shell', glowColor: '#ffd1e8', placeholderColor: '#e8d6c8', specimenScale: 1, heroWeight: 0 },
-  { id: 'ocean_shell_02', scene: 'ocean', category: 'shell', glowColor: '#b3f0ff', placeholderColor: '#c8d6e8', specimenScale: 1, heroWeight: 3 },
-  { id: 'ocean_fish_01', scene: 'ocean', category: 'fish', glowColor: '#6bd8ff', placeholderColor: '#4a8ab8', specimenScale: 1, heroWeight: 4, specimenGrade: { saturation: 0.35, brightness: 1.15 } },
-  { id: 'ocean_fish_02', scene: 'ocean', category: 'fish', glowColor: '#ffa36b', placeholderColor: '#d88a4a', specimenScale: 1, heroWeight: 7, specimenGrade: { saturation: 0.9, brightness: 0.95 } },
+  { id: 'ocean_shell_01', scene: 'ocean', category: 'shell', glowColor: '#4f8dff', placeholderColor: '#e8d6c8', specimenScale: 1, heroWeight: 0 },
+  { id: 'ocean_shell_02', scene: 'ocean', category: 'shell', glowColor: '#ffe0ea', placeholderColor: '#c8d6e8', specimenScale: 1, heroWeight: 3 },
+  { id: 'ocean_fish_01', scene: 'ocean', category: 'fish', glowColor: '#4a78ff', placeholderColor: '#4a8ab8', specimenScale: 1, heroWeight: 4, specimenGrade: { saturation: 1.1, tint: '#7a9cff' }, opacity: 0.72 },
+  { id: 'ocean_fish_02', scene: 'ocean', category: 'fish', glowColor: '#9ff0ee', placeholderColor: '#d88a4a', specimenScale: 1, heroWeight: 7, specimenGrade: { saturation: 1.5, brightness: 0.95, hueCenter: 55, hueWidth: 35, hueSaturation: 0.42 }, reach: 1.6 },
 
-  { id: 'garden_flower_01', scene: 'garden', category: 'flower', glowColor: '#ff8ac8', placeholderColor: '#e86aa8', specimenScale: 1, heroWeight: 8, specimenGrade: { saturation: 0.75, brightness: 0.9 } },
-  { id: 'garden_flower_02', scene: 'garden', category: 'flower', glowColor: '#fff08a', placeholderColor: '#e8d84a', specimenScale: 1, heroWeight: 9, specimenGrade: { hue: 165, saturation: 0.6, brightness: 1.15 } },
+  { id: 'garden_flower_01', scene: 'garden', category: 'flower', glowColor: '#a46bff', placeholderColor: '#e86aa8', specimenScale: 1, heroWeight: 8, specimenGrade: { saturation: 0.75, brightness: 0.9 } },
+  { id: 'garden_flower_02', scene: 'garden', category: 'flower', glowColor: '#5ff0d6', placeholderColor: '#e8d84a', specimenScale: 1, heroWeight: 9, specimenGrade: { hue: 165, saturation: 0.6, brightness: 1.15 } },
   // 浅绿翅膀贴图本身很亮，停在白花上会和背景糊成一片：压暗、提饱和，常驻自发光也减一点
-  { id: 'garden_butterfly_01', scene: 'garden', category: 'butterfly', glowColor: '#8ab8ff', placeholderColor: '#4a6ae8', specimenScale: 1, heroWeight: 10, specimenGrade: { saturation: 1.6, brightness: 0.72 }, selfGlow: -0.2 },
-  { id: 'garden_butterfly_02', scene: 'garden', category: 'butterfly', glowColor: '#ffc78a', placeholderColor: '#e8984a', specimenScale: 1, heroWeight: 10 },
+  { id: 'garden_butterfly_01', scene: 'garden', category: 'butterfly', glowColor: '#a6ffa0', placeholderColor: '#4a6ae8', specimenScale: 1, heroWeight: 10, specimenGrade: { saturation: 1.6, brightness: 0.72 }, selfGlow: -0.2 },
+  { id: 'garden_butterfly_02', scene: 'garden', category: 'butterfly', glowColor: '#c9a8ff', placeholderColor: '#e8984a', specimenScale: 1, heroWeight: 10 },
 ]
 
 export const ASSETS: CollectableAssetDef[] = SEEDS.map((s) => ({

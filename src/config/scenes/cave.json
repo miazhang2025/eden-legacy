@@ -1171,6 +1171,18 @@
       "metalness": 0,
       "envMapIntensity": 0.8,
       "clearcoat": 0.12
+    },
+    "char_礼服｜银蓝珠饰裙摆": {
+      "color": "#d4d2d8",
+      "metalness": 0,
+      "envMapIntensity": 0.8,
+      "clearcoat": 0.12
+    },
+    "char_袖饰｜水晶薄纱": {
+      "color": "#d4d2d8",
+      "metalness": 0,
+      "envMapIntensity": 0.8,
+      "clearcoat": 0.12
     }
   },
   "audio": {
@@ -1202,16 +1214,16 @@
     {
       "id": "cave_ore_01",
       "position": [
-        -1.1950000000000003,
-        -0.2,
-        5.934
+        -2.2950000000000004,
+        0.2,
+        6.034
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 2.23
+      "scale": 1.43
     },
     {
       "id": "cave_ore_02",
@@ -1225,7 +1237,7 @@
         0,
         0
       ],
-      "scale": 2.39
+      "scale": 1.9100000000000001
     },
     {
       "id": "cave_mushroom_01",
@@ -1271,6 +1283,12 @@
     "idleEmissive": 0,
     "activeEmissive": 1,
     "foundEmissive": 2,
+    "foundMarkerRadius": 0.45,
+    "foundMarkerOpacity": 0.6,
+    "foundMarkerPulseSpeed": 0.4,
+    "foundMarkerHeight": -0.2,
+    "foundMarkerBeamHeight": 2.5,
+    "foundMarkerMoteSize": 40,
     "inspectEmissive": 2.6,
     "selectedEmissive": 4,
     "assetSize": 1,

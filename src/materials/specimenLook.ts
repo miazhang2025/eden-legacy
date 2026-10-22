@@ -59,7 +59,9 @@ uniform float uSpecHue;
 uniform float uSpecHueCenter;
 uniform float uSpecHueWidth;
 uniform float uSpecSat;
+uniform float uSpecHueSat;
 uniform float uSpecBright;
+uniform vec3 uSpecTint;
 `
 
 const shade = /* glsl */ `
@@ -89,15 +91,20 @@ export interface SpecimenGrade {
   hueCenter?: number
   /** 选择范围的半宽（度），边缘柔和过渡 */
   hueWidth?: number
+  /** 选中那段色相额外的饱和度倍数（需要 hueCenter），如只压黄色 */
+  hueSaturation?: number
   saturation?: number
   brightness?: number
+  /** 染色：调色后再乘这个颜色（浅色 / 白色部分整体染成该色），默认白 = 不变 */
+  tint?: string
 }
 
-// 色相旋转（绕灰轴；可只转 hueCenter ± hueWidth 那一段，按色相距离柔和衰减），再调饱和度、亮度
+// 色相旋转（绕灰轴；可只转 hueCenter ± hueWidth 那一段，按色相距离柔和衰减），再调饱和度、亮度、染色
 const grade = /* glsl */ `
 {
   vec3 gC = diffuseColor.rgb;
-  float gAngle = uSpecHue;
+  // gBand：像素落在选中色相段里的程度（没选色相段 = 全部算在里面）
+  float gBand = 1.0;
   if (uSpecHueWidth > 0.0) {
     // RGB → 色相（弧度）
     float gMax = max(gC.r, max(gC.g, gC.b));
@@ -112,14 +119,15 @@ const grade = /* glsl */ `
     gH *= 1.0471976;
     float gDist = abs(mod(gH - uSpecHueCenter + 3.1415927, 6.2831853) - 3.1415927);
     // 越灰越不转（灰色没有可靠的色相）
-    gAngle *= (1.0 - smoothstep(uSpecHueWidth * 0.6, uSpecHueWidth, gDist)) * smoothstep(0.02, 0.12, gD / max(gMax, 1e-5));
+    gBand = (1.0 - smoothstep(uSpecHueWidth * 0.6, uSpecHueWidth, gDist)) * smoothstep(0.02, 0.12, gD / max(gMax, 1e-5));
   }
+  float gAngle = uSpecHue * gBand;
   float gCos = cos(gAngle);
   float gSin = sin(gAngle);
   vec3 gK = vec3(0.57735);
   gC = gC * gCos + cross(gK, gC) * gSin + gK * dot(gK, gC) * (1.0 - gCos);
   float gLum = dot(gC, vec3(0.2126, 0.7152, 0.0722));
-  gC = mix(vec3(gLum), gC, uSpecSat) * uSpecBright;
+  gC = mix(vec3(gLum), gC, uSpecSat * mix(1.0, uSpecHueSat, gBand)) * uSpecBright * uSpecTint;
   diffuseColor.rgb = max(gC, 0.0);
 }
 `
@@ -144,7 +152,9 @@ export function patchSpecimenLook(material: Material, g: SpecimenGrade = {}) {
     uSpecHueCenter: { value: (g.hueCenter ?? 0) * DEG },
     uSpecHueWidth: { value: g.hueCenter === undefined ? 0 : (g.hueWidth ?? 40) * DEG },
     uSpecSat: { value: g.saturation ?? 1 },
+    uSpecHueSat: { value: g.hueCenter === undefined ? 1 : (g.hueSaturation ?? 1) },
     uSpecBright: { value: g.brightness ?? 1 },
+    uSpecTint: { value: new Color(g.tint ?? '#ffffff') },
   }
   const prev = m.onBeforeCompile
   m.onBeforeCompile = (shader, renderer) => {

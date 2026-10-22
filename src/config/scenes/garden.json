@@ -26,12 +26,12 @@
     "extraColliders": "/models/colliders/garden.character.glb",
     "extrasTransform": {
       "position": [
-        0.9,
-        0,
+        0.5,
+        -0.5,
         0
       ],
       "rotationY": 0,
-      "scale": 1
+      "scale": 0.8
     },
     "scale": 1,
     "position": [
@@ -850,9 +850,9 @@
     {
       "id": "garden_flower_01",
       "position": [
-        1.0460000000000003,
+        0.412,
         -0.2,
-        9.975999999999999
+        11.937
       ],
       "rotation": [
         0,
@@ -864,9 +864,9 @@
     {
       "id": "garden_flower_02",
       "position": [
-        1.898,
+        1.906,
         0,
-        0.366
+        0.797
       ],
       "rotation": [
         0,
@@ -919,6 +919,12 @@
     "idleEmissive": 0,
     "activeEmissive": 1,
     "foundEmissive": 2,
+    "foundMarkerRadius": 0.45,
+    "foundMarkerOpacity": 0.6,
+    "foundMarkerPulseSpeed": 0.4,
+    "foundMarkerHeight": -0.2,
+    "foundMarkerBeamHeight": 2.5,
+    "foundMarkerMoteSize": 40,
     "inspectEmissive": 2.6,
     "selectedEmissive": 4,
     "assetSize": 1,

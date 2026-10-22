@@ -17,6 +17,7 @@ import draco3d from 'draco3dgltf'
 import { MeshoptSimplifier } from 'meshoptimizer'
 import sharp from 'sharp'
 import { smoothNormals } from './smooth-normals.mjs'
+import { addRelief } from './surface-relief.mjs'
 
 /** 资产 id → 原文件（art/interactive 下） */
 const ASSETS = {
@@ -45,6 +46,14 @@ const TEXTURE_REPLACE = {
   ocean_fish_02: { 材质: 'fish.jpg' },
   ocean_shell_01: { pbr_material: 'shell.jpg' },
   ocean_shell_02: { '材质.1': 'shell.jpg' },
+}
+
+/**
+ * 表面起伏（surface-relief.mjs）：资产 id → { mesh 名, 细分次数, 位移幅度（模型局部单位，亮度 0→1） }。
+ * 笠螺的贝壳原模型只有 550 面、表面平整，按贴图的放射纹做出凹凸
+ */
+const RELIEF = {
+  ocean_shell_02: { mesh: '笠螺-材质', levels: 1, amplitude: 0.01, blur: 30, detail: 0.015, detailSigma: 24 },
 }
 
 const SRC = 'art/interactive'
@@ -90,6 +99,16 @@ for (const [id, file] of Object.entries(ASSETS)) {
     if (!mat) throw new Error(`${id}：没有材质 ${name}，换不了贴图 ${file}`)
     const mime = /\.png$/i.test(file) ? 'image/png' : 'image/jpeg'
     mat.setBaseColorTexture(doc.createTexture(file).setImage(readFileSync(join(TEX_SRC, file))).setMimeType(mime))
+  }
+
+  const relief = RELIEF[id]
+  if (relief) {
+    const mesh = root.listMeshes().find((m) => m.getName() === relief.mesh)
+    if (!mesh) throw new Error(`${id}：没有 mesh ${relief.mesh}，做不了表面起伏`)
+    for (const prim of mesh.listPrimitives()) {
+      const r = await addRelief(doc, prim, relief)
+      console.log(`  表面起伏 ${relief.mesh}：${r.before} → ${r.after} 三角面`)
+    }
   }
 
   // 贴图：只缩超过 MAX_TEX 的，保持原比例与原格式

@@ -172,6 +172,15 @@ export interface SceneConfig {
     activeEmissive: number
     /** 已发现的资产（全部找到后四个都在这一档常亮，供挑选） */
     foundEmissive: number
+    /** 发现后套在资产上的彩色光柱 + 上飘光点（颜色 = 资产 glowColor） */
+    foundMarkerRadius: number
+    foundMarkerOpacity: number
+    /** 亮带每秒往上扫几次 */
+    foundMarkerPulseSpeed: number
+    /** 光柱底部离地高度 */
+    foundMarkerHeight: number
+    foundMarkerBeamHeight: number
+    foundMarkerMoteSize: number
     inspectEmissive: number
     selectedEmissive: number
     /** 本场景 4 个资产的整体大小倍数（再乘 assets[].scale） */
@@ -774,7 +783,7 @@ export interface DecorGrassConfig {
   inset: number
   /** 铺多大一段弧（度，以正下方为中心；360 = 一整圈） */
   arcDeg: number
-  /** 0 = 沿弧均匀；越大越往下沿集中 */
+  /** 下密上疏：0 = 沿弧均匀；0.7 = 正上方的密度只有正下方的 30%（< 1，整圈都有草） */
   bottomBias: number
   /** 每丛占地宽度（占内框高度的比例），下沿取大值、两端取小值 */
   size: Vec2
@@ -1705,6 +1714,12 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     idleEmissive: intensity(10),
     activeEmissive: intensity(10),
     foundEmissive: intensity(10),
+    foundMarkerRadius: num(0.1, 5, 0.05, 'foundMarkerRadius', '发现光柱半径'),
+    foundMarkerOpacity: num(0, 3, 0.01, 'foundMarkerOpacity', '发现光柱 + 光点亮度'),
+    foundMarkerPulseSpeed: num(0, 3, 0.05, 'foundMarkerPulseSpeed', '亮带上扫速度（次/秒）'),
+    foundMarkerHeight: num(-1, 2, 0.01, 'foundMarkerHeight', '光柱底部离地高度'),
+    foundMarkerBeamHeight: num(0, 10, 0.05, 'foundMarkerBeamHeight', '光柱高度（光点也飘到这么高）'),
+    foundMarkerMoteSize: num(0, 200, 1, 'foundMarkerMoteSize', '光点大小'),
     inspectEmissive: intensity(10),
     selectedEmissive: intensity(20),
     assetSize: num(0.1, 5, 0.01, 'assetSize', '本场景交互资产整体大小（× 资产摆位里各自的 scale）'),
@@ -1800,7 +1815,7 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
       radius: num(0.2, 0.7, 0.005),
       inset: num(0, 0.3, 0.005),
       arcDeg: num(0, 360, 1),
-      bottomBias: num(0, 3, 0.05),
+      bottomBias: num(0, 0.95, 0.05),
       size: range(0.005, 0.3, 0.005, 'size（占内框高）'),
       depth: range(-0.6, 0.6, 0.01, 'depth（归一）'),
       lean: num(0, 1, 0.01),

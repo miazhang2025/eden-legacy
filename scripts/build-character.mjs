@@ -5,7 +5,8 @@
 //
 // 美术给的是 Daz（Genesis 9）+ Mixamo 骨骼摆好姿势的蒙皮模型，约 70 万面 / 60MB，动画只有一帧（就是这个姿势）。
 // 处理：
-//   1. 把骨骼姿势烘进顶点（蒙皮 → 静态网格）：去掉骨骼 / 蒙皮 / 动画，运行时不用每帧算蒙皮
+//   1. 把骨骼姿势烘进顶点（蒙皮 → 静态网格）：去掉骨骼 / 蒙皮 / 动画，运行时不用每帧算蒙皮。
+//      姿势取第一个动画的第一帧（有的导出把姿势只存在动画里，骨骼节点上是绑定姿势）
 //   0. 材质名里的空格换成下划线（不同导出设置下 Daz 材质名有时带空格，后面的规则统一按下划线写）；
 //      按人物的配置（CHARACTERS）向别的模型借贴图（导出时丢了贴图的头发）
 //   1b. 没蒙皮、挂在骨架下的 mesh：把节点的世界变换烘进顶点
@@ -34,7 +35,7 @@ import { basename, join } from 'node:path'
 import { NodeIO, getBounds } from '@gltf-transform/core'
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
 import {
-  dedup, draco, flatten, join as joinMeshes, prune, simplify, simplifyPrimitive, textureCompress, transformMesh, weld,
+  cloneDocument, dedup, draco, flatten, join as joinMeshes, prune, simplify, simplifyPrimitive, textureCompress, transformMesh, weld,
 } from '@gltf-transform/functions'
 import { checkKTXSoftware, toktx } from '@gltf-transform/cli'
 import draco3d from 'draco3dgltf'
@@ -87,11 +88,14 @@ const PARTS = [
  *   parts：排在 PARTS 前面的部件规则（各人物的 Tripo 部件编号不一样，哪个是主裙要单独指定）。
  *          规则可以写 material（按改名后的 char_ 材质名匹配图元）代替 match（按 mesh 名）：整个人物合成一个网格时按材质分
  *   borrow：导出时贴图丢了 / 坏了的材质，从另一个模型里同名（去掉 .002 后缀）的材质借底色贴图和参数（替换掉自己的）
- *   copyTextures：导出时挂错了贴图的材质，从同一模型里另一个材质复制底色 / 粗糙度贴图（材质名按规范化后的写）
+ *   copyTextures：导出时挂错了贴图的材质，从同一模型里另一个材质复制底色 / 粗糙度贴图（材质名按规范化后的写）。
+ *           只在目标底色贴图几乎全黑时才换（挂错的是嘴唇遮罩），贴图正常就不动
  *   collider：进碰撞体的 mesh（按 mesh 名），默认 COLLIDER
  *   cloth：做布料波动的 mesh（按 mesh 名），默认 CLOTH；null = 不做
  *   clothMaterials：做布料波动的图元（按材质名，规范化后的原名），和 cloth 叠加
- *   opaque：改成不透明的材质（按规范化后的原名）：贴图的 alpha 其实是 Blender 里叠珠饰用的遮罩，导出器当成了透明度
+ *   keepBlend：保留半透明混合（BLEND）的材质（按规范化后的原名）。默认 BLEND 会改成 alpha 裁切（头发面片排序会乱），
+ *              但真正半透明的薄纱、玻璃泪滴裁切后会变成镂空的洞或整个消失
+ *   normalSize：法线贴图边长上限（比部件规则更严；法线贴图走 UASTC，体积大）
  *   tweaks：改面板调不到的材质参数（按规范化后的原名）：sheenColor（灰度）/ sheenRoughness / clearcoatRoughness /
  *           saturation（底色贴图的饱和度倍数，烘进贴图；贴图被几个材质共用时只处理一次）。
  *           颜色、金属度、清漆强度、环境反射这些面板能调的写在场景 config 的 materials 里
@@ -129,8 +133,10 @@ const CHARACTERS = {
     collider: /MixamoFullCharacter/i,
     cloth: null,
     clothMaterials: /礼服|袖饰/,
-    // 礼服贴图是完整的布料 + 珠饰，alpha 只有珠串（Blender 里叠珠饰的遮罩）：当透明度用的话上身只剩珠串、几乎全透明
-    opaque: /礼服|袖饰/,
+    // 礼服每块都带一张 1024 法线贴图（UASTC 每张 1.2MB），远看看不出来
+    normalSize: 512,
+    // 礼服 / 袖饰的贴图 alpha 是设计好的透明度（袖纱只有 18–35% 不透明）；脸上的玻璃泪滴 alpha 0.15，裁切会整个消失
+    keepBlend: /礼服|袖饰|Tears_Simple/,
     // 礼服导出时是白色满强度天鹅绒光泽 + 近乎镜面的清漆层，在洞穴里整件发白：光泽压到 35%、清漆磨砂一些
     tweaks: [{ match: /礼服|袖饰｜(垂坠透明纱|水晶薄纱)/, sheenColor: 0.35, sheenRoughness: 0.5, clearcoatRoughness: 0.35 }],
     // 同花园 / 海洋人物的 Daz 资产：睫毛贴图导出成纯白不透明，借花园的；脸和口腔的贴图挂反了
@@ -318,20 +324,25 @@ async function build(src, name) {
   const character = CHARACTERS[name] ?? {}
   const clothMatch = character.cloth === undefined ? CLOTH : character.cloth
 
-  // 0. 材质名规范化；WebP 贴图转 PNG（KTX2 压缩不认 WebP）；借贴图
+  // 0. 材质名规范化；借贴图（WebP 贴图到第 6 步缩图时再转 PNG：先缩小再转，4K 的 PNG 太占内存）
   for (const mat of root.listMaterials()) mat.setName(mat.getName().replace(/ /g, '_'))
-  for (const tex of root.listTextures()) {
-    if (tex.getMimeType() !== 'image/webp') continue
-    tex.setImage(await sharp(tex.getImage()).png().toBuffer()).setMimeType('image/png')
-  }
   if (character.borrow) await borrowTextures(doc, character.borrow)
   for (const { to, from } of character.copyTextures ?? []) {
     const mats = root.listMaterials()
     const src = mats.find((m) => from.test(m.getName()))
     const dst = mats.find((m) => to.test(m.getName()))
     if (!src || !dst) throw new Error(`copyTextures：找不到材质 ${from} / ${to}`)
+    // 只修真的挂错了的（底色贴图几乎全黑）：后来的导出脸上是带妆的正确贴图，不能被口腔的素颜贴图盖掉
+    const base = dst.getBaseColorTexture()
+    const mean = base ? (await sharp(base.getImage()).stats()).channels.slice(0, 3).reduce((a, c) => a + c.mean, 0) / 3 / 255 : 0
+    if (mean > 0.1) continue
     dst.setBaseColorTexture(src.getBaseColorTexture()).setMetallicRoughnessTexture(src.getMetallicRoughnessTexture())
+    console.log(`  换贴图   → ${dst.getName()} ← ${src.getName()}（原底色几乎全黑）`)
   }
+
+  // 姿势（动画第一帧）最先应用：下面无蒙皮 mesh 的世界变换和蒙皮烘焙都要用到摆好姿势的骨架
+  const posed = applyPose(root)
+  if (posed) console.log(`  姿势     → 动画第一帧（${posed} 个通道与骨骼节点不同）`)
 
   // 1b. 没蒙皮的 mesh：世界变换烘进顶点（transformMesh 会处理法线和负缩放的绕序），补上 _IDLE（只有布料权重）。
   const skinned = root.listNodes().filter((n) => n.getMesh() && n.getSkin())
@@ -410,8 +421,7 @@ async function build(src, name) {
       const base = mat.getBaseColorTexture()
       if (base && t.saturation !== undefined && !desaturated.has(base)) {
         desaturated.add(base)
-        const png = base.getMimeType() === 'image/png'
-        base.setImage(await sharp(base.getImage()).modulate({ saturation: t.saturation }).toFormat(png ? 'png' : 'jpeg', { quality: 95 }).toBuffer())
+        await reencode(base, sharp(base.getImage()).modulate({ saturation: t.saturation }))
       }
       const sheen = mat.getExtension('KHR_materials_sheen')
       if (sheen && t.sheenColor !== undefined) sheen.setSheenColorFactor([t.sheenColor, t.sheenColor, t.sheenColor])
@@ -419,8 +429,7 @@ async function build(src, name) {
       const clearcoat = mat.getExtension('KHR_materials_clearcoat')
       if (clearcoat && t.clearcoatRoughness !== undefined) clearcoat.setClearcoatRoughnessFactor(t.clearcoatRoughness)
     }
-    if (character.opaque?.test(old)) mat.setAlphaMode('OPAQUE')
-    else if (mat.getAlphaMode() === 'BLEND') {
+    if (mat.getAlphaMode() === 'BLEND' && !character.keepBlend?.test(old)) {
       mat.setAlphaMode('MASK').setAlphaCutoff(CUTOUT.find((c) => c.match.test(old)).cutoff)
     }
     // 去掉 Blender 的重名后缀（.002 之类）：每次重新导出后缀都会变，材质名要稳定，面板里的覆盖才对得上
@@ -459,7 +468,8 @@ async function build(src, name) {
   // 轴心 = 包围盒底面中心（此时所有 mesh 都已烘到世界坐标、挂在场景根）
   const { min, max } = getBounds(root.getDefaultScene() ?? root.listScenes()[0])
   const pivot = [(min[0] + max[0]) / 2, min[1], (min[2] + max[2]) / 2]
-  const collider = await buildCollider(await io.readBinary(await io.writeBinary(doc)), name, pivot, character.collider)
+  // 克隆文档（贴图数据共享引用）而不是整个序列化一遍：几十 MB 的贴图拼成一个大 buffer 容易分配失败
+  const collider = await buildCollider(cloneDocument(doc), name, pivot, character.collider)
   setPivot(doc, pivot, idle)
 
   // 6. 贴图尺寸：每个材质的上限 = 用到它的部件里最大的；每张贴图的上限 = 用到它的材质里最大的
@@ -472,19 +482,21 @@ async function build(src, name) {
   })
   const limit = new Map()
   for (const tex of root.listTextures()) {
-    const sizes = [...materialsOf(tex)].map((m) => matLimit.get(m) ?? 0)
-    if (sizes.length) limit.set(tex, Math.max(...sizes))
+    const mats = [...materialsOf(tex)]
+    const sizes = mats.map((m) => matLimit.get(m) ?? 0)
+    if (!sizes.length) continue
+    const isNormal = mats.some((m) => m.getNormalTexture() === tex)
+    limit.set(tex, isNormal && character.normalSize ? Math.min(character.normalSize, Math.max(...sizes)) : Math.max(...sizes))
   }
-  for (const [tex, size] of limit) {
+  // 超出上限的缩小；WebP 顺带转格式（KTX2 压缩不认 WebP）
+  for (const tex of root.listTextures()) {
+    const size = limit.get(tex) ?? Infinity
     const [w, h] = tex.getSize() ?? [0, 0]
-    if (Math.max(w, h) <= size) continue
-    const s = size / Math.max(w, h)
+    const webp = tex.getMimeType() === 'image/webp'
+    if (Math.max(w, h) <= size && !webp) continue
+    const s = Math.min(1, size / Math.max(w, h))
     // 尺寸取 4 的倍数（块压缩要求）
-    const img = await sharp(tex.getImage())
-      .resize(Math.max(4, Math.round((w * s) / 4) * 4), Math.max(4, Math.round((h * s) / 4) * 4))
-      .toFormat(tex.getMimeType() === 'image/png' ? 'png' : 'jpeg', { quality: 95 })
-      .toBuffer()
-    tex.setImage(img)
+    await reencode(tex, sharp(tex.getImage()).resize(Math.max(4, Math.round((w * s) / 4) * 4), Math.max(4, Math.round((h * s) / 4) * 4)))
   }
 
   await doc.transform(
@@ -506,6 +518,12 @@ async function build(src, name) {
 /** 材质有没有用任何贴图（核心槽位或扩展里的） */
 function materialHasTextures(mat) {
   return mat.getGraph().listChildren(mat).some((c) => c.propertyType === 'Texture' || mat.getGraph().listChildren(c).some((cc) => cc.propertyType === 'Texture'))
+}
+
+/** 用 sharp 处理后写回贴图：JPEG 保持 JPEG，其余（PNG / WebP）存成 PNG（保留透明通道） */
+async function reencode(tex, pipeline) {
+  const jpeg = tex.getMimeType() === 'image/jpeg'
+  tex.setImage(await pipeline.toFormat(jpeg ? 'jpeg' : 'png', { quality: 95 }).toBuffer()).setMimeType(jpeg ? 'image/jpeg' : 'image/png')
 }
 
 /** 用到这张贴图的材质（核心槽位直接挂在材质上；specular 之类挂在材质的扩展属性上，再往上找一层） */
@@ -530,6 +548,26 @@ function headForward(root) {
     return normalize([m[8], m[9], m[10]])
   }
   return [0, 0, 1]
+}
+
+/** 第一个动画第一帧的平移 / 旋转 / 缩放写到目标节点上；返回和节点原值不同的通道数 */
+function applyPose(root) {
+  const anim = root.listAnimations()[0]
+  if (!anim) return 0
+  let changed = 0
+  for (const ch of anim.listChannels()) {
+    const node = ch.getTargetNode()
+    const value = ch.getSampler()?.getOutput()?.getElement(0, [])
+    if (!node || !value) continue
+    const path = ch.getTargetPath()
+    const cur = path === 'translation' ? node.getTranslation() : path === 'rotation' ? node.getRotation() : path === 'scale' ? node.getScale() : null
+    if (!cur) continue
+    if (value.some((v, i) => Math.abs(v - cur[i]) > 1e-4)) changed++
+    if (path === 'translation') node.setTranslation(value)
+    else if (path === 'rotation') node.setRotation(value)
+    else node.setScale(value)
+  }
+  return changed
 }
 
 /** 颈部位置（世界坐标）与点头轴：头部摆动的旋转中心 / 轴 */

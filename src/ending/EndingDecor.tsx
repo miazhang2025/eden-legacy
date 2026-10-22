@@ -38,7 +38,7 @@ const euler = new Euler(0, 0, 0, 'ZYX')
 
 /**
  * 沿内框铺一圈草：两种草丛各一个 InstancedMesh。
- * 角度 θ 以正下方为中心、在 arcDeg 范围内取，bottomBias 让它往下沿集中；越往上越小。
+ * 角度 θ 以正下方为中心、在 arcDeg 范围内取，bottomBias 让下沿密、上沿疏（密度按余弦平滑过渡）；越往上越小。
  * 每丛「朝上」的方向在世界向上与指向中心之间按 lean 混合，两侧的草会向里倾。
  */
 function GrassBed({ scene, cfg, seed, brightness }: { scene: Object3D; cfg: DecorCfg['grass']; seed: string; brightness: number }) {
@@ -62,12 +62,24 @@ function GrassBed({ scene, cfg, seed, brightness }: { scene: Object3D; cfg: Deco
     if (!tufts.length) return []
     const lists: Matrix4[][] = tufts.map(() => [])
     const r = (i: number, k: number) => hash01(seed, 300 + i * 7 + k)
-    const arc = (cfg.arcDeg * Math.PI) / 180
+    const half = (cfg.arcDeg * Math.PI) / 360
+    // 离正下方 φ 处的密度 1 - b·(1 - cos φ)/2（正下方 1，正上方 1 - b），其累积分布 F 是奇函数、单调递增
+    const b = Math.min(cfg.bottomBias, 0.95)
+    const cdf = (p: number) => p * (1 - b / 2) + (b / 2) * Math.sin(p)
+    const total = cdf(half)
     for (let i = 0; i < cfg.count; i++) {
-      // 分层抖动：每丛占弧上一小格、在格内随机，整圈铺得均匀，不会扎堆或留空
-      const u = ((i + r(i, 0)) / cfg.count) * 2 - 1
-      const uw = Math.sign(u) * Math.pow(Math.abs(u), 1 + cfg.bottomBias)
-      const theta = -Math.PI / 2 + (uw * arc) / 2
+      // 分层抖动：每丛在累积分布上占一小格、在格内随机，不会扎堆或留空；再反解出角度（二分）
+      const target = (((i + r(i, 0)) / cfg.count) * 2 - 1) * total
+      let lo = -half
+      let hi = half
+      for (let k = 0; k < 24; k++) {
+        const mid = (lo + hi) / 2
+        if (cdf(mid) < target) lo = mid
+        else hi = mid
+      }
+      const phi = (lo + hi) / 2
+      const uw = half > 0 ? phi / half : 0
+      const theta = -Math.PI / 2 + phi
       const rad = cfg.radius - cfg.inset * r(i, 1)
       const cx = Math.cos(theta)
       const cy = Math.sin(theta)

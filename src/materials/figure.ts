@@ -284,7 +284,8 @@ if (uFigureEnabled > 0.5) {
 }
 `
 
-// 皮肤：贴图采样之后（diffuseColor 在线性空间），先按亮度去饱和，再乘亮度和色调
+// 皮肤：贴图采样之后（diffuseColor 在线性空间），先按亮度去饱和，再乘亮度和色调。
+// 去饱和只作用在接近肤色的色相（橙红，约 13° 上下）：眼影、唇彩、蓝绿色妆偏离肤色，保持原样（腮红色相接近，会淡一点）
 const fragmentSkinHead = /* glsl */ `
 uniform float uFigureSkinBrightness;
 uniform float uFigureSkinSaturation;
@@ -292,8 +293,20 @@ uniform vec3 uFigureSkinTint;
 `
 const fragmentSkin = /* glsl */ `
 {
-  float l = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-  diffuseColor.rgb = mix(vec3(l), diffuseColor.rgb, uFigureSkinSaturation) * uFigureSkinBrightness * uFigureSkinTint;
+  vec3 c = diffuseColor.rgb;
+  float mx = max(c.r, max(c.g, c.b));
+  float d = mx - min(c.r, min(c.g, c.b));
+  float hue = 0.0;
+  if (d > 1e-5) {
+    if (mx == c.r) hue = mod((c.g - c.b) / d, 6.0);
+    else if (mx == c.g) hue = (c.b - c.r) / d + 2.0;
+    else hue = (c.r - c.g) / d + 4.0;
+    hue /= 6.0;
+  }
+  float hueDist = min(abs(hue - 0.035), 1.0 - abs(hue - 0.035));
+  float skinLike = 1.0 - smoothstep(0.04, 0.08, hueDist);
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  diffuseColor.rgb = mix(vec3(l), c, mix(1.0, uFigureSkinSaturation, skinLike)) * uFigureSkinBrightness * uFigureSkinTint;
 }
 `
 

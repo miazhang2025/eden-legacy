@@ -106,6 +106,8 @@ export function AssetModel({
       m.material = Array.isArray(m.material) ? m.material.map(own) : own(m.material)
       m.castShadow = true
       m.receiveShadow = true
+      // 常驻半透明的资产（def.opacity < 1）不写深度：排在水面（renderOrder 1）之后画，否则会被后画的水面整个盖住
+      if ((def.opacity ?? 1) < 1) m.renderOrder = 2
       // 骨骼动画会让包围盒跑出静止姿态，不做视锥剔除免得边缘闪没
       if (m instanceof SkinnedMesh) m.frustumCulled = false
     })

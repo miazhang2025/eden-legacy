@@ -36,7 +36,10 @@ const COPY: Record<string, string> = {
   'card.title': '标本档案',
   'card.button.locked': '先去看看其他 {n} 件',
   'scene.progress': '已发现 {found} / {total}',
-  'scene.progress.done': '都找到了，选择一件带走吧',
+  // 四个都找到后替换掉进场提示
+  'scene.cave.done': '岩层替时间藏住了许多东西。\n选一份，让它跟你离开。',
+  'scene.ocean.done': '潮水会带走大多数相遇。\n留下一个，不让它消失。',
+  'scene.garden.done': '花园从不停止更替。\n挑一种，让它在别处继续存在。',
 
   // ---------- 竖屏提示 ----------
   'orientation.hint': '请将设备横向放置',
@@ -159,7 +162,9 @@ const COPY_EN: Record<string, string> = {
   'card.title': 'Specimen File',
   'card.button.locked': 'See {n} more first',
   'scene.progress': 'Discovered {found} / {total}',
-  'scene.progress.done': 'All found. Choose one to take with you.',
+  'scene.cave.done': 'The rock strata have hidden many things for time.\nChoose one, and let it leave with you.',
+  'scene.ocean.done': 'The tide carries most encounters away.\nLeave one behind, and do not let it disappear.',
+  'scene.garden.done': 'The garden never stops changing.\nChoose one, and let it continue somewhere else.',
 
   // ---------- 竖屏提示 ----------
   'orientation.hint': 'Please rotate your device to landscape',

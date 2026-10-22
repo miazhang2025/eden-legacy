@@ -18,6 +18,7 @@ const center = new Vector3()
 const rel = new Matrix4()
 /** 标本背面离绒布表面的最小距离（标本盒单位） */
 const VELVET_GAP = 0.01
+const DEG = Math.PI / 180
 
 /** 在 root 自身局部空间里的包围盒（不受父级旋转缩放影响） */
 function localBounds(root: Group, out: Box3) {
@@ -103,8 +104,8 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
     )
     material.emissiveIntensity = useEndingUi.getState().hoveredId === asset?.id ? hoverEmissive : emissiveIntensity
     for (const m of mats.current) {
-      m.opacity = p
-      m.transparent = p < 1
+      m.opacity = p * (asset?.opacity ?? 1)
+      m.transparent = m.opacity < 1
     }
     g.visible = p > 0.001
   })
@@ -114,11 +115,14 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
   // z 把背面贴在落位点上（像钉在背板上的标本，厚的只往前凸，不会穿进背板）
   useLayoutEffect(() => {
     const g = fit.current
-    // 摊平（占位几何体、upright 的资产不转）
+    // 摊平（占位几何体不转；upright 的资产不摊平，只按 specimenRotation 转到正面朝镜头）
     const f = flat.current
     if (f) {
       f.quaternion.identity()
-      if (!placeholder && loaded > 0 && asset?.specimenPose !== 'upright') f.quaternion.copy(flatteningQuaternion(f))
+      if (!placeholder && asset?.specimenPose === 'upright') {
+        const [rx, ry, rz] = asset.specimenRotation ?? [0, 0, 0]
+        f.rotation.set(rx * DEG, ry * DEG, rz * DEG)
+      } else if (!placeholder && loaded > 0) f.quaternion.copy(flatteningQuaternion(f))
     }
     if (!g || !asset) return
     g.scale.setScalar(1)

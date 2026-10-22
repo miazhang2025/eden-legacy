@@ -31,7 +31,7 @@ export function CollectPrompt({ sceneId }: { sceneId: SceneId }) {
   return (
     <>
       <div className={`collect-prompt ${showBubble ? 'is-visible' : ''}`} aria-hidden={!showBubble} aria-live="polite">
-        {allFound ? copy('scene.progress.done') : copy(`scene.${sceneId}.prompt`)}
+        {copy(`scene.${sceneId}.${allFound ? 'done' : 'prompt'}`)}
       </div>
       <div className={`discovery ${active && total > 0 ? 'is-visible' : ''} ${allFound ? 'is-done' : ''}`} aria-hidden={!active}>
         <span className="discovery__hearts" aria-hidden="true">

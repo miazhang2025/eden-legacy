@@ -98,7 +98,8 @@ export function AssetFlow({ sceneId }: { sceneId: SceneId }) {
       const angle = Math.abs(
         MathUtils.euclideanModulo(Math.atan2(ax - camera.position.x, az - camera.position.z) - yaw + Math.PI, Math.PI * 2) - Math.PI,
       )
-      const held = flow.phase === 'INSPECTING' && flow.assetId === a.id ? HOLD : 1
+      // 模型特别大的资产（游动时鱼鳍展开的斗鱼）远处就显得很近，按 reach 放宽距离和角度
+      const held = (flow.phase === 'INSPECTING' && flow.assetId === a.id ? HOLD : 1) * (a.reach ?? 1)
       const inView = d <= f.inspectDistance * held && angle <= f.inspectAngleDeg * DEG * held
       if (!inView && d > f.proximity) continue
       // 越居中越优先；贴身的直接优先
