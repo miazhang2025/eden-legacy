@@ -172,8 +172,9 @@
     "roughness": 0.45,
     "metalness": 0.1,
     "hoverEmissive": 0.9,
-    "sceneGlow": 1,
-    "saturation": 1.3
+    "sceneGlow": 0.6,
+    "saturation": 1.4,
+    "brightness": 0.72
   },
   "interaction": {
     "yawLimitDeg": 25,

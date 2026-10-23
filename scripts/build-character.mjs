@@ -137,10 +137,10 @@ const CHARACTERS = {
     parts: [
       { material: /sculpted_strands/i, ratio: 0.12, error: 0.012, texture: 1024, rebuildNormals: true },
       { material: /Hair/i, ratio: 0.25, error: 0.006, texture: 1024 },
-      { material: /珍珠/, ratio: 0.2, error: 0.01, texture: 512 },
       { material: /银蓝珠饰裙摆/, ratio: 0.1, error: 0.008, texture: 1024 },
       { material: /礼服|袖饰/, ratio: 0.2, error: 0.006, texture: 1024 },
-      { material: /发带/, ratio: 0.5, error: 0.01, texture: 512 },
+      // 头饰（发带：底座、珍珠、宝石）整个才 2.6 万面，每颗珠子都是低面数小球，减面会把珠子减成碎块，保留原样
+      { material: /发带/, ratio: 1, error: 0, texture: 512 },
       { material: /Tears/i, ratio: 0.3, error: 0.01, texture: 256 },
       { material: /Eyes|Eyelashes/i, ratio: 1, error: 0, texture: 512 },
       // 皮肤贴图尺寸由 TEXTURE_BY_MATERIAL 定

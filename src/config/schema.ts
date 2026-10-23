@@ -914,6 +914,8 @@ export interface EndingConfig {
     sceneGlow: number
     /** 真实模型的饱和度倍数（乘在资产自己的调色上）：深色背景、没有场景里的泛光，同样的调色在标本盒里显得更灰 */
     saturation: number
+    /** 真实模型的亮度倍数（乘在资产自己的调色上，自发光按底色走，也跟着变暗）：深色绒布上同样亮度显得刺眼 */
+    brightness: number
   }
   /** 入场：画布淡入 + 标本盒放大 + 三件标本依次落位（自己写，不用 Theatre 时间轴，见 ADR-003） */
   reveal: {
@@ -1887,6 +1889,7 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     hoverEmissive: intensity(5),
     sceneGlow: num(0, 3, 0.01, 'sceneGlow', '真实模型自发光 × 场景里的常驻发光（1 = 与场景一致）'),
     saturation: num(0, 3, 0.01, 'saturation', '真实模型饱和度 × 资产自己的调色'),
+    brightness: num(0, 2, 0.01, 'brightness', '真实模型亮度 × 资产自己的调色'),
   },
   reveal: {
     _label: '入场',

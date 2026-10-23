@@ -53,7 +53,7 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
   const outer = useRef<Group>(null)
   const reveal = useEndingCfg((c) => c.reveal)
   const { floatAmplitude, floatSpeed } = useEndingCfg((c) => c.composition)
-  const { emissiveIntensity, roughness, metalness, hoverEmissive, sceneGlow, saturation } = useEndingCfg((c) => c.specimen)
+  const { emissiveIntensity, roughness, metalness, hoverEmissive, sceneGlow, saturation, brightness } = useEndingCfg((c) => c.specimen)
   /** 排版（specimenLayout.ts）挪出来的 xy 偏移（加在落位点上） */
   const shift = useRef<[number, number]>([0, 0])
   /** 自动适配出的基准缩放 / 位置（排版结果在此基础上再缩放） */
@@ -202,7 +202,7 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
             ) : (
               <Suspense fallback={null}>
                 {/* 蝴蝶：停在翅膀展得最开的一帧，再由 flat 平铺正对背板 */}
-                <AssetModel def={asset} onMaterials={onMaterials} grade={grade} saturation={saturation} pose={asset.category === 'butterfly' ? 'spread' : 'animate'} />
+                <AssetModel def={asset} onMaterials={onMaterials} grade={grade} saturation={saturation} brightness={brightness} pose={asset.category === 'butterfly' ? 'spread' : 'animate'} />
               </Suspense>
             )}
           </group>

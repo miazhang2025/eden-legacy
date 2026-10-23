@@ -26,7 +26,7 @@
     "extraColliders": "/models/colliders/cave.character.glb",
     "extrasTransform": {
       "position": [
-        1.1102230246251565e-16,
+        5.551115123125783e-17,
         2.7755575615628914e-17,
         0.5
       ],
@@ -1101,12 +1101,6 @@
     "SC01_land": {
       "shadowLift": 0.8,
       "shadowLiftThreshold": 0.55
-    },
-    "char_Tears_Simple": {
-      "envMapIntensity": 6
-    },
-    "char_Dual_Color_Glass_(Crystal)": {
-      "envMapIntensity": 8
     }
   },
   "audio": {
