@@ -60,6 +60,7 @@ uniform float uSpecHueCenter;
 uniform float uSpecHueWidth;
 uniform float uSpecSat;
 uniform float uSpecHueSat;
+uniform float uSpecHueBright;
 uniform float uSpecBright;
 uniform vec3 uSpecTint;
 uniform float uSpecMinLight;
@@ -96,6 +97,8 @@ export interface SpecimenGrade {
   hueWidth?: number
   /** 选中那段色相额外的饱和度倍数（需要 hueCenter），如只压黄色 */
   hueSaturation?: number
+  /** 选中那段色相额外的亮度倍数（需要 hueCenter），如整体提亮时把浅色的茎压回去，免得过亮发光 */
+  hueBrightness?: number
   saturation?: number
   brightness?: number
   /** 染色：调色后再乘这个颜色（浅色 / 白色部分整体染成该色），默认白 = 不变 */
@@ -132,7 +135,7 @@ const grade = /* glsl */ `
   vec3 gK = vec3(0.57735);
   gC = gC * gCos + cross(gK, gC) * gSin + gK * dot(gK, gC) * (1.0 - gCos);
   float gLum = dot(gC, vec3(0.2126, 0.7152, 0.0722));
-  gC = mix(vec3(gLum), gC, uSpecSat * mix(1.0, uSpecHueSat, gBand)) * uSpecBright * uSpecTint;
+  gC = mix(vec3(gLum), gC, uSpecSat * mix(1.0, uSpecHueSat, gBand)) * uSpecBright * mix(1.0, uSpecHueBright, gBand) * uSpecTint;
   diffuseColor.rgb = max(gC, 0.0);
 }
 `
@@ -159,6 +162,7 @@ export function patchSpecimenLook(material: Material, g: SpecimenGrade = {}) {
     uSpecHueWidth: { value: g.hueCenter === undefined ? 0 : (g.hueWidth ?? 40) * DEG },
     uSpecSat: { value: g.saturation ?? 1 },
     uSpecHueSat: { value: g.hueCenter === undefined ? 1 : (g.hueSaturation ?? 1) },
+    uSpecHueBright: { value: g.hueCenter === undefined ? 1 : (g.hueBrightness ?? 1) },
     uSpecBright: { value: g.brightness ?? 1 },
     uSpecTint: { value: new Color(g.tint ?? '#ffffff') },
     uSpecMinLight: { value: g.minLight ?? 0 },

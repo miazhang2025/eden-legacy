@@ -8,6 +8,7 @@ import { AssetModel } from '../scene/AssetModel'
 import { PlaceholderModel } from '../scene/PlaceholderModel'
 import { useEndingUi } from './useEndingUi'
 import { flatteningQuaternion, relativeMatrix } from './flatten'
+import { reportSilhouette, silhouette, useSpecimenLayout } from './specimenLayout'
 import { velvetSurface } from './FrameModel'
 import { segment } from './reveal'
 import type { ThreeEvent } from '@react-three/fiber'
@@ -52,7 +53,15 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
   const outer = useRef<Group>(null)
   const reveal = useEndingCfg((c) => c.reveal)
   const { floatAmplitude, floatSpeed } = useEndingCfg((c) => c.composition)
-  const { emissiveIntensity, roughness, metalness, hoverEmissive, sceneGlow } = useEndingCfg((c) => c.specimen)
+  const { emissiveIntensity, roughness, metalness, hoverEmissive, sceneGlow, saturation } = useEndingCfg((c) => c.specimen)
+  /** 排版（specimenLayout.ts）挪出来的 xy 偏移（加在落位点上） */
+  const shift = useRef<[number, number]>([0, 0])
+  /** 自动适配出的基准缩放 / 位置（排版结果在此基础上再缩放） */
+  const base = useRef({ scale: 1, position: new Vector3() })
+  /** 已应用的排版结果对应的轮廓版本；0 = 还没排好，先不显示 */
+  const [laidOut, setLaidOut] = useState(0)
+  const myVersion = useRef(-1)
+  const result = useSpecimenLayout((s) => s.placed[index])
   // 真实模型照它在自己场景里「已发现」时的样子按底色发光（颜色贴近场景里）
   const glow =
     useConfigStore((s) => (asset ? foundGlow(s.configs[asset.scene].flow, asset.selfGlow) * (asset.glowScale ?? 1) : 0)) * sceneGlow
@@ -106,8 +115,8 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
     // 落位深度不低于绒布表面（各画框背板深浅不一，薄的标本会被绒布盖住）
     const z = Number.isFinite(velvetSurface.z) ? Math.max(position[2], velvetSurface.z + VELVET_GAP) : position[2]
     g.position.set(
-      position[0] + reveal.specimenFrom[0] * (1 - p),
-      position[1] + reveal.specimenFrom[1] * (1 - p) + bob,
+      position[0] + shift.current[0] + reveal.specimenFrom[0] * (1 - p),
+      position[1] + shift.current[1] + reveal.specimenFrom[1] * (1 - p) + bob,
       z + reveal.specimenFrom[2] * (1 - p),
     )
     material.emissiveIntensity = useEndingUi.getState().hoveredId === asset?.id ? hoverEmissive : emissiveIntensity
@@ -116,8 +125,18 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
       m.opacity = p * opacity
       m.transparent = m.opacity < 1
     }
-    g.visible = p > 0.001
+    g.visible = p > 0.001 && laidOut > 0
   })
+
+  // 应用排版结果：以落位点为中心缩放 k、整体平移 (dx, dy)
+  useLayoutEffect(() => {
+    const g = fit.current
+    if (!g || !result || result.version !== myVersion.current) return
+    shift.current = [result.dx, result.dy]
+    g.scale.setScalar(base.current.scale * result.k)
+    g.position.copy(base.current.position).multiplyScalar(result.k)
+    setLaidOut(result.version)
+  }, [result])
 
 
   // 自动适配：等比缩放到刚好装进 region（取三轴里最紧的一个）；x / y 把包围盒中心对齐落位点，
@@ -142,7 +161,14 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
     const s = Math.min(region[0] / (size.x || 1), region[1] / (size.y || 1), region[2] / (size.z || 1)) * scale
     g.scale.setScalar(s)
     g.position.set(-center.x * s, -center.y * s, -box.min.z * s)
-  }, [asset, region, scale, rotation, loaded, placeholder])
+    base.current = { scale: s, position: g.position.clone() }
+
+    // 真实模型还没加载好时不报（占位的直接报）：把基准大小下的轮廓交给排版，结果回来前先不显示
+    if (!placeholder && loaded === 0) return
+    g.updateMatrix()
+    reportSilhouette(index, silhouette(g, g.matrix))
+    myVersion.current = useSpecimenLayout.getState().reports[index]!.version
+  }, [asset, region, scale, rotation, loaded, placeholder, index])
 
   if (!asset || !material) return null
   const ui = useEndingUi.getState
@@ -176,7 +202,7 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
             ) : (
               <Suspense fallback={null}>
                 {/* 蝴蝶：停在翅膀展得最开的一帧，再由 flat 平铺正对背板 */}
-                <AssetModel def={asset} onMaterials={onMaterials} grade={grade} pose={asset.category === 'butterfly' ? 'spread' : 'animate'} />
+                <AssetModel def={asset} onMaterials={onMaterials} grade={grade} saturation={saturation} pose={asset.category === 'butterfly' ? 'spread' : 'animate'} />
               </Suspense>
             )}
           </group>

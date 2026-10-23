@@ -872,6 +872,8 @@ export interface EndingConfig {
     slots: DecorSlot[]
     /** 花草离画框内框边缘至少留多少（标本盒单位）：超出内框的会以根部为中心缩小，根部在框外的先往里挪，不和画框穿模 */
     fitMargin: number
+    /** 花草离标本至少留多少（标本盒单位）：压到标本的往里挪 / 缩小，太小就不放 */
+    specimenGap: number
     /** 沿内框铺一圈草（decor.glb 里的 grass_* 草丛，实例化） */
     grass: DecorGrassConfig
   }
@@ -890,6 +892,14 @@ export interface EndingConfig {
     mirror: MirrorMode
     /** 按组合 id 给每件的旋转加的随机扰动（度） */
     jitterDeg: number
+    /** 标本离一圈草至少留多少（按画框尺寸归一的半径）：三件一起排版时草是禁区（见 specimenLayout.ts） */
+    grassMargin: number
+    /** 标本之间至少留多少（标本盒单位） */
+    specimenGap: number
+    /** 排版时标本最多放大到自动适配大小的几倍（主体先放大，点缀不超过主体的倍数） */
+    maxGrow: number
+    /** 排版打分时主体的权重（点缀为 1）：越大越优先把主体放大，点缀让位 */
+    heroWeight: number
     /** 静止时的轻微漂浮 */
     floatAmplitude: number
     floatSpeed: number
@@ -902,6 +912,8 @@ export interface EndingConfig {
     hoverEmissive: number
     /** 真实模型的自发光 = 该资产在自己场景里「已发现」时的常驻发光（按底色发光）× 这个倍数；1 = 与场景一致 */
     sceneGlow: number
+    /** 真实模型的饱和度倍数（乘在资产自己的调色上）：深色背景、没有场景里的泛光，同样的调色在标本盒里显得更灰 */
+    saturation: number
   }
   /** 入场：画布淡入 + 标本盒放大 + 三件标本依次落位（自己写，不用 Theatre 时间轴，见 ADR-003） */
   reveal: {
@@ -1827,6 +1839,7 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     pieces: { t: 'text', label: 'pieces（逗号分隔）' },
     brightness: num(0, 2, 0.01),
     fitMargin: num(0, 0.5, 0.005),
+    specimenGap: num(0, 0.5, 0.005),
     slots: {
       t: 'array',
       label: '落位',
@@ -1859,6 +1872,10 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     accentFar: { _label: '远景点缀', ...roleSchema },
     mirror: select<MirrorMode>('auto', 'off', 'on'),
     jitterDeg: num(0, 30, 0.5),
+    grassMargin: num(0, 0.3, 0.005),
+    specimenGap: num(0, 0.5, 0.005),
+    maxGrow: num(0.5, 3, 0.01),
+    heroWeight: num(0.5, 5, 0.05),
     floatAmplitude: num(0, 0.3, 0.005),
     floatSpeed: num(0, 3, 0.01),
   },
@@ -1869,6 +1886,7 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     metalness: num(0, 1, 0.01),
     hoverEmissive: intensity(5),
     sceneGlow: num(0, 3, 0.01, 'sceneGlow', '真实模型自发光 × 场景里的常驻发光（1 = 与场景一致）'),
+    saturation: num(0, 3, 0.01, 'saturation', '真实模型饱和度 × 资产自己的调色'),
   },
   reveal: {
     _label: '入场',

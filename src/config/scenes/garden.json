@@ -207,9 +207,9 @@
     "lookDistance": 30,
     "lookMaxAngle": 0.6,
     "lookSpeed": 2,
-    "skinBrightness": 1.22,
-    "skinSaturation": 0.55,
-    "skinTint": "#f6f8ff"
+    "skinBrightness": 1.28,
+    "skinSaturation": 0.4,
+    "skinTint": "#f6ffe6"
   },
   "bubble": {
     "centerOpacity": 0.08,

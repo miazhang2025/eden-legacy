@@ -147,6 +147,10 @@
     },
     "mirror": "auto",
     "jitterDeg": 8,
+    "grassMargin": 0.03,
+    "specimenGap": 0.08,
+    "maxGrow": 1.6,
+    "heroWeight": 1.3,
     "floatAmplitude": 0.03,
     "floatSpeed": 0.25
   },
@@ -168,7 +172,8 @@
     "roughness": 0.45,
     "metalness": 0.1,
     "hoverEmissive": 0.9,
-    "sceneGlow": 1
+    "sceneGlow": 1,
+    "saturation": 1.3
   },
   "interaction": {
     "yawLimitDeg": 25,
@@ -266,6 +271,7 @@
     "pieces": "cave_50,cave_55,cave_57,garden_2,garden_5,garden_32,ocean_25,ocean_19",
     "brightness": 0.85,
     "fitMargin": 0.06,
+    "specimenGap": 0.05,
     "slots": [
       {
         "anchor": [

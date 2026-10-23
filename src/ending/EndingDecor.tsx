@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
+import { create } from 'zustand'
 import {
   Box3,
   Euler,
@@ -17,8 +18,9 @@ import type { EndingConfig } from '../config/schema'
 import { DRACO_PATH, url, useKTX2Extension } from '../scene/EnvModel'
 import { useEndingCfg } from '../state/useConfigStore'
 import { hash01, isMirrored } from './composition'
-import { relativeMatrix } from './flatten'
-import { useFrameInner, type FrameInner } from './FrameModel'
+import { fitInside, footprint } from './fitInside'
+import { useFrameInner } from './FrameModel'
+import { useSpecimenLayout } from './specimenLayout'
 
 type DecorCfg = EndingConfig['decor']
 
@@ -38,63 +40,38 @@ const quat = new Quaternion()
 const scl = new Vector3()
 const euler = new Euler(0, 0, 0, 'ZYX')
 const rot = new Euler()
-const rel = new Matrix4()
 const placeMatrix = new Matrix4()
 const vtx = new Vector3()
 
-/** 花草摆好后在标本盒 xy 平面上的投影（每个网格抽样约 400 个顶点）；m = 摆位矩阵 */
-function footprint(o: Object3D, m: Matrix4): [number, number][] {
-  const out: [number, number][] = []
-  o.updateMatrixWorld(true)
-  o.traverse((x) => {
-    if (!(x instanceof Mesh)) return
-    const p = x.geometry.getAttribute('position')
-    if (!p) return
-    relativeMatrix(x, o, rel).premultiply(m)
-    const step = Math.max(1, Math.floor(p.count / 400))
-    for (let i = 0; i < p.count; i += step) {
-      vtx.fromBufferAttribute(p, i).applyMatrix4(rel)
-      out.push([vtx.x, vtx.y])
-    }
-  })
-  return out
-}
-
-/** 往里挪的根部至少保留原尺寸的多少：够了就不再往里挪 */
+/** 装饰花草往里挪时至少保留原尺寸的多少：够了就不再往里挪 */
 const KEEP_SCALE = 0.7
+/** 为了让开标本缩到比这还小，就整株不显示 */
+const MIN_SCALE = 0.45
+
+/** 一圈草的「无草区」按角度分成多少格 */
+const CLEAR_BINS = 90
 
 /**
- * 把一株花草收进内框椭圆（半轴各减 margin）：先把根部 (px, py) 沿径向往里挪（最多挪到原半径的一半），
- * 挪到以根部为中心缩小后还能保留 KEEP_SCALE 的尺寸为止；都不够就取尺寸最大的那个位置。
- * 返回新的根部与缩放系数 k（≤ 1），所有投影点都在框内。
+ * 一圈草的「无草区」：把标本盒 xy 按 frame.size 归一成单位圆（u = x / 半宽，v = y / 半高），
+ * 每个角度格里离中心最近的草叶顶点的半径 = 这个方向上草从哪里开始。标本伸进去就会被草挡住（见 SpecimenSlot）。
+ * clear = null：还没铺草（或关掉了），不限制。
  */
-function fitInside(px: number, py: number, pts: [number, number][], inner: FrameInner, margin: number) {
-  const a = Math.max(inner.halfW - margin, 0.01)
-  const b = Math.max(inner.halfH - margin, 0.01)
-  const e = (x: number, y: number) => ((x - inner.cx) / a) ** 2 + ((y - inner.cy) / b) ** 2
-  // 根部离中心的「椭圆半径」，起点不超过 0.9（贴边或在框外的先挪进来）
-  const er = Math.sqrt(e(px, py)) || 1
-  const start = Math.min(1, 0.9 / er)
-  let best = { x: px, y: py, k: -1 }
-  for (let f = start; f >= start * 0.5 - 1e-6; f -= start * 0.05) {
-    const x = inner.cx + (px - inner.cx) * f
-    const y = inner.cy + (py - inner.cy) * f
-    const inside = (k: number) => pts.every(([vx, vy]) => e(x + k * (vx - px), y + k * (vy - py)) <= 1)
-    let k = 1
-    if (!inside(1)) {
-      let lo = 0
-      let hi = 1
-      for (let i = 0; i < 16; i++) {
-        const mid = (lo + hi) / 2
-        if (inside(mid)) lo = mid
-        else hi = mid
-      }
-      k = lo
-    }
-    if (k > best.k) best = { x, y, k }
-    if (k >= KEEP_SCALE) break
-  }
-  return best
+export const useGrassClear = create<{ clear: Float32Array | null; halfW: number; halfH: number }>()(() => ({
+  clear: null,
+  halfW: 1,
+  halfH: 1,
+}))
+
+/** (x, y) 在不在无草区里（离草至少 margin，归一半径）；相邻两格一起看，免得卡在格子边上 */
+export function clearOfGrass(x: number, y: number, margin: number) {
+  const { clear, halfW, halfH } = useGrassClear.getState()
+  if (!clear) return true
+  const u = x / halfW
+  const v = y / halfH
+  const n = clear.length
+  const bin = Math.floor(((Math.atan2(v, u) / (Math.PI * 2) + 1) % 1) * n) % n
+  const limit = Math.min(clear[bin], clear[(bin + 1) % n], clear[(bin + n - 1) % n])
+  return Math.hypot(u, v) <= limit - margin
 }
 
 /**
@@ -173,6 +150,29 @@ function GrassBed({ scene, cfg, seed, brightness }: { scene: Object3D; cfg: Deco
   }, [tufts, cfg, seed, w, h, d])
   useEffect(() => () => meshes.forEach((m) => m.dispose()), [meshes])
 
+  // 无草区：每丛草抽样约 60 个顶点，按实例矩阵摆好后记下每个角度格里的最小归一半径
+  useEffect(() => {
+    if (!meshes.length) return
+    const clear = new Float32Array(CLEAR_BINS).fill(Infinity)
+    const m = new Matrix4()
+    for (const mesh of meshes) {
+      const p = mesh.geometry.getAttribute('position')
+      const step = Math.max(1, Math.floor(p.count / 60))
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, m)
+        for (let j = 0; j < p.count; j += step) {
+          vtx.fromBufferAttribute(p, j).applyMatrix4(m)
+          const u = vtx.x / (w / 2)
+          const v = vtx.y / (h / 2)
+          const bin = Math.floor(((Math.atan2(v, u) / (Math.PI * 2) + 1) % 1) * CLEAR_BINS) % CLEAR_BINS
+          clear[bin] = Math.min(clear[bin], Math.hypot(u, v))
+        }
+      }
+    }
+    useGrassClear.setState({ clear, halfW: w / 2, halfH: h / 2 })
+    return () => useGrassClear.setState({ clear: null })
+  }, [meshes, w, h])
+
   return (
     <group>
       {meshes.map((m, i) => (
@@ -188,6 +188,8 @@ function DecorPieces({ cfg, seed }: { cfg: DecorCfg; seed: string }) {
   const { scene } = useGLTF(url(cfg.model), DRACO_PATH, undefined, useKTX2Extension())
   const mirror = isMirrored(composition, seed)
   const inner = useFrameInner((s) => s.inner)
+  // 标本排好之后才摆（要让开标本，见 specimenLayout.ts）
+  const occupied = useSpecimenLayout((s) => s.occupied)
 
   // 材质整体压暗：每种原材质克隆一份，颜色乘 brightness
   const materials = useMemo(() => {
@@ -213,9 +215,10 @@ function DecorPieces({ cfg, seed }: { cfg: DecorCfg; seed: string }) {
         .filter((n) => n && !n.startsWith('grass_') && scene.getObjectByName(n)),
       seed,
     )
-    if (!names.length) return []
+    if (!names.length || !occupied) return []
     const sx = mirror ? -1 : 1
-    return cfg.slots.map((slot, i) => {
+    const out: { key: string; object: Object3D; position: [number, number, number]; rotation: [number, number, number]; scale: number }[] = []
+    cfg.slots.forEach((slot, i) => {
       const src = scene.getObjectByName(names[i % names.length]) as Object3D
       const o = src.clone(true)
       o.position.set(0, 0, 0)
@@ -230,17 +233,23 @@ function DecorPieces({ cfg, seed }: { cfg: DecorCfg; seed: string }) {
       const position: [number, number, number] = [sx * slot.anchor[0] * w, slot.anchor[1] * h, slot.anchor[2] * d]
       const rotation: [number, number, number] = [slot.rotation[0], sx * slot.rotation[1], sx * slot.rotation[2]]
       let scale = (slot.height * h) / height
-      // 收进画框内框，不和画框穿模（画框模型还没量出内框时先按原样摆）
-      if (inner) {
-        placeMatrix.compose(pos.set(...position), quat.setFromEuler(rot.set(...rotation)), scl.setScalar(scale))
-        const fit = fitInside(position[0], position[1], footprint(o, placeMatrix), inner, cfg.fitMargin)
-        position[0] = fit.x
-        position[1] = fit.y
-        scale *= fit.k
-      }
-      return { key: `${i}-${names[i % names.length]}`, object: o, position, rotation, scale }
+      // 收进画框内框（不和画框穿模）、让开标本：往中心挪、以根部为中心缩小；缩得太小就不放
+      // （画框模型还没量出内框时只让开标本，以画框中心为准）
+      placeMatrix.compose(pos.set(...position), quat.setFromEuler(rot.set(...rotation)), scl.setScalar(scale))
+      const a = inner ? Math.max(inner.halfW - cfg.fitMargin, 0.01) : w / 2
+      const b = inner ? Math.max(inner.halfH - cfg.fitMargin, 0.01) : h / 2
+      const cx = inner?.cx ?? 0
+      const cy = inner?.cy ?? 0
+      const ok = (x: number, y: number) => ((x - cx) / a) ** 2 + ((y - cy) / b) ** 2 <= 1 && !occupied(x, y)
+      const fit = fitInside(position[0], position[1], footprint(o, placeMatrix), cx, cy, ok, KEEP_SCALE)
+      if (fit.k < MIN_SCALE) return
+      position[0] = fit.x
+      position[1] = fit.y
+      scale *= fit.k
+      out.push({ key: `${i}-${names[i % names.length]}`, object: o, position, rotation, scale })
     })
-  }, [scene, cfg.pieces, cfg.slots, cfg.fitMargin, seed, mirror, materials, inner, w, h, d])
+    return out
+  }, [scene, cfg.pieces, cfg.slots, cfg.fitMargin, seed, mirror, materials, inner, occupied, w, h, d])
 
   return (
     <group>

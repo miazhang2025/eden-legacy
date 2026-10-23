@@ -33,7 +33,10 @@
 import { readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { NodeIO, getBounds } from '@gltf-transform/core'
-import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
+import {
+  ALL_EXTENSIONS, KHRMaterialsClearcoat, KHRMaterialsIOR, KHRMaterialsIridescence, KHRMaterialsSheen, KHRMaterialsSpecular,
+  KHRMaterialsTransmission, KHRMaterialsVolume,
+} from '@gltf-transform/extensions'
 import {
   cloneDocument, dedup, draco, flatten, join as joinMeshes, prune, simplify, simplifyPrimitive, textureCompress, transformMesh, weld,
 } from '@gltf-transform/functions'
@@ -61,8 +64,8 @@ const OUT_COLLIDER = 'public/models/colliders'
 const COLLIDER = /Hair|^Genesis9\.Shape|tripo_part|衣服/i
 const COLLIDER_TRIANGLES = 4000
 
-/** 整个 mesh 删掉（按 mesh 名匹配） */
-const DROP_MESH = /Genesis9Tear|Genesis9Mouth/i
+/** 整个 mesh 删掉（按 mesh 名匹配）。UCX_ 开头的是游戏引擎用的碰撞盒（Blender 里隐藏），不该渲染 */
+const DROP_MESH = /Genesis9Tear|Genesis9Mouth|^UCX_/i
 /** 删掉的图元（按规范化后的材质名匹配）：眼球湿润层 / 泪腺（透明壳），口腔里的牙齿舌头。脸上雕刻的泪滴（Sculpted_Tears）保留 */
 const DROP_MATERIAL = /EyeMoisture|^Genesis_9_Tear|^Genesis_9_Mouth_(Mouth|Teeth)/i
 
@@ -98,7 +101,11 @@ const PARTS = [
  *              但真正半透明的薄纱、玻璃泪滴裁切后会变成镂空的洞或整个消失
  *   normalSize：法线贴图边长上限（比部件规则更严；法线贴图走 UASTC，体积大）
  *   tweaks：改面板调不到的材质参数（按规范化后的原名）：sheenColor（灰度）/ sheenRoughness / clearcoatRoughness /
- *           saturation（底色贴图的饱和度倍数，烘进贴图；贴图被几个材质共用时只处理一次）。
+ *           saturation（底色贴图的饱和度倍数，烘进贴图；贴图被几个材质共用时只处理一次）/
+ *           glass（改成透射材质 —— 透明液体 / 玻璃，透出后面的东西并折射；不透明、单面，运行时走 three 的透射通道，
+ *                  场景里已经有透射材质时几乎不增加开销）：
+ *                  { ior, thickness（0 = 不加体积，可合并网格）, roughness, color（透射染色，线性 RGB）, transmission（<1 颜色更实）,
+ *                    iridescence（薄膜干涉，彩色反光）, specular（镜面反射倍数，可 >1）, sheen（白色边缘光泽） }。
  *           颜色、金属度、清漆强度、环境反射这些面板能调的写在场景 config 的 materials 里
  */
 const CHARACTERS = {
@@ -147,10 +154,23 @@ const CHARACTERS = {
     clothMaterials: /礼服|袖饰/,
     // 礼服每块都带一张 1024 法线贴图（UASTC 每张 1.2MB），远看看不出来
     normalSize: 512,
-    // 礼服 / 袖饰的贴图 alpha 是设计好的透明度（袖纱只有 18–35% 不透明）；脸上的玻璃泪滴 alpha 0.15，裁切会整个消失
-    keepBlend: /礼服|袖饰|Tears_Simple/,
+    // 礼服 / 袖饰的贴图 alpha 是设计好的透明度（袖纱只有 18–35% 不透明）
+    keepBlend: /礼服|袖饰/,
     // 礼服导出时是白色满强度天鹅绒光泽 + 近乎镜面的清漆层，在洞穴里整件发白：光泽压到 35%、清漆磨砂一些
-    tweaks: [{ match: /礼服|袖饰｜(垂坠透明纱|水晶薄纱)/, sheenColor: 0.35, sheenRoughness: 0.5, clearcoatRoughness: 0.35 }],
+    tweaks: [
+      { match: /礼服|袖饰｜(垂坠透明纱|水晶薄纱)/, sheenColor: 0.35, sheenRoughness: 0.5, clearcoatRoughness: 0.35 },
+      // 脸上的泪滴：导出是 15% 不透明的白色、双面，好几层叠起来成了乳白色的膏状条纹。改成透射的水
+      // 清澈透明的泪水：几乎无色（极淡的紫），全透射，只靠高光和一点彩色反光显形；和紫色的钻石区分开
+      {
+        match: /Tears/,
+        glass: { ior: 1.4, thickness: 0.08, roughness: 0, color: [0.9, 0.87, 1], transmission: 1, iridescence: 0.3, specular: 2.5 },
+      },
+      // 泪痕上的紫水晶钻：导出是近白色、全透射的玻璃，贴在皮肤上完全透明、看不见。降低透射显出紫色，加强高光和彩色反光
+      {
+        match: /Dual_Color_Glass/,
+        glass: { ior: 1.5, thickness: 0, roughness: 0, color: [0.48, 0.15, 1], transmission: 0.35, iridescence: 1, specular: 3 },
+      },
+    ],
     // 同花园 / 海洋人物的 Daz 资产：睫毛贴图导出成纯白不透明，借花园的；脸和口腔的贴图挂反了
     borrow: { from: 'art/character/garden.glb', materials: /Eyelashes/i },
     copyTextures: [{ to: /HD_Head/i, from: /HD_Mouth_Cavity/i }],
@@ -451,6 +471,30 @@ async function build(src, name) {
       if (sheen && t.sheenRoughness !== undefined) sheen.setSheenRoughnessFactor(t.sheenRoughness)
       const clearcoat = mat.getExtension('KHR_materials_clearcoat')
       if (clearcoat && t.clearcoatRoughness !== undefined) clearcoat.setClearcoatRoughnessFactor(t.clearcoatRoughness)
+      if (t.glass) {
+        const { ior, thickness, roughness, color = [1, 1, 1], transmission = 1, iridescence = 0, specular = 1, sheen = 0 } = t.glass
+        mat
+          .setAlphaMode('OPAQUE')
+          .setDoubleSided(false)
+          .setBaseColorTexture(null)
+          .setBaseColorFactor([...color, 1])
+          .setMetallicFactor(0)
+          .setRoughnessFactor(roughness)
+          .setExtension('KHR_materials_transmission', doc.createExtension(KHRMaterialsTransmission).createTransmission().setTransmissionFactor(transmission))
+          .setExtension('KHR_materials_ior', doc.createExtension(KHRMaterialsIOR).createIOR().setIOR(ior))
+          .setExtension('KHR_materials_clearcoat', doc.createExtension(KHRMaterialsClearcoat).createClearcoat().setClearcoatFactor(1).setClearcoatRoughnessFactor(0))
+          .setExtension('KHR_materials_specular', doc.createExtension(KHRMaterialsSpecular).createSpecular().setSpecularFactor(specular))
+        // 体积（厚度）只在 thickness > 0 时加：带体积的材质不会被合并网格（厚度按各网格自己的坐标算）
+        if (thickness > 0) mat.setExtension('KHR_materials_volume', doc.createExtension(KHRMaterialsVolume).createVolume().setThicknessFactor(thickness))
+        if (iridescence > 0) {
+          const ir = doc.createExtension(KHRMaterialsIridescence).createIridescence()
+          mat.setExtension('KHR_materials_iridescence', ir.setIridescenceFactor(iridescence).setIridescenceIOR(1.3).setIridescenceThicknessMinimum(200).setIridescenceThicknessMaximum(500))
+        }
+        if (sheen > 0) {
+          const sh = doc.createExtension(KHRMaterialsSheen).createSheen()
+          mat.setExtension('KHR_materials_sheen', sh.setSheenColorFactor([sheen, sheen, sheen]).setSheenRoughnessFactor(0.25))
+        }
+      }
     }
     if (mat.getAlphaMode() === 'BLEND' && !character.keepBlend?.test(old)) {
       mat.setAlphaMode('MASK').setAlphaCutoff(CUTOUT.find((c) => c.match.test(old)).cutoff)
@@ -529,8 +573,10 @@ async function build(src, name) {
     if (skinTex.length) console.log(`  雀斑     → ${skinTex.length} 张皮肤贴图淡化 ${Math.round(freckleStrength * 100)}%`)
   }
 
+  // 再合并一次：前面按部件 / 规则改过的材质，到这里的去重才合并成一个（例如 19 颗钻石的材质），再把它们的网格并成一个 draw call
   await doc.transform(
     dedup(),
+    joinMeshes({ keepNamed: false }),
     prune(),
     ...(hasKTX
       ? [

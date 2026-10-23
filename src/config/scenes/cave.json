@@ -27,10 +27,10 @@
     "extrasTransform": {
       "position": [
         1.1102230246251565e-16,
-        -0.5,
+        2.7755575615628914e-17,
         0.5
       ],
-      "rotationY": null,
+      "rotationY": 0,
       "scale": 1
     },
     "scale": 1,
@@ -39,7 +39,7 @@
       0,
       0
     ],
-    "rotationY": null
+    "rotationY": 0
   },
   "character": {
     "moveSpeed": 2,
@@ -1101,6 +1101,12 @@
     "SC01_land": {
       "shadowLift": 0.8,
       "shadowLiftThreshold": 0.55
+    },
+    "char_Tears_Simple": {
+      "envMapIntensity": 6
+    },
+    "char_Dual_Color_Glass_(Crystal)": {
+      "envMapIntensity": 8
     }
   },
   "audio": {
@@ -1133,7 +1139,7 @@
       "id": "cave_ore_01",
       "position": [
         -2.2950000000000004,
-        0.1,
+        0,
         6.534
       ],
       "rotation": [

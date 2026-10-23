@@ -65,14 +65,14 @@ const SEEDS: Seed[] = [
   { id: 'cave_ore_01', scene: 'cave', category: 'mineral', glowColor: '#89d2f5', placeholderColor: '#6a7fa8', specimenScale: 1, heroWeight: 5, glowScale: 0 },
   { id: 'cave_ore_02', scene: 'cave', category: 'plant', glowColor: '#89aef5', placeholderColor: '#8a6aa8', specimenScale: 1, heroWeight: 6, specimenPose: 'upright', specimenRotation: [0, -90, 0], specimenGrade: { saturation: 0.6 } },
   { id: 'cave_mushroom_01', scene: 'cave', category: 'plant', glowColor: '#89b6f5', placeholderColor: '#b89a7a', specimenScale: 1, heroWeight: 6, specimenPose: 'upright', specimenRotation: [0, 180, 0] },
-  { id: 'cave_mushroom_02', scene: 'cave', category: 'plant', glowColor: '#f589bc', placeholderColor: '#a87a6a', specimenScale: 1, heroWeight: 4, specimenPose: 'upright', specimenGrade: { hue: 75, saturation: 0.5, brightness: 1.55, tint: '#ffd2e6' }, selfGlow: 0.2, box: { grade: { saturation: 0.38 } } },
+  { id: 'cave_mushroom_02', scene: 'cave', category: 'plant', glowColor: '#f589bc', placeholderColor: '#a87a6a', specimenScale: 1, heroWeight: 4, specimenPose: 'upright', specimenGrade: { hue: 75, saturation: 0.5, brightness: 1.55, tint: '#ffd2e6' }, selfGlow: 0.2, box: { grade: { saturation: 0.2, tint: '#ffeaf2' } } },
 
   { id: 'ocean_shell_01', scene: 'ocean', category: 'shell', glowColor: '#89d2f5', placeholderColor: '#e8d6c8', specimenScale: 1, heroWeight: 0 },
   { id: 'ocean_shell_02', scene: 'ocean', category: 'shell', glowColor: '#f5e389', placeholderColor: '#c8d6e8', specimenScale: 1, heroWeight: 3 },
   { id: 'ocean_fish_01', scene: 'ocean', category: 'fish', glowColor: '#89a5f5', placeholderColor: '#4a8ab8', specimenScale: 1, heroWeight: 4, specimenGrade: { saturation: 0.35, brightness: 1.15 }, materialGrades: { seaangel_outer: { saturation: 1.1, brightness: 1.05, tint: '#9fb6ff' } } },
   { id: 'ocean_fish_02', scene: 'ocean', category: 'fish', glowColor: '#89f5f3', placeholderColor: '#d88a4a', specimenScale: 1, heroWeight: 7, specimenGrade: { saturation: 1.5, brightness: 0.95, hueCenter: 55, hueWidth: 35, hueSaturation: 0.42 }, reach: 1.6 },
 
-  { id: 'garden_flower_01', scene: 'garden', category: 'flower', glowColor: '#b389f5', placeholderColor: '#e86aa8', specimenScale: 1, heroWeight: 8, specimenGrade: { saturation: 0.75, brightness: 0.9 } },
+  { id: 'garden_flower_01', scene: 'garden', category: 'flower', glowColor: '#b389f5', placeholderColor: '#e86aa8', specimenScale: 1, heroWeight: 8, specimenGrade: { saturation: 0.85, brightness: 4, hueCenter: 60, hueWidth: 40, hueBrightness: 0.25 }, box: { grade: { hueCenter: 60, hueWidth: 40, hueSaturation: 0.3 } } },
   { id: 'garden_flower_02', scene: 'garden', category: 'flower', glowColor: '#89f5e2', placeholderColor: '#e8d84a', specimenScale: 1, heroWeight: 9, specimenGrade: { hue: 165, saturation: 0.6, brightness: 1.15 } },
   // 浅绿翅膀贴图本身很亮，停在白花上会和背景糊成一片：压暗、提饱和，常驻自发光也减一点
   { id: 'garden_butterfly_01', scene: 'garden', category: 'butterfly', glowColor: '#90f589', placeholderColor: '#4a6ae8', specimenScale: 1, heroWeight: 10, specimenGrade: { saturation: 1.6, brightness: 0.72 }, selfGlow: -0.2 },
