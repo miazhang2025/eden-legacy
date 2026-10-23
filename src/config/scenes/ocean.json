@@ -1050,17 +1050,24 @@
   "materials": {
     "SC16_shell": {
       "side": "double",
-      "emissive": "#ab99b2",
-      "color": "#c5c5c5"
+      "transmission": 0,
+      "color": "#ffd8ee",
+      "emissive": "#5a4766",
+      "emissiveIntensity": 1,
+      "roughness": 0.3,
+      "clearcoat": 1,
+      "envMapIntensity": 1.3,
+      "iridescence": 0.7
     },
     "SC18_Pearl": {
-      "emissive": "#d6b2c0",
-      "transmission": 0.25,
-      "thickness": 4.78,
-      "attenuationColor": "#6900ff",
-      "color": "#9da3ff",
-      "envMapIntensity": 0.87,
-      "emissiveIntensity": 0.87
+      "transmission": 0,
+      "color": "#fff6fb",
+      "emissive": "#9a8494",
+      "emissiveIntensity": 1,
+      "roughness": 0.1,
+      "clearcoat": 1,
+      "envMapIntensity": 1.4,
+      "iridescence": 0.6
     },
     "SC12_bubble": {
       "transparent": true,
@@ -1078,6 +1085,16 @@
     "SC09_bubble": {
       "transparent": true,
       "transmission": 1
+    },
+    "SC17_Pearl": {
+      "transmission": 0,
+      "color": "#fff0f7",
+      "emissive": "#7a6878",
+      "emissiveIntensity": 1,
+      "roughness": 0.15,
+      "clearcoat": 1,
+      "envMapIntensity": 1.2,
+      "iridescence": 0.5
     }
   },
   "audio": {
@@ -1200,6 +1217,9 @@
     "spinSpeed": 0.3,
     "assetLift": 0.8,
     "inspectDistance": 6,
+    "discoverScreenSize": 0.15,
+    "discoverFocusDuration": 1.4,
+    "discoverFocusDamping": 0.28,
     "inspectAngleDeg": 12,
     "introPromptSeconds": 6
   },

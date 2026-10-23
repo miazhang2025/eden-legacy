@@ -54,7 +54,8 @@ export function SpecimenSlot({ index, placement }: { index: number; placement: P
   const { floatAmplitude, floatSpeed } = useEndingCfg((c) => c.composition)
   const { emissiveIntensity, roughness, metalness, hoverEmissive, sceneGlow } = useEndingCfg((c) => c.specimen)
   // 真实模型照它在自己场景里「已发现」时的样子按底色发光（颜色贴近场景里）
-  const glow = useConfigStore((s) => (asset ? foundGlow(s.configs[asset.scene].flow, asset.selfGlow) : 0)) * sceneGlow
+  const glow =
+    useConfigStore((s) => (asset ? foundGlow(s.configs[asset.scene].flow, asset.selfGlow) * (asset.glowScale ?? 1) : 0)) * sceneGlow
 
   const material = useMemo(
     () =>

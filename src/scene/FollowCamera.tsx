@@ -3,8 +3,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, PerspectiveCamera, Vector3 } from 'three'
 import { consumeLook } from '../input/useInput'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
+import { nowSec } from '../state/useFlowStore'
 import { groundHeight, hitDistance } from './collision'
-import { dampFactor, forwardFromYaw, rig } from './rig'
+import { assetCenters, dampFactor, forwardFromYaw, rig } from './rig'
 
 const fwd = new Vector3()
 const desired = new Vector3()
@@ -13,6 +14,36 @@ const toCam = new Vector3()
 
 // 第三人称与第一人称共用同一套平滑：位置与视线目标都用 camera.damping 做阻尼插值，
 // 只有「刚进场景 / 切换视角 / 被地形遮挡」这三种情况直接吸附。
+/** 两个角度之差，归一到 (-π, π] */
+const angleDelta = (to: number, from: number) => MathUtils.euclideanModulo(to - from + Math.PI, Math.PI * 2) - Math.PI
+
+/**
+ * 发现资产时相机平滑转向它（rig.focus，AssetFlow 触发）：yaw（第一人称时连同 pitch）用阻尼插值逼近「资产在画面正中」的角度，
+ * 阻尼强度在开头 0.3 秒内从 0 渐入，起步和收尾都是缓的；转完（discoverFocusDuration 秒）或玩家自己转视角就交还控制。
+ * 只改 rig 的朝向，相机位置 / 视线的平滑照旧走下面的 camera.damping。
+ */
+function focusAsset(camera: PerspectiveCamera, c: ReturnType<typeof getSceneCfg>['camera'], userLook: boolean, dt: number) {
+  const focus = rig.focus
+  if (!focus.id) return
+  const f = getSceneCfg().flow
+  const target = assetCenters.get(focus.id)
+  const elapsed = nowSec() - focus.start
+  if (!target || userLook || elapsed > f.discoverFocusDuration) {
+    focus.id = null
+    return
+  }
+  const k = dampFactor(f.discoverFocusDamping, dt) * MathUtils.smoothstep(elapsed, 0, 0.3)
+  const tx = target.x - camera.position.x
+  const tz = target.z - camera.position.z
+  // forwardFromYaw(yaw) = (-sin yaw, 0, -cos yaw)
+  rig.yaw += angleDelta(Math.atan2(-tx, -tz), rig.yaw) * k
+  if (c.mode === 'first') {
+    // 第一人称 pitch 为正是往下看
+    const pitch = MathUtils.clamp(Math.atan2(camera.position.y - target.y, Math.hypot(tx, tz)), c.pitchMin, c.pitchMax)
+    rig.pitch += (pitch - rig.pitch) * k
+  }
+}
+
 export function FollowCamera() {
   const camera = useThree((s) => s.camera) as PerspectiveCamera
   const { fov, near, far } = useSceneCfg((c) => c.camera)
@@ -36,6 +67,7 @@ export function FollowCamera() {
     const { dx, dy } = consumeLook()
     rig.yaw -= dx * c.rotateSpeed
     rig.pitch = MathUtils.clamp(rig.pitch + dy * c.rotateSpeed, c.pitchMin, c.pitchMax)
+    focusAsset(camera, c, dx !== 0 || dy !== 0, dt)
 
     forwardFromYaw(rig.yaw, fwd)
     const modeChanged = mode.current !== c.mode

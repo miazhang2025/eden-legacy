@@ -100,6 +100,7 @@ export function snapshot(m: MeshStandardMaterial, role: MaterialRole): Required<
     ior: p?.ior ?? 1.5,
     thickness: p?.thickness ?? 0,
     attenuationColor: p ? `#${p.attenuationColor.getHexString()}` : '#ffffff',
+    iridescence: p?.iridescence ?? 0,
   }
 }
 
@@ -125,11 +126,13 @@ export function applyValues(materials: MeshStandardMaterial[], v: Required<Mater
     if (isPhysical(m)) {
       // transmission 从 0 变为非 0 会切换 shader 分支，需要重新编译
       if ((m.transmission > 0) !== (v.transmission > 0)) needsUpdate = true
+      if ((m.iridescence > 0) !== (v.iridescence > 0)) needsUpdate = true
       m.clearcoat = v.clearcoat
       m.transmission = v.transmission
       m.ior = v.ior
       m.thickness = v.thickness
       m.attenuationColor.set(v.attenuationColor)
+      m.iridescence = v.iridescence
     }
     if (needsUpdate) m.needsUpdate = true
   }

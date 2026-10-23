@@ -155,9 +155,14 @@ export interface SceneConfig {
     zoneRadius: number
     /** 贴身距离：这么近时不管朝向都算在看它 */
     proximity: number
-    /** 看向判定：资产在这个距离内、且偏离画面中心（水平）不超过 inspectAngleDeg 时可以采集 */
+    /** 看向判定：资产偏离画面中心（水平）不超过 inspectAngleDeg、且在画面上够大（见 discoverScreenSize）时算找到；inspectDistance 是相机距离上限 */
     inspectDistance: number
     inspectAngleDeg: number
+    /** 资产最长边至少占竖直视野的多少（0–1）才算找到：按资产尺寸和视野角换算距离，各资产判定时在画面里的大小差不多 */
+    discoverScreenSize: number
+    /** 发现资产时相机平滑转向它：最长持续（秒）/ 阻尼时间常数（秒，越小转得越快）；持续设 0 关闭 */
+    discoverFocusDuration: number
+    discoverFocusDamping: number
     /** 进场景时底部叙事提示停留多久（秒），之后消失，全部找到时再出现 */
     introPromptSeconds: number
     othersFadeOut: boolean
@@ -247,6 +252,8 @@ export interface MaterialOverride {
   ior?: number
   thickness?: number
   attenuationColor?: string
+  /** 薄膜干涉的彩虹珠光（贝壳内壁 / 珍珠）0–1 */
+  iridescence?: number
 }
 
 export interface SkyConfig {
@@ -1160,6 +1167,7 @@ export const MATERIAL_FIELDS: Array<{ key: keyof MaterialOverride; leaf: Leaf; p
   { key: 'ior', leaf: num(1, 2.333, 0.01), physical: true },
   { key: 'thickness', leaf: num(0, 10, 0.01), physical: true },
   { key: 'attenuationColor', leaf: color(), physical: true },
+  { key: 'iridescence', leaf: num(0, 1, 0.01, 'iridescence 珠光'), physical: true },
 ]
 
 /** 新建粒子池的默认值 */
@@ -1720,8 +1728,11 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     zoneCenter: vec(0.5, 'zoneCenter（已弃用）'),
     zoneRadius: num(0.5, 40, 0.1, 'zoneRadius', '已弃用（原采集区半径）'),
     proximity: num(0.5, 10, 0.1, 'proximity', '贴身距离：不管朝向都可采集'),
-    inspectDistance: num(1, 20, 0.1, 'inspectDistance', '看向判定的最远距离'),
+    inspectDistance: num(1, 40, 0.1, 'inspectDistance', '看向判定的相机距离上限'),
     inspectAngleDeg: num(2, 60, 0.5, 'inspectAngleDeg', '偏离画面中心（水平）多少度以内算看着它'),
+    discoverScreenSize: num(0.02, 0.6, 0.005, 'discoverScreenSize', '资产最长边占竖直视野多少才算找到（越小越远就能找到）'),
+    discoverFocusDuration: num(0, 4, 0.05, 'discoverFocusDuration', '发现时相机转向资产的最长时间（0 关闭）'),
+    discoverFocusDamping: num(0.02, 2, 0.01, 'discoverFocusDamping', '相机转向的平滑时间常数（越小越快）'),
     introPromptSeconds: num(0, 30, 0.5, 'introPromptSeconds', '进场景的叙事提示停留多久'),
     othersFadeOut: bool('othersFadeOut', '确认后其余三个资产是否同步淡出'),
     selectGlowDuration: seconds(),

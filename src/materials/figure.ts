@@ -317,6 +317,9 @@ export function patchFigure(material: Material) {
   const m = material as Material & { [PATCHED]?: true }
   if (m[PATCHED]) return
   m[PATCHED] = true
+  // 半透明的纱（洞穴礼服）也写深度：GLTFLoader 给 BLEND 材质关了 depthWrite，
+  // 水面（半透明、renderOrder 更大）后画时会盖到水面以上、本该在前面的裙子上，看起来像被吃掉一块
+  if (m.transparent) m.depthWrite = true
   const skin = isFigureSkin(m.name)
   const prev = m.onBeforeCompile
   m.onBeforeCompile = (shader, renderer) => {

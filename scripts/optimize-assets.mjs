@@ -50,12 +50,9 @@ const TEXTURE_REPLACE = {
 
 /**
  * 底色贴图暗部提亮：资产 id → { lift 强度 0–1, threshold 明度阈值 0–1 }。
- * 按 HSL 明度抬起低于阈值的部分（色相、饱和度不变，亮部不动）。
- * 沉蓝晶脉的母岩在贴图里画成深海军蓝，场景里显得发黑
+ * 按 HSL 明度抬起低于阈值的部分（色相、饱和度不变，亮部不动）。例：{ cave_ore_01: { lift: 1, threshold: 0.8 } }
  */
-const TEXTURE_LIFT = {
-  cave_ore_01: { lift: 1, threshold: 0.85 },
-}
+const TEXTURE_LIFT = {}
 
 /**
  * 表面起伏（surface-relief.mjs）：资产 id → { mesh 名, 细分次数, 位移幅度（模型局部单位，亮度 0→1） }。
@@ -63,6 +60,14 @@ const TEXTURE_LIFT = {
  */
 const RELIEF = {
   ocean_shell_02: { mesh: '笠螺-材质', levels: 1, amplitude: 0.01, blur: 30, detail: 0.015, detailSigma: 24 },
+}
+
+/**
+ * 拆材质：资产 id → { mesh 名: 新材质名 }，给这些 mesh 复制一份独立的材质（贴图共用），
+ * 运行时可以按材质名单独调色（data/assets.ts 的 materialGrades）。海蝶：只给最外层皮上色
+ */
+const SPLIT_MATERIAL = {
+  ocean_fish_01: { seaa_skinout_Seaangel_out_0: 'seaangel_outer' },
 }
 
 const SRC = 'art/interactive'
@@ -153,6 +158,12 @@ for (const [id, file] of Object.entries(ASSETS)) {
     if (!mat) throw new Error(`${id}：没有材质 ${name}，换不了贴图 ${file}`)
     const mime = /\.png$/i.test(file) ? 'image/png' : 'image/jpeg'
     mat.setBaseColorTexture(doc.createTexture(file).setImage(readFileSync(join(TEX_SRC, file))).setMimeType(mime))
+  }
+
+  for (const [meshName, matName] of Object.entries(SPLIT_MATERIAL[id] ?? {})) {
+    const mesh = root.listMeshes().find((m) => m.getName() === meshName)
+    if (!mesh) throw new Error(`${id}：没有 mesh ${meshName}，拆不了材质`)
+    for (const prim of mesh.listPrimitives()) prim.setMaterial(prim.getMaterial().clone().setName(matName))
   }
 
   const relief = RELIEF[id]

@@ -26,12 +26,12 @@
     "extraColliders": "/models/colliders/garden.character.glb",
     "extrasTransform": {
       "position": [
-        0.5,
-        -0.5,
+        0,
+        0,
         0
       ],
       "rotationY": 0,
-      "scale": 0.8
+      "scale": 1
     },
     "scale": 1,
     "position": [
@@ -851,9 +851,9 @@
     {
       "id": "garden_flower_01",
       "position": [
-        0.412,
+        0.9,
         -0.2,
-        11.937
+        9.075
       ],
       "rotation": [
         0,
@@ -942,6 +942,9 @@
     "spinSpeed": 0.3,
     "assetLift": 0.8,
     "inspectDistance": 6,
+    "discoverScreenSize": 0.15,
+    "discoverFocusDuration": 1.4,
+    "discoverFocusDamping": 0.28,
     "inspectAngleDeg": 12,
     "introPromptSeconds": 6
   },

@@ -93,6 +93,7 @@ const PARTS = [
  *   collider：进碰撞体的 mesh（按 mesh 名），默认 COLLIDER
  *   cloth：做布料波动的 mesh（按 mesh 名），默认 CLOTH；null = 不做
  *   clothMaterials：做布料波动的图元（按材质名，规范化后的原名），和 cloth 叠加
+ *   drop：额外删掉的图元（按规范化后的原材质名）
  *   keepBlend：保留半透明混合（BLEND）的材质（按规范化后的原名）。默认 BLEND 会改成 alpha 裁切（头发面片排序会乱），
  *              但真正半透明的薄纱、玻璃泪滴裁切后会变成镂空的洞或整个消失
  *   normalSize：法线贴图边长上限（比部件规则更严；法线贴图走 UASTC，体积大）
@@ -106,11 +107,18 @@ const CHARACTERS = {
     tweaks: [{ match: /^(78|80)(\.\d+)?$/, saturation: 0.25 }],
   },
   ocean: {
-    // 主裙：原贴图 8K，保留 2048。头发比花园那版多 2 万面、海洋还要多画一遍水面反射，减得更狠一些
+    // 按材质分（网格名每次导出都在变：Mesh_0.001 / Ocean_Charactermesh …）。海洋要多画一遍水面反射，面数压在 25 万左右。
+    // 主裙（tripo_part_0）113 万面、珍珠贝母饰物 4 块共 33 万、上衣（tripo_part_1）22 万、头发 25 万
     parts: [
-      { match: /^tripo_part_0/i, ratio: 0.25, error: 0.01, texture: 2048 },
-      { match: /Hair/i, ratio: 0.22, error: 0.006, texture: 1024 },
+      { material: /tripo_part_0/i, ratio: 0.05, error: 0.02, texture: 2048, rebuildNormals: true },
+      { material: /珍珠贝母/, ratio: 0.08, error: 0.02, texture: 512, rebuildNormals: true },
+      { material: /tripo_part_1/i, ratio: 0.15, error: 0.02, texture: 2048, rebuildNormals: true },
+      { material: /tripo_part/i, ratio: 0.15, error: 0.02, texture: 1024, rebuildNormals: true },
+      { material: /Hair/i, ratio: 0.15, error: 0.008, texture: 1024 },
+      { material: /Eyes|Eyelashes/i, ratio: 1, error: 0, texture: 512 },
+      { material: /.*/, ratio: 1, error: 0, texture: 1024 },
     ],
+    collider: /Ocean_Character|^Mesh_0/i,
     // 头发在 Blender 里是程序化头发材质，导不出来（白色金属片）；睫毛贴图导出成了纯白不透明（透明度在另一张图里，丢了）。
     // 与花园人物是同一套 Daz 资产，借它的贴图
     borrow: { from: 'art/character/garden.glb', materials: /Hair|Eyelashes/i },
@@ -118,19 +126,23 @@ const CHARACTERS = {
     copyTextures: [{ to: /HD_Head/i, from: /HD_Mouth_Cavity/i }],
   },
   cave: {
-    // 整个人物是一个网格（49 个图元，60 万面），按材质分：头发是雕刻出来的实体发束（19 万面），礼服 4 块 21 万面，珍珠发带 8 万面
+    // 按材质分（网格名每次导出都在变）。最新导出 146 万面：礼服裙摆 65 万、雕刻发束 40 万、银纱垂饰 14 万、上身 9 万
     parts: [
-      { material: /sculpted_strands/i, ratio: 0.2, error: 0.012, texture: 1024, rebuildNormals: true },
-      { material: /Hair/i, ratio: 0.4, error: 0.004, texture: 1024 },
+      { material: /sculpted_strands/i, ratio: 0.12, error: 0.012, texture: 1024, rebuildNormals: true },
+      { material: /Hair/i, ratio: 0.25, error: 0.006, texture: 1024 },
       { material: /珍珠/, ratio: 0.2, error: 0.01, texture: 512 },
-      { material: /礼服|袖饰/, ratio: 0.3, error: 0.005, texture: 1024 },
+      { material: /银蓝珠饰裙摆/, ratio: 0.1, error: 0.008, texture: 1024 },
+      { material: /礼服|袖饰/, ratio: 0.2, error: 0.006, texture: 1024 },
       { material: /发带/, ratio: 0.5, error: 0.01, texture: 512 },
-      { material: /Sculpted_Tears/i, ratio: 0.3, error: 0.01, texture: 256 },
+      { material: /Tears/i, ratio: 0.3, error: 0.01, texture: 256 },
       { material: /Eyes|Eyelashes/i, ratio: 1, error: 0, texture: 512 },
       // 皮肤贴图尺寸由 TEXTURE_BY_MATERIAL 定
       { material: /.*/, ratio: 1, error: 0, texture: 1024 },
     ],
-    collider: /MixamoFullCharacter/i,
+    collider: /Dress|Skirt|内裙|外层礼服|Genesis9\.Shape|FullDensity|tripo_part/i,
+    // 头发根部的头皮罩（Hair_Root_Cap）在 Blender 里靠程序化透明度只露出发际线，导出后是整块不透明的黑色、盖住整张脸；
+    // 雕刻发束和两侧补发已经把头盖全了，直接删掉
+    drop: /soft_scalp/i,
     cloth: null,
     clothMaterials: /礼服|袖饰/,
     // 礼服每块都带一张 1024 法线贴图（UASTC 每张 1.2MB），远看看不出来
@@ -144,6 +156,14 @@ const CHARACTERS = {
     copyTextures: [{ to: /HD_Head/i, from: /HD_Mouth_Cavity/i }],
   },
 }
+
+/**
+ * 淡化雀斑（皮肤底色贴图里画的小颗橙褐色点），在缩图之后做：
+ *   和高斯模糊后的「平均肤色」比，比周围略深、色相接近肤色的像素往平均肤色拉 strength。
+ *   很深的（鼻孔、眼线）、色相不同的（眼影、唇彩、彩色眼线）不动；大块妆容模糊前后差不多，也基本不动。
+ *   radius = 模糊半径占贴图边长的比例；各人物可用 CHARACTERS[name].freckles 覆盖 strength（0 = 不处理）
+ */
+const FRECKLES = { materials: /^char_(Head|Body|Arms|Legs)$/, strength: 0.85, radius: 1 / 250 }
 
 /** 皮肤粗糙度贴图换常数；平均值低于 min 视为错误贴图，取 fallback */
 const SKIN = { match: /HD_/i, min: 0.2, fallback: 0.58 }
@@ -392,7 +412,10 @@ async function build(src, name) {
       node.dispose()
       continue
     }
-    for (const prim of mesh.listPrimitives()) if (DROP_MATERIAL.test(prim.getMaterial()?.getName() ?? '')) prim.dispose()
+    for (const prim of mesh.listPrimitives()) {
+      const mat = prim.getMaterial()?.getName() ?? ''
+      if (DROP_MATERIAL.test(mat) || character.drop?.test(mat)) prim.dispose()
+    }
     if (!mesh.listPrimitives().length) node.dispose()
   }
 
@@ -499,6 +522,13 @@ async function build(src, name) {
     await reencode(tex, sharp(tex.getImage()).resize(Math.max(4, Math.round((w * s) / 4) * 4), Math.max(4, Math.round((h * s) / 4) * 4)))
   }
 
+  const freckleStrength = character.freckles ?? FRECKLES.strength
+  if (freckleStrength > 0) {
+    const skinTex = root.listTextures().filter((t) => [...materialsOf(t)].some((m) => FRECKLES.materials.test(m.getName()) && m.getBaseColorTexture() === t))
+    for (const tex of skinTex) await reduceFreckles(tex, freckleStrength)
+    if (skinTex.length) console.log(`  雀斑     → ${skinTex.length} 张皮肤贴图淡化 ${Math.round(freckleStrength * 100)}%`)
+  }
+
   await doc.transform(
     dedup(),
     prune(),
@@ -518,6 +548,39 @@ async function build(src, name) {
 /** 材质有没有用任何贴图（核心槽位或扩展里的） */
 function materialHasTextures(mat) {
   return mat.getGraph().listChildren(mat).some((c) => c.propertyType === 'Texture' || mat.getGraph().listChildren(c).some((cc) => cc.propertyType === 'Texture'))
+}
+
+async function reduceFreckles(tex, strength) {
+  const { data, info } = await sharp(tex.getImage()).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+  const { width, height } = info
+  const sigma = Math.max(1, width * FRECKLES.radius)
+  const blur = await sharp(data, { raw: { width, height, channels: 3 } }).blur(sigma).raw().toBuffer()
+  const out = Buffer.from(data)
+  const lum = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b
+  const smooth = (a, b, x) => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+  }
+  for (let i = 0; i < data.length; i += 3) {
+    const r = data[i], g = data[i + 1], b = data[i + 2]
+    const br = blur[i], bg = blur[i + 1], bb = blur[i + 2]
+    const L = lum(r, g, b), Lb = lum(br, bg, bb)
+    if (L >= Lb || Lb < 1) continue
+    // 比周围深多少：雀斑一般 3–30%，鼻孔 / 眼线更深
+    const dark = (Lb - L) / Lb
+    // 色相（0–1）：肤色和雀斑都在橙红（约 0.0–0.1）
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn
+    if (d < 1) continue
+    let hue = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4
+    hue /= 6
+    const hueDist = Math.min(Math.abs(hue - 0.05), 1 - Math.abs(hue - 0.05))
+    const w = strength * (1 - smooth(0.06, 0.1, hueDist)) * (1 - smooth(0.35, 0.5, dark))
+    if (w <= 0) continue
+    out[i] = r + (br - r) * w
+    out[i + 1] = g + (bg - g) * w
+    out[i + 2] = b + (bb - b) * w
+  }
+  await reencode(tex, sharp(out, { raw: { width, height, channels: 3 } }))
 }
 
 /** 用 sharp 处理后写回贴图：JPEG 保持 JPEG，其余（PNG / WebP）存成 PNG（保留透明通道） */

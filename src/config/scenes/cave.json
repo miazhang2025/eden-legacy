@@ -26,12 +26,12 @@
     "extraColliders": "/models/colliders/cave.character.glb",
     "extrasTransform": {
       "position": [
-        -2,
+        1.1102230246251565e-16,
         -0.5,
         0.5
       ],
-      "rotationY": -0.41000000000000003,
-      "scale": 1.33
+      "rotationY": null,
+      "scale": 1
     },
     "scale": 1,
     "position": [
@@ -39,7 +39,7 @@
       0,
       0
     ],
-    "rotationY": 0
+    "rotationY": null
   },
   "character": {
     "moveSpeed": 2,
@@ -987,85 +987,6 @@
     }
   },
   "materials": {
-    "SC38_CRYSTAL": {
-      "emissiveIntensity": 0,
-      "transparent": true
-    },
-    "SC39_CRYSTAL": {
-      "emissiveIntensity": 0,
-      "transparent": true,
-      "side": "front",
-      "transmission": 0.75,
-      "opacity": 0.85,
-      "normalScale": 0,
-      "envMapIntensity": 0.8200000000000001,
-      "clearcoat": 0.24
-    },
-    "SC40_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0,
-      "transparent": true,
-      "roughness": 0.13,
-      "transmission": 0.6,
-      "opacity": 0.76
-    },
-    "SC41_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0,
-      "transparent": true,
-      "roughness": 0.21,
-      "clearcoat": 0.1,
-      "transmission": 0.87,
-      "opacity": 0.62
-    },
-    "SC42_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0,
-      "transparent": true,
-      "roughness": 0.07,
-      "opacity": 0.52,
-      "transmission": 0.8300000000000001
-    },
-    "SC43_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0,
-      "transparent": true,
-      "roughness": 0.08
-    },
-    "SC45_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0,
-      "transparent": true,
-      "roughness": 0.62,
-      "opacity": 0.49999999999999994,
-      "transmission": 0.35000000000000003,
-      "envMapIntensity": 1.09,
-      "normalScale": 1.6300000000000001
-    },
-    "SC46_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0,
-      "transparent": true,
-      "roughness": 0.11,
-      "transmission": 0.64,
-      "opacity": 0.75
-    },
-    "SC47_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0,
-      "transparent": true,
-      "roughness": 0.16,
-      "transmission": 0.3,
-      "opacity": 0.5800000000000001
-    },
-    "SC48_CRYSTAL": {
-      "emissive": "#d8a8ff",
-      "emissiveIntensity": 0,
-      "transparent": true,
-      "transmission": 0.79,
-      "opacity": 0.76,
-      "roughness": 0.09
-    },
     "SC29_plants": {
       "role": "static"
     },
@@ -1073,27 +994,17 @@
       "role": "static"
     },
     "SC36_PLANTS": {
-      "emissive": "#f5f5f5",
-      "transparent": true,
-      "roughness": 1,
-      "emissiveIntensity": 0,
-      "envMapIntensity": 0.65,
-      "opacity": 0.86,
       "role": "static",
       "transmission": 0.51,
-      "clearcoat": 1,
-      "normalScale": 1.04
-    },
-    "droplet_crystal": {
-      "emissive": "#858585"
+      "clearcoat": 1
     },
     "SC27_LAND": {
       "shadowLift": 0.8,
       "shadowLiftThreshold": 0.55
     },
     "SC20_LAND": {
-      "shadowLift": 0.8,
-      "shadowLiftThreshold": 0.55
+      "shadowLift": 1,
+      "shadowLiftThreshold": 0.9
     },
     "SC21_LAND": {
       "shadowLift": 0.8,
@@ -1190,42 +1101,6 @@
     "SC01_land": {
       "shadowLift": 0.8,
       "shadowLiftThreshold": 0.55
-    },
-    "char_礼服｜同纹包臀银纱": {
-      "color": "#d4d2d8",
-      "metalness": 0,
-      "envMapIntensity": 0.8,
-      "clearcoat": 0.12
-    },
-    "char_礼服｜水晶斜肩上身": {
-      "color": "#d4d2d8",
-      "metalness": 0,
-      "envMapIntensity": 0.8,
-      "clearcoat": 0.12
-    },
-    "char_礼服｜银纱垂饰": {
-      "color": "#d4d2d8",
-      "metalness": 0,
-      "envMapIntensity": 0.8,
-      "clearcoat": 0.12
-    },
-    "char_袖饰｜垂坠透明纱": {
-      "color": "#d4d2d8",
-      "metalness": 0,
-      "envMapIntensity": 0.8,
-      "clearcoat": 0.12
-    },
-    "char_礼服｜银蓝珠饰裙摆": {
-      "color": "#d4d2d8",
-      "metalness": 0,
-      "envMapIntensity": 0.8,
-      "clearcoat": 0.12
-    },
-    "char_袖饰｜水晶薄纱": {
-      "color": "#d4d2d8",
-      "metalness": 0,
-      "envMapIntensity": 0.8,
-      "clearcoat": 0.12
     }
   },
   "audio": {
@@ -1258,15 +1133,15 @@
       "id": "cave_ore_01",
       "position": [
         -2.2950000000000004,
-        0.2,
-        6.034
+        0.1,
+        6.534
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 1.43
+      "scale": 2.28
     },
     {
       "id": "cave_ore_02",
@@ -1348,6 +1223,9 @@
     "spinSpeed": 0.3,
     "assetLift": 0.8,
     "inspectDistance": 6,
+    "discoverScreenSize": 0.15,
+    "discoverFocusDuration": 1.4,
+    "discoverFocusDamping": 0.28,
     "inspectAngleDeg": 12,
     "introPromptSeconds": 6
   },

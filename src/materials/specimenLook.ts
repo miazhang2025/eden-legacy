@@ -62,6 +62,7 @@ uniform float uSpecSat;
 uniform float uSpecHueSat;
 uniform float uSpecBright;
 uniform vec3 uSpecTint;
+uniform float uSpecMinLight;
 `
 
 const shade = /* glsl */ `
@@ -75,6 +76,8 @@ if (uSpecMix > 0.0) {
   float sGloss = 1.0 - clamp(roughnessFactor, 0.0, 1.0);
   float sSpec = pow(max(dot(sN, normalize(uSpecKeyDir + sV)), 0.0), mix(8.0, 80.0, sGloss)) * sGloss;
   vec3 sLight = vec3(uSpecAmbient) + uSpecKeyColor * (uSpecKey * sKey) + uSpecFillColor * (uSpecFill * sFill) + vec3(uSpecRim * sRim);
+  // 单个资产的最低受光（背光的缝 / 凹处不至于发黑）
+  sLight = max(sLight, vec3(uSpecMinLight));
   vec3 sAlbedo = diffuseColor.rgb;
   float sLum = dot(sAlbedo, vec3(0.2126, 0.7152, 0.0722));
   sAlbedo = max(mix(vec3(sLum), sAlbedo, uSpecSaturation), 0.0);
@@ -97,6 +100,8 @@ export interface SpecimenGrade {
   brightness?: number
   /** 染色：调色后再乘这个颜色（浅色 / 白色部分整体染成该色），默认白 = 不变 */
   tint?: string
+  /** 影棚光的最低受光（0 = 不限；环境光为 0.5，受光面约 1.1–1.3）：背光的缝 / 凹处不发黑 */
+  minLight?: number
 }
 
 // 色相旋转（绕灰轴；可只转 hueCenter ± hueWidth 那一段，按色相距离柔和衰减），再调饱和度、亮度、染色
@@ -156,6 +161,7 @@ export function patchSpecimenLook(material: Material, g: SpecimenGrade = {}) {
     uSpecHueSat: { value: g.hueCenter === undefined ? 1 : (g.hueSaturation ?? 1) },
     uSpecBright: { value: g.brightness ?? 1 },
     uSpecTint: { value: new Color(g.tint ?? '#ffffff') },
+    uSpecMinLight: { value: g.minLight ?? 0 },
   }
   const prev = m.onBeforeCompile
   m.onBeforeCompile = (shader, renderer) => {

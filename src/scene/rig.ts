@@ -6,7 +6,12 @@ export const rig = {
   position: new Vector3(),
   yaw: 0,
   pitch: 0.25,
+  /** 发现资产时相机平滑转向它（FollowCamera 处理）：资产 id 与开始时刻（performance.now() 秒），id 为 null 表示没有在转 */
+  focus: { id: null as string | null, start: 0 },
 }
+
+/** 各交互资产的世界中心（不含上下浮动），CollectableAsset 逐帧写入，相机对焦用 */
+export const assetCenters = new Map<string, Vector3>()
 
 export function forwardFromYaw(yaw: number, out = new Vector3()) {
   return out.set(-Math.sin(yaw), 0, -Math.cos(yaw))

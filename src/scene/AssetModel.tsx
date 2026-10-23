@@ -98,7 +98,7 @@ export function AssetModel({
       if (!c) {
         c = m.clone()
         // 标本影棚光：场景里和标本盒里同一套着色，颜色接近效果图
-        patchSpecimenLook(c, grade)
+        patchSpecimenLook(c, def.materialGrades?.[m.name] ?? grade)
         cache.set(m, c)
         mats.push(c)
       }

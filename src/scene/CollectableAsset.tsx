@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { Color, DoubleSide, MathUtils, MeshStandardMaterial, type Group, type Material } from 'three'
+import { Color, DoubleSide, MathUtils, MeshStandardMaterial, Vector3, type Group, type Material } from 'three'
 import type { CollectableAssetDef } from '../data/assets'
 import { assetTransform, useAssetTransform } from '../state/assetPlacement'
 import { getSceneCfg, useSceneCfg } from '../state/useConfigStore'
@@ -10,7 +10,7 @@ import { groundHeightFromSky } from './collision'
 import { AssetModel } from './AssetModel'
 import { FoundMarker } from './FoundMarker'
 import { PlaceholderModel } from './PlaceholderModel'
-import { dampFactor } from './rig'
+import { assetCenters, dampFactor } from './rig'
 
 export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
   const group = useRef<Group>(null)
@@ -104,7 +104,9 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     }
 
     emissive.current = MathUtils.lerp(emissive.current, targetEmissive, dampFactor(f.emissiveDamping, dt))
-    const glow = placeholder ? emissive.current : f.assetSelfGlow + (def.selfGlow ?? 0) + emissive.current * f.assetGlowGain
+    const glow = placeholder
+      ? emissive.current
+      : (f.assetSelfGlow + (def.selfGlow ?? 0) + emissive.current * f.assetGlowGain) * (def.glowScale ?? 1)
     // 资产自己的常驻不透明度（def.opacity，如半透明的海蝶）叠在淡入淡出上
     const alpha = opacity * (placeholder ? 1 : (def.opacity ?? 1))
     for (const m of mats.current) {
@@ -123,7 +125,12 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     const lift = floating ? Math.sin(t * f.floatSpeed + phaseOffset) * f.floatAmplitude : 0
     g.position.y = ground.current.y + offsetY + f.assetLift + lift
     // 发现光点从资产中心（不含上下浮动）往外飘
-    marker.current?.position.set(x, ground.current.y + offsetY + f.assetLift + f.foundMarkerHeight, z)
+    // 资产中心（不含上下浮动）：发现光点从这里往外飘，相机对焦也看这里
+    const cy = ground.current.y + offsetY + f.assetLift
+    marker.current?.position.set(x, cy + f.foundMarkerHeight, z)
+    let center = assetCenters.get(def.id)
+    if (!center) assetCenters.set(def.id, (center = new Vector3()))
+    center.set(x, cy, z)
     if (floating) g.rotation.y += dt * f.spinSpeed
   })
 
@@ -143,6 +150,7 @@ export function CollectableAsset({ def }: { def: CollectableAssetDef }) {
     document.body.style.cursor = ''
   }
   useEffect(() => onOut, [])
+  useEffect(() => () => void assetCenters.delete(def.id), [def.id])
 
   return (
     <>
