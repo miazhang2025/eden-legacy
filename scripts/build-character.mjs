@@ -97,6 +97,9 @@ const PARTS = [
  *   cloth：做布料波动的 mesh（按 mesh 名），默认 CLOTH；null = 不做
  *   clothMaterials：做布料波动的图元（按材质名，规范化后的原名），和 cloth 叠加
  *   drop：额外删掉的图元（按规范化后的原材质名）
+ *   bezels：给宝石生成金属包边（导出里没有底托几何体时补上）：
+ *           { mesh（宝石所在 mesh 名）, gems（宝石材质名，规范化后）, material: { name, color, metallic, roughness },
+ *             scale（环比宝石轮廓大多少）, tube（环管半径，占宝石短半轴的比例）, offset（沿法线往底座方向挪，占宝石厚度的比例） }
  *   keepBlend：保留半透明混合（BLEND）的材质（按规范化后的原名）。默认 BLEND 会改成 alpha 裁切（头发面片排序会乱），
  *              但真正半透明的薄纱、玻璃泪滴裁切后会变成镂空的洞或整个消失
  *   normalSize：法线贴图边长上限（比部件规则更严；法线贴图走 UASTC，体积大）
@@ -150,6 +153,15 @@ const CHARACTERS = {
     // 头发根部的头皮罩（Hair_Root_Cap）在 Blender 里靠程序化透明度只露出发际线，导出后是整块不透明的黑色、盖住整张脸；
     // 雕刻发束和两侧补发已经把头盖全了，直接删掉
     drop: /soft_scalp/i,
+    // 参考渲染里每颗大椭圆宝石外有一圈底托，导出的 glb 里没有（宝石都是独立的椭球体）：按每颗宝石的轮廓生成细白边
+    bezels: {
+      mesh: /椭圆饰石/,
+      gems: /发带｜(暖白贝母|灰绿宝石|烟蓝宝石|浅灰玉石)/,
+      material: { name: '发带｜金属包边', color: [0.9, 0.9, 0.88], metallic: 0.15, roughness: 0.3 },
+      scale: 1.08,
+      tube: 0.06,
+      offset: 0.35,
+    },
     cloth: null,
     clothMaterials: /礼服|袖饰/,
     // 礼服每块都带一张 1024 法线贴图（UASTC 每张 1.2MB），远看看不出来
@@ -421,6 +433,10 @@ async function build(src, name) {
     node.setTranslation([0, 0, 0]).setRotation([0, 0, 0, 1]).setScale([1, 1, 1])
     scene.addChild(node)
   }
+  if (character.bezels) {
+    const n = buildBezels(doc, scene, character.bezels, idle?.neck ?? [0, 0, 0])
+    console.log(`  包边     → ${n} 颗宝石生成金属底托`)
+  }
   for (const a of root.listAnimations()) a.dispose()
   for (const s of root.listSkins()) s.dispose()
   for (const n of root.listNodes()) if (!n.getMesh()) n.dispose()
@@ -657,6 +673,123 @@ function headForward(root) {
     return normalize([m[8], m[9], m[10]])
   }
   return [0, 0, 1]
+}
+
+/** 3×3 对称矩阵的特征分解（Jacobi），返回按特征值从大到小排的 [值, 向量] */
+function eigen3(A) {
+  const a = A.map((r) => [...r])
+  const v = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+  for (let sweep = 0; sweep < 50; sweep++) {
+    let off = 0
+    for (let p = 0; p < 3; p++) for (let q = p + 1; q < 3; q++) off += a[p][q] ** 2
+    if (off < 1e-20) break
+    for (let p = 0; p < 3; p++) {
+      for (let q = p + 1; q < 3; q++) {
+        if (Math.abs(a[p][q]) < 1e-30) continue
+        const theta = (a[q][q] - a[p][p]) / (2 * a[p][q])
+        const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1))
+        const c = 1 / Math.sqrt(t * t + 1), sn = t * c
+        for (let k = 0; k < 3; k++) {
+          const akp = a[k][p], akq = a[k][q]
+          a[k][p] = c * akp - sn * akq
+          a[k][q] = sn * akp + c * akq
+        }
+        for (let k = 0; k < 3; k++) {
+          const apk = a[p][k], aqk = a[q][k]
+          a[p][k] = c * apk - sn * aqk
+          a[q][k] = sn * apk + c * aqk
+        }
+        for (let k = 0; k < 3; k++) {
+          const vkp = v[k][p], vkq = v[k][q]
+          v[k][p] = c * vkp - sn * vkq
+          v[k][q] = sn * vkp + c * vkq
+        }
+      }
+    }
+  }
+  return [0, 1, 2].map((i) => [a[i][i], [v[0][i], v[1][i], v[2][i]]]).sort((x, y) => y[0] - x[0])
+}
+
+/**
+ * 宝石金属包边：宝石图元里每个连通块（一颗宝石）做主成分分析，得到椭圆长 / 短轴和法线（最小方差方向，朝外）；
+ * 在宝石底部（沿法线往底座方向挪 offset × 厚度）套一个略大的椭圆环，环管截面是圆。
+ * 顶点在世界坐标（蒙皮已烘焙），_IDLE 取这颗宝石顶点的平均（跟着头一起动）。
+ */
+function buildBezels(doc, scene, cfg, neck) {
+  const SEG = 40, TUBE = 8
+  const pos = [], nrm = [], idl = [], ind = []
+  let count = 0
+  for (const node of scene.listChildren()) {
+    const mesh = node.getMesh()
+    if (!mesh || !cfg.mesh.test(mesh.getName())) continue
+    for (const prim of mesh.listPrimitives()) {
+      if (!cfg.gems.test(prim.getMaterial()?.getName() ?? '')) continue
+      const P = prim.getAttribute('POSITION'), I = prim.getAttribute('_IDLE'), idx = prim.getIndices().getArray()
+      // 连通块（按顶点下标，宝石之间不共用顶点）
+      const parent = [...Array(P.getCount()).keys()]
+      const find = (x) => (parent[x] === x ? x : (parent[x] = find(parent[x])))
+      for (let t = 0; t < idx.length; t += 3) {
+        parent[find(idx[t])] = find(idx[t + 1])
+        parent[find(idx[t + 1])] = find(idx[t + 2])
+      }
+      const islands = new Map()
+      for (let i = 0; i < P.getCount(); i++) {
+        const r = find(i)
+        if (!islands.has(r)) islands.set(r, [])
+        islands.get(r).push(i)
+      }
+      for (const verts of islands.values()) {
+        const pts = verts.map((i) => P.getElement(i, []))
+        const c = pts.reduce((a, p) => a.map((x, k) => x + p[k] / pts.length), [0, 0, 0])
+        const cov = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+        for (const p of pts) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) cov[a][b] += ((p[a] - c[a]) * (p[b] - c[b])) / pts.length
+        const [[, u], [, w], [, nn]] = eigen3(cov)
+        const out = dot(nn, sub(c, neck)) < 0 ? nn.map((x) => -x) : nn
+        const ext = (axis) => Math.max(...pts.map((p) => Math.abs(dot(sub(p, c), axis))))
+        const ru = ext(u) * cfg.scale, rw = ext(w) * cfg.scale, th = ext(out)
+        const tube = Math.min(ru, rw) * cfg.tube
+        const center = c.map((x, k) => x - out[k] * th * cfg.offset)
+        const idle = verts.reduce((a, i) => a.map((x, k) => x + I.getElement(i, [])[k] / verts.length), [0, 0, 0, 0])
+        idle[3] = 0
+        const base = pos.length / 3
+        for (let i = 0; i < SEG; i++) {
+          const a = (i / SEG) * Math.PI * 2
+          const ca = Math.cos(a), sa = Math.sin(a)
+          // 椭圆上一点及其在平面内的外法线
+          const ring = [0, 1, 2].map((k) => center[k] + u[k] * ru * ca + w[k] * rw * sa)
+          const radial = normalize([0, 1, 2].map((k) => u[k] * rw * ca + w[k] * ru * sa))
+          for (let j = 0; j < TUBE; j++) {
+            const b = (j / TUBE) * Math.PI * 2
+            const n = [0, 1, 2].map((k) => radial[k] * Math.cos(b) + out[k] * Math.sin(b))
+            pos.push(...ring.map((x, k) => x + n[k] * tube))
+            nrm.push(...n)
+            idl.push(...idle)
+          }
+        }
+        for (let i = 0; i < SEG; i++) {
+          for (let j = 0; j < TUBE; j++) {
+            const a = base + i * TUBE + j, b = base + ((i + 1) % SEG) * TUBE + j
+            const c2 = base + ((i + 1) % SEG) * TUBE + ((j + 1) % TUBE), d = base + i * TUBE + ((j + 1) % TUBE)
+            ind.push(a, b, d, b, c2, d)
+          }
+        }
+        count++
+      }
+    }
+  }
+  if (!count) return 0
+  const buffer = doc.getRoot().listBuffers()[0]
+  const { name, color, metallic, roughness } = cfg.material
+  const mat = doc.createMaterial(name).setBaseColorFactor([...color, 1]).setMetallicFactor(metallic).setRoughnessFactor(roughness)
+  const prim = doc
+    .createPrimitive()
+    .setMaterial(mat)
+    .setAttribute('POSITION', doc.createAccessor().setType('VEC3').setBuffer(buffer).setArray(new Float32Array(pos)))
+    .setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setBuffer(buffer).setArray(new Float32Array(nrm)))
+    .setAttribute('_IDLE', doc.createAccessor().setType('VEC4').setBuffer(buffer).setArray(new Float32Array(idl)))
+    .setIndices(doc.createAccessor().setType('SCALAR').setBuffer(buffer).setArray(new Uint32Array(ind)))
+  scene.addChild(doc.createNode('bezels').setMesh(doc.createMesh('发带｜金属包边').addPrimitive(prim)))
+  return count
 }
 
 /** 第一个动画第一帧的平移 / 旋转 / 缩放写到目标节点上；返回和节点原值不同的通道数 */
