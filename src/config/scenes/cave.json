@@ -26,12 +26,12 @@
     "extraColliders": "/models/colliders/cave.character.glb",
     "extrasTransform": {
       "position": [
-        5.551115123125783e-17,
-        2.7755575615628914e-17,
+        -1,
+        -0.30000000000000004,
         0.5
       ],
-      "rotationY": 0,
-      "scale": 1
+      "rotationY": 0.07,
+      "scale": 1.1
     },
     "scale": 1,
     "position": [
@@ -258,7 +258,10 @@
     "lookSpeed": 2,
     "skinBrightness": 1.2,
     "skinSaturation": 0.6,
-    "skinTint": "#fbfaff"
+    "skinTint": "#fbfaff",
+    "feltScale": 150,
+    "feltStrength": 2,
+    "feltSpeckle": 0.4
   },
   "bubble": {
     "centerOpacity": 0.08,
@@ -1101,6 +1104,15 @@
     "SC01_land": {
       "shadowLift": 0.8,
       "shadowLiftThreshold": 0.55
+    },
+    "char_发带｜古铜绿织面": {
+      "color": "#4f5650",
+      "metalness": 0.1,
+      "roughness": 0.8
+    },
+    "char_发带｜深色内衬": {
+      "color": "#2c322e",
+      "roughness": 0.85
     }
   },
   "audio": {

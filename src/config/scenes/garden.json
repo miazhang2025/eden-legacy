@@ -209,7 +209,10 @@
     "lookSpeed": 2,
     "skinBrightness": 1.28,
     "skinSaturation": 0.4,
-    "skinTint": "#f6ffe6"
+    "skinTint": "#f6ffe6",
+    "feltScale": 400,
+    "feltStrength": 0.6,
+    "feltSpeckle": 0.25
   },
   "bubble": {
     "centerOpacity": 0.08,

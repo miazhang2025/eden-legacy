@@ -104,6 +104,7 @@ const PARTS = [
  *              但真正半透明的薄纱、玻璃泪滴裁切后会变成镂空的洞或整个消失
  *   normalSize：法线贴图边长上限（比部件规则更严；法线贴图走 UASTC，体积大）
  *   tweaks：改面板调不到的材质参数（按规范化后的原名）：sheenColor（灰度）/ sheenRoughness / clearcoatRoughness /
+ *           felt（true：运行时加程序化毛毡纹理，写在材质 extras.edenFelt，参数在场景 config 的 figure.felt*）/
  *           saturation（底色贴图的饱和度倍数，烘进贴图；贴图被几个材质共用时只处理一次）/
  *           glass（改成透射材质 —— 透明液体 / 玻璃，透出后面的东西并折射；不透明、单面，运行时走 three 的透射通道，
  *                  场景里已经有透射材质时几乎不增加开销）：
@@ -171,6 +172,8 @@ const CHARACTERS = {
     // 礼服导出时是白色满强度天鹅绒光泽 + 近乎镜面的清漆层，在洞穴里整件发白：光泽压到 35%、清漆磨砂一些
     tweaks: [
       { match: /礼服|袖饰｜(垂坠透明纱|水晶薄纱)/, sheenColor: 0.35, sheenRoughness: 0.5, clearcoatRoughness: 0.35 },
+      // 头饰底座：参考渲染是深炭灰绿的毛毡面（颜色 / 粗糙度在 cave.json 的材质覆盖里）；没有 UV，纹理在运行时程序化生成
+      { match: /发带｜(古铜绿织面|深色内衬)/, felt: true },
       // 脸上的泪滴：导出是 15% 不透明的白色、双面，好几层叠起来成了乳白色的膏状条纹。改成透射的水
       // 清澈透明的泪水：几乎无色（极淡的紫），全透射，只靠高光和一点彩色反光显形；和紫色的钻石区分开
       {
@@ -477,6 +480,7 @@ async function build(src, name) {
     if (DROP_NORMAL.test(old)) mat.setNormalTexture(null)
     for (const t of character.tweaks ?? []) {
       if (!t.match.test(old)) continue
+      if (t.felt) mat.setExtras({ ...mat.getExtras(), edenFelt: true })
       const base = mat.getBaseColorTexture()
       if (base && t.saturation !== undefined && !desaturated.has(base)) {
         desaturated.add(base)

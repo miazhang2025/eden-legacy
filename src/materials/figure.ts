@@ -46,6 +46,10 @@ export const figureUniforms = {
   uFigureSkinBrightness: { value: 1 },
   uFigureSkinSaturation: { value: 1 },
   uFigureSkinTint: { value: new Color('#ffffff') },
+  // 毛毡纹理（build-character 标了 extras.edenFelt 的材质，如洞穴头饰底座）
+  uFigureFeltScale: { value: 400 },
+  uFigureFeltStrength: { value: 0.6 },
+  uFigureFeltSpeckle: { value: 0.25 },
 }
 
 export const isFigureMaterial = (name: string) => name.startsWith('char_')
@@ -70,6 +74,9 @@ export function updateFigureUniforms(cfg: SceneConfig) {
   u.uFigureSkinBrightness.value = f.skinBrightness ?? 1
   u.uFigureSkinSaturation.value = f.skinSaturation ?? 1
   u.uFigureSkinTint.value.set(f.skinTint ?? '#ffffff')
+  u.uFigureFeltScale.value = f.feltScale ?? 400
+  u.uFigureFeltStrength.value = f.feltStrength ?? 0.6
+  u.uFigureFeltSpeckle.value = f.feltSpeckle ?? 0.25
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +317,52 @@ const fragmentSkin = /* glsl */ `
 }
 `
 
+// 毛毡 / 丝绒纹理：模型没有 UV，用静止姿势的物体坐标（position）算 3D 值噪声，跟着模型走、不随头部转动漂移。
+//   凹凸：两层噪声叠加，用屏幕导数扰动法线（同 three 的 bumpMap 算法）；斑点：同一噪声轻微调颜色明暗。
+//   颗粒小于一个像素时（远处）按 fwidth 淡出，避免闪烁
+const feltVertexHead = /* glsl */ `
+varying vec3 vEdenFeltPos;
+`
+const feltFragmentHead = /* glsl */ `
+varying vec3 vEdenFeltPos;
+uniform float uFigureFeltScale;
+uniform float uFigureFeltStrength;
+uniform float uFigureFeltSpeckle;
+float edenFeltHash(vec3 p) {
+  p = fract(p * 0.3183099 + 0.1);
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+float edenFeltNoise(vec3 x) {
+  vec3 i = floor(x);
+  vec3 f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(edenFeltHash(i), edenFeltHash(i + vec3(1, 0, 0)), f.x), mix(edenFeltHash(i + vec3(0, 1, 0)), edenFeltHash(i + vec3(1, 1, 0)), f.x), f.y),
+    mix(mix(edenFeltHash(i + vec3(0, 0, 1)), edenFeltHash(i + vec3(1, 0, 1)), f.x), mix(edenFeltHash(i + vec3(0, 1, 1)), edenFeltHash(i + vec3(1, 1, 1)), f.x), f.y),
+    f.z);
+}
+float edenFelt(vec3 p) {
+  return 0.65 * edenFeltNoise(p) + 0.35 * edenFeltNoise(p * 2.7 + 13.1);
+}
+`
+const feltFragmentColor = /* glsl */ `
+vec3 edenFeltP = vEdenFeltPos * uFigureFeltScale;
+float edenFeltFade = 1.0 - smoothstep(0.35, 0.9, length(fwidth(edenFeltP)));
+float edenFeltH = edenFelt(edenFeltP);
+diffuseColor.rgb *= 1.0 + (edenFeltH - 0.5) * 2.0 * uFigureFeltSpeckle * edenFeltFade;
+`
+const feltFragmentNormal = /* glsl */ `
+{
+  vec3 sx = dFdx(-vViewPosition), sy = dFdy(-vViewPosition);
+  vec3 r1 = cross(sy, normal), r2 = cross(normal, sx);
+  float det = dot(sx, r1) * (gl_FrontFacing ? 1.0 : -1.0);
+  float h = edenFeltH * uFigureFeltStrength * edenFeltFade * 0.02;
+  vec3 grad = sign(det) * (dFdx(h) * r1 + dFdy(h) * r2);
+  normal = normalize(abs(det) * normal - grad);
+}
+`
+
 // Symbol.for：开发时热更新会把本模块再加载一份，全局共享的标记才能防止同一材质被补两遍（重复声明，编译失败）
 const PATCHED = Symbol.for('eden-figure')
 
@@ -321,6 +374,7 @@ export function patchFigure(material: Material) {
   // 水面（半透明、renderOrder 更大）后画时会盖到水面以上、本该在前面的裙子上，看起来像被吃掉一块
   if (m.transparent) m.depthWrite = true
   const skin = isFigureSkin(m.name)
+  const felt = m.userData?.edenFelt === true
   const prev = m.onBeforeCompile
   m.onBeforeCompile = (shader, renderer) => {
     prev?.call(m, shader, renderer)
@@ -331,6 +385,15 @@ export function patchFigure(material: Material) {
       .replace('#include <common>', `#include <common>\n${head}`)
       .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>\n${vertexDeform}`)
       .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed = edenPos;')
+    if (felt) {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `#include <common>\n${feltVertexHead}`)
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEdenFeltPos = position;')
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\n${feltFragmentHead}`)
+        .replace('#include <map_fragment>', `#include <map_fragment>\n${feltFragmentColor}`)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${feltFragmentNormal}`)
+    }
     if (skin) {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>\n${fragmentSkinHead}`)
@@ -338,7 +401,7 @@ export function patchFigure(material: Material) {
     }
   }
   const prevKey = m.customProgramCacheKey?.bind(m)
-  m.customProgramCacheKey = () => `${prevKey?.() ?? ''}|eden-figure${skin ? '-skin' : ''}`
+  m.customProgramCacheKey = () => `${prevKey?.() ?? ''}|eden-figure${skin ? '-skin' : ''}${felt ? '-felt' : ''}`
   m.needsUpdate = true
 }
 

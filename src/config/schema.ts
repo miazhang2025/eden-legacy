@@ -418,6 +418,12 @@ export interface FigureConfig {
   skinSaturation: number
   /** 皮肤色调（乘在皮肤颜色上，白色 = 不变） */
   skinTint: string
+  /** 毛毡纹理（标了 edenFelt 的材质，如洞穴头饰底座）：颗粒密度（越大越细） */
+  feltScale: number
+  /** 毛毡凹凸强度（0 = 关） */
+  feltStrength: number
+  /** 毛毡颜色斑点强度 */
+  feltSpeckle: number
 }
 
 export interface BubbleConfig {
@@ -1467,6 +1473,9 @@ export const SCENE_SCHEMA: SchemaFor<SceneConfig> = {
     skinBrightness: num(0.5, 2, 0.01, 'skinBrightness', '皮肤亮度（>1 提亮）'),
     skinSaturation: num(0, 1.5, 0.01, 'skinSaturation', '皮肤饱和度（<1 更白净）'),
     skinTint: color('skinTint 皮肤色调'),
+    feltScale: num(20, 2000, 1, 'feltScale', '毛毡颗粒密度（越大越细）'),
+    feltStrength: num(0, 3, 0.01, 'feltStrength', '毛毡凹凸强度'),
+    feltSpeckle: num(0, 1, 0.01, 'feltSpeckle', '毛毡斑点强度'),
   },
   bubble: {
     _label: '泡泡 bubble',
